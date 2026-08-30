@@ -6,102 +6,101 @@ Josi ist eine kleine, lokal laufende Musik-App für das iPad. Nutzer importieren
 
 Der Proof of Concept validiert vor allem den Ablauf **Importieren → organisieren → zuverlässig abspielen** und erweitert ihn schrittweise um Funktionen für größere lokale Musiksammlungen.
 
-## Zielgruppe
-
-Nutzer mit eigenen Musikdateien auf dem iPad, die diese ohne Streamingdienst einfach in Playlists organisieren und abspielen möchten.
-
 ## Kernfunktionen
 
 - Mehrere lokale Audiodateien über den normalen Dateidialog importieren und lokal speichern.
 - Bibliothek aller importierten Songs.
-- Unter „Bibliothek“ ein eigener „Verlauf“-Tab mit chronologisch importierten Dateien.
-- Songs des neuesten Imports blau markieren; ein neuer Import normalisiert automatisch die vorherige blaue Gruppe.
-- Einen Song per Langdruck „Als gesehen markieren“ oder alle neuen Songs gleichzeitig als gesehen markieren.
-- Unter „Verlauf“ ein eigener „Loops“-Tab für Songs mit gespeichertem Loop-Vorschlag.
-- Songs mit gespeichertem Loop am rechten Ende ihrer Zeile mit einer roten Schleife markieren.
-- Songdetailansicht mit experimenteller Loop-Analyse: Josi schlägt Start und Ende eines Loops vor und zeigt einen Vertrauenswert. Der Nutzer kann den Vorschlag aktivieren, neu analysieren oder entfernen.
-- Linke Navigation und Songbereich unabhängig voneinander scrollen.
-- Player mit Play/Pause, Vor, Zurück, Fortschrittsanzeige, Autoplay, Shuffle und Wiederholung.
-- Lange Songtitel im kompakten „Jetzt“-Bereich automatisch horizontal durchlaufen lassen.
+- Verlauf für zuletzt importierte Dateien und blaue Markierung des neuesten Imports.
+- Eigener „Loops“-Tab für Songs mit gespeichertem Loop-Vorschlag.
+- Songs mit Loop durch eine rote Schleife am rechten Ende markieren.
+- Experimentelle lokale Loop-Analyse in der Songdetailansicht.
+- Player mit Play/Pause, Vor, Zurück, Fortschritt, Autoplay, Shuffle und Wiederholung.
+- Lange Songtitel im kompakten Player automatisch horizontal durchlaufen lassen.
 - Mehrere Playlists erstellen, umbenennen, bebildern und löschen.
-- Unter jedem Songtitel anzeigen, in welchen Playlists der Song enthalten ist; sonst „In keiner Playlist“.
-- In allen Songlisten eine „Auswählen“-Funktion verwenden, mehrere Songs markieren und gesammelt einer Playlist zuordnen.
-- Die Playlist-Zuordnung unten rechts über einen einzigen Kasten „Alle Playlists“ öffnen. Die Liste ist alphabetisch bzw. numerisch gruppiert; Zahlen und Symbole stehen vor den Buchstaben-Gruppen.
-- Reihenfolge von Songs in Bibliothek und Playlist bearbeiten.
-- Reihenfolge der Playlists links bearbeiten; der Modus wird durch einen einsekündigen Langdruck auf „Playlists“ angeboten.
-- Derselbe Langdruck bietet zusätzlich „Übersicht“ an. Diese Ansicht zeigt Playlists bildschirmfüllend als Galerie mit vier Karten pro Reihe auf iPad-Größe.
-- Sortieren ohne langes Ziehen: Element auswählen, zur Zielstelle scrollen, Zwischenraum antippen, rote Zielmarkierung sehen und mit Haken bestätigen oder mit X abbrechen.
-- Oben links stehen in dieser Reihenfolge Zurück, Vor, Undo und Redo. Bei einer vorgemerkten Verschiebung folgen rechts davon Haken und X.
-- Media-Session-Integration für System-Mediensteuerungen, soweit der verwendete Browser/iPadOS dies bereitstellt.
-- Installierbare PWA ohne Backend.
+- Unter jedem Songtitel anzeigen, in welchen Playlists er enthalten ist.
+- In allen Songlisten mehrere Songs über „Auswählen“ markieren.
+- Die Playlist-Zuordnung für Einzel- und Mehrfachauswahl ausschließlich über „Alle Playlists“ unten rechts öffnen.
+- Playlist-Dialog nach Symbolen, Zahlen und anschließend Buchstaben gruppieren.
+- Alle früheren Langdruck-Aktionen durch sichtbare Drei-Punkte-Menüs `•••` ersetzen.
+- Alle Songlisten nach mehreren Kriterien sortierbar machen, ohne die manuelle Reihenfolge zu überschreiben.
+- Lieddauer als `MM:SS` direkt in den Songzeilen anzeigen.
+- Vollständig gehörte Wiedergaben zählen; übersprungene Songs erhöhen den Zähler nicht.
+- Oben links Zurück, Vor, Undo und Redo; bei vorgemerkter manueller Verschiebung zusätzlich Haken und X.
+- Media-Session-Integration für System-Mediensteuerungen, soweit Browser/iPadOS dies bereitstellt.
 
-## Zentrale Abläufe
+## Bedienprinzip Drei-Punkte-Menüs
 
-### Musik importieren
+Langdruck wird vollständig aus der App entfernt, weil diese Geste mit Scrollen, Auswahl und iPadOS-Gesten kollidieren kann.
 
-1. Nutzer tippt auf „Musik importieren“.
-2. Der normale Dateidialog öffnet sich.
-3. Eine oder mehrere Audiodateien werden ausgewählt.
-4. Josi markiert die bisherige „Neu“-Gruppe als gesehen.
-5. Josi speichert die neuen Dateien lokal und markiert genau diesen neuesten Import blau.
-6. Die Dateien erscheinen zusätzlich im Verlauf mit Importzeitpunkt.
+Stattdessen steht ein sichtbarer `•••`-Knopf an Stellen mit zusätzlichen Funktionen:
 
-Der experimentelle Ordnerimport wurde wieder entfernt, weil er im Zielgerät nicht zuverlässig funktioniert hat.
+- bei Songs,
+- bei Playlists,
+- neben der Überschrift „Playlists“.
 
-### Neue Importe prüfen
+Das Menü ist gleichzeitig der vorgesehene Platz für künftige Zusatzfunktionen. Bei Songs enthält es unter anderem „Als gesehen markieren“ und „Loop erstellen“.
 
-1. Songs des neuesten Imports sind in Bibliothek und Verlauf blau hervorgehoben.
-2. Ein etwa einsekündiger Langdruck auf einen Song öffnet ein kleines Menü.
-3. „Als gesehen markieren“ entfernt die blaue Markierung nur bei diesem Song.
-4. „Alle als gesehen markieren“ entfernt alle aktuellen Neu-Markierungen.
-5. Beim nächsten Import werden verbliebene Markierungen des vorherigen Imports automatisch normalisiert.
-
-### Mehrere Songs auswählen
+## Mehrere Songs auswählen
 
 1. In Bibliothek, Playlist, Verlauf oder Loops wird „Auswählen“ gewählt.
-2. Mehrere Songs werden markiert; „Alle“ markiert die aktuell sichtbare Liste vollständig.
-3. „Zu Playlist“ öffnet die alphabetisch gruppierte Playlist-Liste.
-4. Ein Tipp auf eine Playlist fügt alle ausgewählten Songs hinzu, ohne Audiodateien zu duplizieren.
+2. Mehrere Songs können markiert werden; „Alle“ markiert die komplette aktuell sichtbare Liste.
+3. Der bisherige Kopfzeilen-Knopf „Zu Playlist“ entfällt.
+4. Unten rechts bleibt „Alle Playlists“ aktiv und öffnet den Playlist-Dialog für die gesamte Auswahl.
+5. Ein Tipp auf eine Playlist fügt alle ausgewählten Songs hinzu, ohne Audiodateien zu duplizieren.
 
-### Playlist-Zuordnung des aktuellen Songs
+Damit gibt es nur noch einen einzigen Weg zur Playlist-Zuordnung.
 
-1. Unten rechts steht nur der Kasten „Alle Playlists“.
-2. Ein Tipp öffnet die vollständige Playlist-Liste.
-3. Gruppen werden in der Reihenfolge Symbole, Zahlen und danach Buchstaben angezeigt.
-4. Innerhalb jeder Gruppe stehen Playlists alphabetisch.
-5. Plus bzw. Minus fügt den aktuellen Song hinzu oder entfernt ihn sofort.
+## Sortierung von Songlisten
 
-### Loop-Vorschlag
+Alle Listen mit Lieddateien bieten dieselben Optionen:
 
-1. Nutzer öffnet die nähere Songansicht.
-2. „Loop vorschlagen“ analysiert die Audiodatei lokal auf dem Gerät.
-3. Josi vergleicht kurze Klangabschnitte und sucht zwei Stellen, die als Übergang ähnlich klingen.
-4. Ein vorgeschlagener Start- und Endpunkt sowie ein Vertrauenswert werden angezeigt.
-5. „Loop aktivieren“ lässt den Player beim Endpunkt zum Startpunkt springen.
-6. „Neu analysieren“ berechnet einen neuen Vorschlag; „Loop entfernen“ löscht den gespeicherten Vorschlag.
-7. Songs mit gespeichertem Vorschlag tragen in Listen eine rote Schleife und erscheinen im Tab „Loops“.
+- **Manuell** – die selbst erstellte Reihenfolge.
+- **A–Z Anfang** – Vergleich ab dem Anfang des Titels.
+- **A–Z Ende** – Vergleich ab dem Ende des Titels nach vorne.
+- **Anzahl des Hörens** – Zahl vollständig gehörter Wiedergaben.
+- **Dauer** – Länge des Liedes.
+- **Chronik** – Zeitpunkt des Imports.
 
-Die Loop-Erkennung ist ausdrücklich experimentell. Sie erkennt klangliche Ähnlichkeit, aber nicht zuverlässig musikalische Absicht, Taktstruktur oder den perfekten Übergang bei jedem Lied.
+Neben der Sortieroption steht ein Pfeil. Pfeil nach unten zeigt die normale Richtung des gewählten Kriteriums, Pfeil nach oben kehrt sie um. Bei „Manuell“ ist der Pfeil deaktiviert.
 
-### Playlist-Übersicht
+Beispiel: „A–Z Anfang“ mit Pfeil nach unten ergibt A–Z, mit Pfeil nach oben Z–A.
 
-1. Nutzer hält „Playlists“ links etwa eine Sekunde gedrückt.
-2. Neben „Bearbeiten“ erscheint „Übersicht“.
-3. „Übersicht“ öffnet eine bildschirmfüllende Playlist-Galerie.
-4. Auf iPad-Größe stehen vier Playlists in einer Reihe mit großzügigem Abstand.
-5. Jede Karte zeigt Playlist-Bild bzw. Icon, vollständigen Namen und Liedanzahl.
+Wichtig: Keine automatische Sortierung verändert die manuelle Reihenfolge. Sie wird separat gespeichert und erscheint unverändert wieder, sobald „Manuell“ gewählt wird.
 
-### Navigation und Bearbeitungsverlauf
+## Lieddauer und Höranzahl
 
-- Zurück und Vor öffnen die vorherige bzw. nächste besuchte App-Ansicht.
-- Undo und Redo stehen direkt rechts daneben und betreffen den Bearbeitungsverlauf.
-- Bei einer vorgemerkten Verschiebung erscheinen rechts von diesen vier Knöpfen ein grüner Haken und ein rotes X.
+Die App versucht beim Import die Dauer lokal zu ermitteln. Zusätzlich wird die Dauer beim ersten Laden eines Songs im Player gespeichert. In den Songzeilen steht sie im Format `MM:SS`.
 
-### System-Mediensteuerung
+Ein Song zählt als vollständig gehört, wenn der Player sein natürliches Ende erreicht. Wechsel zum nächsten Song, Zurückspringen oder anderes manuelles Überspringen erhöht den Zähler nicht.
 
-- Josi meldet den aktuellen Song und den Wiedergabestatus über die Media Session API an den Browser.
-- Unterstützte Systemoberflächen können dadurch Play/Pause, vorherigen/nächsten Song und Positionswechsel anbieten.
-- Die PWA versucht die Wiedergabe beim App-Wechsel fortzuführen. Das tatsächliche Hintergrundverhalten wird jedoch von Safari/iPadOS gesteuert.
+## Loop-Vorschlag
+
+1. Nutzer öffnet die nähere Songansicht oder wählt im `•••`-Menü „Loop erstellen“.
+2. Josi analysiert die Audiodatei lokal.
+3. Ein vorgeschlagener Start- und Endpunkt sowie ein Vertrauenswert werden gespeichert.
+4. In der Detailansicht kann der Loop aktiviert, neu analysiert oder entfernt werden.
+5. Songs mit gespeichertem Loop tragen eine rote Schleife und erscheinen im Tab „Loops“.
+
+Die Erkennung ist experimentell und erkennt klangliche Ähnlichkeit, aber nicht zuverlässig musikalische Absicht oder perfekte Taktgrenzen.
+
+## Playlist-Verwaltung
+
+Das `•••` neben „Playlists“ ersetzt den früheren Langdruck und bietet insbesondere:
+
+- Bearbeiten der manuellen Playlist-Reihenfolge,
+- Öffnen der großen Playlist-Übersicht.
+
+Auch einzelne Playlist-Einträge besitzen `•••` für playlistbezogene Aktionen.
+
+## Navigation und Bearbeitungsverlauf
+
+- Zurück und Vor öffnen die vorherige bzw. nächste besuchte Ansicht.
+- Undo und Redo stehen direkt rechts daneben.
+- Bei einer vorgemerkten manuellen Verschiebung erscheinen rechts von diesen vier Knöpfen ein grüner Haken und ein rotes X.
+
+## System-Mediensteuerung
+
+Josi meldet aktuellen Song und Wiedergabestatus über die Media Session API. Unterstützte Systemoberflächen können Play/Pause, vorherigen/nächsten Song und Positionswechsel anbieten. Die tatsächliche Hintergrundwiedergabe wird weiterhin von Safari/iPadOS gesteuert.
 
 ## Abgrenzung
 
@@ -109,20 +108,21 @@ Noch nicht Teil der aktuellen Version:
 
 - Cloud-Synchronisierung oder Backend,
 - Nutzerkonten im Produktablauf,
-- automatische Metadaten-/Cover-Erkennung für Songs,
+- automatische Metadaten-/Cover-Erkennung,
 - Suche,
 - Musik-Streaming,
-- manuelles Feintuning der automatisch vorgeschlagenen Loop-Punkte,
+- manuelles Feintuning der Loop-Punkte,
 - Crossfade/Fading,
 - native iOS-Hintergrund-Audio-Berechtigungen außerhalb der Möglichkeiten einer PWA.
+
+Der experimentelle Ordnerimport bleibt entfernt.
 
 ## Offene Annahmen
 
 - Die lokale Browser-Speicherkapazität reicht für einen realistischen ersten Test.
 - Relevante Audioformate werden von Safari/iPadOS zuverlässig abgespielt.
-- Der Verlauf und die blaue Neu-Markierung helfen bei größeren Importen, neue Dateien schnell wiederzufinden.
-- Mehrfachauswahl reduziert den Aufwand beim Zuordnen größerer Songgruppen zu Playlists.
-- Die gruppierte „Alle Playlists“-Ansicht bleibt auch bei vielen Playlists schnell verständlich.
-- Die experimentelle Loop-Analyse liefert bei einem relevanten Anteil der realen Musiksammlung brauchbare Vorschläge; dies muss praktisch getestet werden.
-- Media-Session-Steuerungen funktionieren auf den verwendeten iPadOS-/Safari-Versionen ausreichend zuverlässig für den PoC.
-- Für eine spätere Produktversion müssen Backup, Speichergrenzen, Datenverlust bei Browser-/Gerätebereinigung und gegebenenfalls eine native App-Hülle geprüft werden.
+- Drei-Punkte-Menüs sind auf dem iPad robuster als Langdruck-Gesten.
+- Die manuelle Reihenfolge bleibt verständlich, obwohl temporär andere Sortierungen verwendet werden können.
+- Höranzahl und Dauer sind hilfreiche Kriterien für größere Sammlungen.
+- Die Daueranalyse beim Import bleibt bei realistischen Dateimengen schnell genug.
+- Die experimentelle Loop-Analyse liefert bei einem relevanten Anteil der realen Musiksammlung brauchbare Vorschläge.
