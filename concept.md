@@ -54,6 +54,10 @@ Der Import bleibt bewusst leichtgewichtig. Nur neu ausgewählte Dateien werden g
 
 `--:--` bedeutet unbekannte Dauer. `FEHLT` bedeutet, dass der lokale Audioblob nicht mehr vorhanden ist und der Song neu importiert werden muss.
 
+Wichtig für die Datenintegrität: Die eigentliche Audiodatei und spätere Änderungen an einem Song werden getrennt gespeichert. **Loop speichern, Umbenennen, Dauer, Hörzähler, „gelesen“ und Sortierung dürfen die Audiodatei selbst nicht erneut schreiben.** Dadurch kann eine reine Bearbeitung die importierte Datei nicht mehr durch einen erneuten Blob-Schreibvorgang beschädigen.
+
+Dateien, die bereits vor dieser Änderung beschädigt oder leer geworden sind, können von der App nicht wiederhergestellt werden und müssen erneut importiert werden.
+
 ## Mehrfachauswahl
 
 „Auswählen“ funktioniert in Bibliothek, Playlist, Verlauf und Loops. Mehrere markierte Songs werden ausschließlich über den Kasten **„Alle Playlists“** unten rechts einer Playlist zugeordnet.
@@ -100,13 +104,13 @@ Die Wellenform entspricht dem, was man aus Schnittprogrammen kennt: Sie zeigt ni
 
 Das Bedienprinzip priorisiert große, eindeutige Touch-Flächen. Unsichtbare Trefferbereiche dürfen größer als die sichtbaren Striche sein, solange sie sich nicht gegenseitig blockieren. Besonders der blaue Cursor nimmt deshalb entlang seines Strichs keine Eingaben an; nur der blaue Punkt ist greifbar.
 
-Beim Abspielen innerhalb des Editors springt die Wiedergabe nur dann am Loop-Ende wieder zum Loop-Start, wenn **Cursor-Loop** eingeschaltet ist. **Loop speichern** übernimmt Start, Ende, Marker und aktiviert den gespeicherten Song-Loop. Gespeicherte Loops werden weiterhin mit einer roten Schleife markiert und im Tab **Loops** gesammelt.
+Beim Abspielen innerhalb des Editors springt die Wiedergabe nur dann am Loop-Ende wieder zum Loop-Start, wenn **Cursor-Loop** eingeschaltet ist. **Loop speichern** übernimmt Start, Ende, Marker und aktiviert den gespeicherten Song-Loop. Diese Werte werden nur als Metadaten gespeichert; die Audiodatei selbst bleibt unangetastet. Gespeicherte Loops werden weiterhin mit einer roten Schleife markiert und im Tab **Loops** gesammelt.
 
 ## Wiedergabe nach Loop-Bearbeitung
 
-Das Speichern oder Umschalten eines Loops darf die zugrunde liegende Audiodatei nicht neu laden. Die Audioquelle wird deshalb nur dann neu erzeugt, wenn sich der ausgewählte Song oder dessen tatsächlicher Datei-Blob ändert.
+Das Speichern oder Umschalten eines Loops darf die zugrunde liegende Audiodatei weder neu laden noch neu in IndexedDB schreiben. Die Audioquelle wird nur dann neu erzeugt, wenn sich der ausgewählte Song oder dessen tatsächlicher Datei-Blob ändert.
 
-Änderungen wie Loop speichern, Loop an/aus, Marker, Dauer oder Umbenennen verändern nur Metadaten. Dadurch bleibt die Wiedergabequelle stabil und Songs sollen nach der Loop-Bearbeitung sowohl **mit aktiviertem Loop als auch ohne Loop** normal startbar bleiben.
+Änderungen wie Loop speichern, Loop an/aus, Marker, Dauer oder Umbenennen verändern nur Metadaten. Dadurch bleibt die Wiedergabequelle stabil und die importierte Datei geschützt.
 
 ## Teilen
 
@@ -140,5 +144,5 @@ Der experimentelle Ordnerimport bleibt entfernt.
 - Systemfreigabe von Audiodateien funktioniert auf den tatsächlich verwendeten iPadOS-/Safari-Versionen ausreichend zuverlässig.
 - Die klassische Amplituden-Wellenform ist auf realen Musikdateien schnell genug berechenbar und hilft bei der Loop-Auswahl.
 - Die vergrößerten Trefferflächen und die getrennte Fokus-Leiste machen den Editor auf Touch-Geräten zuverlässiger bedienbar.
-- Die Audioquelle bleibt bei reinen Loop-Metadatenänderungen stabil.
+- Die getrennte Speicherung von Audiodatei und Metadaten verhindert, dass reine Bearbeitungsschritte bestehende Audiodaten erneut schreiben.
 - Für eine spätere Produktversion müssen Backup, Speichergrenzen, Wiederherstellung verlorener Audiodaten und eventuell eine native App-Hülle geprüft werden.
