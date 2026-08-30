@@ -80,17 +80,27 @@ Der Editor enthält:
 - einen **roten Loop-Kasten** mit verschiebbarem Gesamtbereich,
 - getrennte rote Start- und Endkanten,
 - **Zoom von 1× bis 16×** und horizontales Scrollen,
+- eine klassische **Audio-Wellenform** als Amplitude über Zeit,
 - einen **blauen Abspielstrich**, der unabhängig vom roten Bereich bewegt werden kann,
 - einen Schalter, der den roten Loop-Bereich transparent und unbeweglich macht,
 - **−5 s**, **Play/Pause** und **+5 s**,
 - **orange Markierungen**, die an der Position des blauen Cursors gesetzt werden,
 - anklickbare orange Markierungen, die den blauen Cursor direkt dorthin bringen,
 - einen Schalter zum Aktivieren/Deaktivieren der Markierungsbedienung,
-- **−10 ms / +10 ms** für die zuletzt berührte rote Start- oder Endkante,
+- ein Eingabefeld für die **Feinschrittweite der zuletzt berührten roten Kante**, z. B. `0,01` = 10 ms, `0,1` = 100 ms oder `1` = eine Sekunde,
+- zwei Knöpfe **− Schritt / + Schritt**, die genau diese eingestellte Schrittweite verwenden,
 - ein Eingabefeld für einen frei wählbaren Vorlauf in Sekunden, z. B. `0,5` oder `1`,
 - **vor Start abspielen** und **vor Ende abspielen**, die den blauen Cursor entsprechend vor die gewünschte rote Kante setzen und die Wiedergabe starten.
 
+Die Wellenform entspricht dem, was man aus Schnittprogrammen kennt: Sie zeigt nicht die Frequenz in Hertz, sondern die Stärke des Audios über die Zeit. Das macht Einsätze, Pausen und Übergänge leichter sichtbar. Kann die Datei lokal nicht für die Wellenform dekodiert werden, bleibt der Song trotzdem normal abspielbar.
+
 Beim Abspielen innerhalb des Editors springt die Wiedergabe am Loop-Ende wieder zum Loop-Start. **Loop speichern** übernimmt Start, Ende, Marker und aktiviert den Loop. Gespeicherte Loops werden weiterhin mit einer roten Schleife markiert und im Tab **Loops** gesammelt.
+
+## Wiedergabe nach Loop-Bearbeitung
+
+Das Speichern oder Umschalten eines Loops darf die zugrunde liegende Audiodatei nicht neu laden. Die Audioquelle wird deshalb nur dann neu erzeugt, wenn sich der ausgewählte Song oder dessen tatsächlicher Datei-Blob ändert.
+
+Änderungen wie Loop speichern, Loop an/aus, Marker, Dauer oder Umbenennen verändern nur Metadaten. Dadurch bleibt die Wiedergabequelle stabil und Songs sollen nach der Loop-Bearbeitung sowohl **mit aktiviertem Loop als auch ohne Loop** normal startbar bleiben.
 
 ## Teilen
 
@@ -112,6 +122,7 @@ Noch nicht Teil der aktuellen Version:
 - Suche,
 - Musik-Streaming,
 - automatische Loop-Erkennung,
+- Frequenz-Spektrogramm,
 - Crossfade/Fading,
 - native iOS-Hintergrund-Audio-Berechtigungen außerhalb der Möglichkeiten einer PWA.
 
@@ -120,7 +131,7 @@ Der experimentelle Ordnerimport bleibt entfernt.
 ## Offene Annahmen
 
 - Die lokale Browser-Speicherkapazität reicht für einen realistischen Test.
-- Das neue Datei-Löschen und Kopieren bleibt auch bei größeren Bibliotheken schnell genug.
 - Systemfreigabe von Audiodateien funktioniert auf den tatsächlich verwendeten iPadOS-/Safari-Versionen ausreichend zuverlässig.
-- Der präzise manuelle Loop-Editor ist für echte Musikdateien nützlicher als eine automatische Heuristik.
+- Die klassische Amplituden-Wellenform ist auf realen Musikdateien schnell genug berechenbar und hilft bei der Loop-Auswahl.
+- Die Audioquelle bleibt bei reinen Loop-Metadatenänderungen stabil.
 - Für eine spätere Produktversion müssen Backup, Speichergrenzen, Wiederherstellung verlorener Audiodaten und eventuell eine native App-Hülle geprüft werden.
