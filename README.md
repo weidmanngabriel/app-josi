@@ -1,32 +1,26 @@
-# PWA Template
+# Josi
 
-Schlanke Ausgangsbasis für eine neue Progressive Web App mit React, TypeScript, Vite, Google Login und Deployment über GitHub Pages.
+Dieses Repository ist die technische Basis für **Josi**. Aktuell ist noch kein produktspezifischer Funktionsumfang festgelegt; das Projekt befindet sich auf dem Stand eines schlanken, installierbaren PWA-Grundgerüsts.
 
-Das Repository enthält bewusst keine produktspezifische Fachlogik. Es soll kopiert und anschließend über `concept.md` und `architecture.md` auf die neue App zugeschnitten werden.
+Die fachliche Produktidee wird in `concept.md` festgehalten. Technische Entscheidungen und die aktuelle Struktur stehen in `architecture.md`.
 
-## Enthalten
+## Aktueller Stand
+
+Vorhanden sind:
 
 - React + TypeScript + Vite
-- installierbare PWA mit Service Worker und App-Icons
-- Pull-to-Refresh für installierte Apps auf Touch-Geräten
-- neutraler responsiver Startscreen
-- Google Login
+- installierbare Progressive Web App mit Service Worker und App-Icons
+- responsive Oberfläche
+- Pull-to-Refresh auf Touch-Geräten
+- optionaler Google Login über Google Identity Services
 - mehrere lokal gespeicherte Google-Konten mit Accountwechsel
-- GitHub-Pages-Deployment über GitHub Actions
-- `agents.md`, `concept.md` und `architecture.md` als Startpunkt für agentengestützte Entwicklung
+- automatisches Deployment über GitHub Pages und GitHub Actions
 
-Nicht enthalten sind Google Sheets/Drive, Datenbanklogik, Rollen, fachliche Workflows oder andere Funktionen einer konkreten App.
-
-## Neue App aus dem Template erstellen
-
-1. Auf GitHub **Use this template** wählen und ein neues Repository erstellen.
-2. `concept.md` mit der Grundidee der neuen App füllen.
-3. Name, Texte, Farben und Icons der neutralen Beispieloberfläche ersetzen.
-4. Falls Google Login gebraucht wird, die Google-Konfiguration unten durchführen.
-5. In **Settings → Pages** als Quelle **GitHub Actions** auswählen.
-6. Die unten stehenden ChatGPT-Projektinstruktionen kopieren und Repository-Name sowie Live-URL anpassen.
+Noch nicht definiert sind unter anderem Zielgruppe, Kernnutzen, fachliche Abläufe, Datenmodell, Rollen und Zahlungsfunktionen. Diese Punkte werden erst ergänzt, wenn das Produktkonzept feststeht.
 
 ## Lokal starten
+
+Voraussetzung ist eine aktuelle Node.js-Installation.
 
 ```bash
 npm install
@@ -34,80 +28,48 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Für einen Produktionsbuild:
+Produktionsbuild prüfen:
 
 ```bash
 npm run build
 ```
 
-## Google Login einrichten
+## Google Login
 
-Der Login ist optional. Ohne Client-ID funktioniert die restliche App weiterhin.
+Der Google Login ist optional. Ohne konfigurierte Client-ID funktioniert die restliche App weiterhin.
 
-1. In Google Cloud einen OAuth Client vom Typ **Web application** anlegen.
-2. Für lokale Entwicklung `http://localhost:5173` als autorisierten JavaScript-Ursprung eintragen.
-3. Die spätere GitHub-Pages-Origin ebenfalls eintragen, zum Beispiel `https://DEIN-USER.github.io`.
-4. Die Client-ID lokal in `.env.local` setzen:
+Für lokale Entwicklung kann in `.env.local` eine öffentliche OAuth-Web-Client-ID gesetzt werden:
 
 ```env
 VITE_GOOGLE_CLIENT_ID=deine-client-id.apps.googleusercontent.com
 ```
 
-5. In GitHub unter **Settings → Secrets and variables → Actions → Variables** eine Repository-Variable `GOOGLE_CLIENT_ID` mit derselben Client-ID anlegen.
+Für das Deployment wird dieselbe Client-ID in GitHub unter **Settings → Secrets and variables → Actions → Variables** als Repository-Variable `GOOGLE_CLIENT_ID` hinterlegt.
 
-Die Client-ID ist öffentlich und darf im Browser verwendet werden. Ein Client-Secret darf dagegen niemals in das Frontend oder Repository eingebaut werden.
+Ein Client-Secret gehört nicht in dieses Repository oder in den Browser-Code.
 
-Der Template-Login speichert nur die Profildaten bereits angemeldeter Konten lokal. Er ist keine serverseitige Autorisierung für sensible Daten.
+Die aktuell lokal gespeicherten Google-Profildaten dienen nur dem komfortablen Accountwechsel. Sie sind keine sichere Autorisierung für geschützte Daten oder Backend-Funktionen.
 
-## GitHub Pages
+## Deployment
 
-Der Workflow `.github/workflows/deploy.yml` wird bei Änderungen auf `main` ausgeführt, baut `dist` und veröffentlicht dieses Verzeichnis über GitHub Pages.
+Der Workflow `.github/workflows/deploy.yml` läuft bei Änderungen auf `main`, erstellt den Produktionsbuild und veröffentlicht `dist` über GitHub Pages.
 
-Der Vite-Basispfad ist relativ gehalten. Deshalb muss der Repository-Name nach dem Erstellen aus dem Template nicht in `vite.config.ts` eingetragen werden.
+GitHub Pages muss im Repository als Veröffentlichungsquelle **GitHub Actions** verwenden.
 
-## ChatGPT-Projekt einrichten
-
-Für ein neues ChatGPT-Projekt kann der folgende Text als projektspezifische Instruktion verwendet werden. Er ist absichtlich direkt kopierbar. Nur die Werte in `<...>` müssen für die neue App angepasst werden.
-
-```text
-Du bist ein Coding Agent für das GitHub Projekt "<OWNER>/<REPOSITORY>".
-
-Bitte gehe von einem geringen technischen Verständnis aus; vermeide schwierige technische Details und Entwickler-Sprech, es sei denn, ich frage explizit danach.
-
-Bitte berate mich positiv, aber challenge auch meine Annahmen. Ziel ist es, einen funktionierenden Prototyp auf die Beine zu stellen, mit dem man ein echtes Geschäftsmodell validieren kann.
-
-Du musst in jedem neuen Chat als erstes per GitHub Connector auf die dortige agents.md Datei zugreifen.
-
-Nach dem Lesen von agents.md lies vor jeder Implementierung auch architecture.md. Bei Änderungen an Produktfunktionen lies zusätzlich concept.md.
-
-Halte agents.md, architecture.md und concept.md bei relevanten Änderungen aktuell. Bei widersprüchlichen Angaben haben agents.md und die aktuelle Nutzeranweisung Vorrang. Weise mich auf echte Widersprüche hin, damit wir die Dokumentation bereinigen können.
-
-Committe während eines Runs auf einen temporären Branch und merge am Ende alles per Squash direkt auf main. Pro Anpassung soll auf main nur ein aussagekräftiger Commit übrig bleiben. Das triggert dann einmalig den Rebuild und das Deployment per GitHub Action.
-
-Die App ist hier live gehostet: <LIVE-URL>
-```
-
-### Beispielwerte
-
-Für ein Repository `maxmustermann/meine-app` wären die wichtigsten Ersetzungen:
-
-```text
-<OWNER>/<REPOSITORY> = maxmustermann/meine-app
-<LIVE-URL> = https://maxmustermann.github.io/meine-app/
-```
-
-Wenn eine neue App andere technische Grundregeln braucht, sollten zuerst `agents.md` und `architecture.md` angepasst werden. Der ChatGPT-Projektprompt kann danach meist unverändert bleiben.
+Der Vite-Basispfad ist relativ konfiguriert. Dadurch funktioniert derselbe Build lokal und unter einem GitHub-Pages-Unterpfad.
 
 ## Wichtige Dateien
 
-- `agents.md` – Arbeitsregeln für Coding Agents
-- `concept.md` – fachliche Produktidee und Kernabläufe
+- `agents.md` – verbindliche Arbeitsregeln für Coding Agents
+- `concept.md` – Produktidee, Zielgruppe, Kernfunktionen und zentrale Abläufe
 - `architecture.md` – technische Architektur und wichtige Entscheidungen
-- `src/App.tsx` – neutrale Beispieloberfläche
+- `src/App.tsx` – aktuelle Oberfläche
 - `src/auth/google.ts` – lokale Google-Account-Verwaltung
 - `src/PullToRefresh.tsx` – Pull-to-Refresh für Touch-Geräte
 - `.github/workflows/deploy.yml` – GitHub-Pages-Deployment
 
-## Nach dem Erstellen aus dem Template
+## Entwicklungsprinzip
 
-Die erste sinnvolle Änderung ist normalerweise nicht eine neue technische Library, sondern das Ausfüllen von `concept.md`: Problem, Zielgruppe, Kernnutzen und der kleinste validierbare Ablauf. Danach kann die neutrale Beispieloberfläche gezielt durch die echte Produktoberfläche ersetzt werden.
+Josi soll zunächst als möglichst einfacher Prototyp entstehen. Neue Libraries, ein Backend oder zusätzliche technische Schichten werden erst eingeführt, wenn eine konkrete Produktanforderung sie rechtfertigt.
+
+Der nächste fachlich wichtige Schritt ist das Ausfüllen von `concept.md`: Welches Problem Josi löst, für wen die App gedacht ist und welcher kleinste Ablauf ein echtes Geschäftsmodell testen kann.
