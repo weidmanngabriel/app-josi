@@ -15,76 +15,69 @@ Es gibt zwei Datenarten:
 - **Songs**: ID, Anzeigename, Audiodatei als Blob, MIME-Typ, Importzeitpunkt, optionaler relativer Quellpfad und optionale manuelle Position in der Bibliothek.
 - **Playlists**: ID, Name, geordnete Song-IDs, optionales Playlist-Bild als Blob, Zeitpunkte für Erstellung und letzte Verwendung sowie optionale manuelle Position in der linken Playlist-Liste.
 
-Audiodateien werden beim Import vollständig in IndexedDB gespeichert. Playlists referenzieren nur Song-IDs; die Audiodatei wird nicht pro Playlist dupliziert. Playlist-Bilder werden ebenfalls lokal in der jeweiligen Playlist gespeichert.
+Audiodateien werden beim Import vollständig in IndexedDB gespeichert. Playlists referenzieren nur Song-IDs; die Audiodatei wird nicht pro Playlist dupliziert.
 
-Für die Wiedergabe erzeugt die App für den aktuell ausgewählten Audio-Blob temporär eine Object-URL und gibt sie an ein HTML-Audio-Element weiter. Dasselbe Prinzip wird für die Anzeige lokaler Playlist-Bilder verwendet. Nicht mehr benötigte Object-URLs werden wieder freigegeben.
-
-Die manuelle Reihenfolge der Bibliothek wird über `libraryOrder` an den Songs gespeichert. Die manuelle Reihenfolge der Playlist-Liste wird über `sortOrder` an den Playlists gespeichert. Bestehende Einträge ohne diese Werte verwenden weiterhin ihre bisherige zeitliche Reihenfolge als Fallback, bis sie erstmals manuell sortiert werden.
+Die Reihenfolge der Bibliothek wird über `libraryOrder` an den Songs gespeichert. Die Reihenfolge der Playlist-Liste wird über `sortOrder` an den Playlists gespeichert.
 
 ## Layout und Scrollen
 
-Auf iPad-Größen ist die Hauptansicht in zwei unabhängig scrollbare Bereiche aufgeteilt:
+Auf iPad-Größen sind die linke Navigation und der rechte Songbereich getrennte Scrollbereiche. Header und Player bleiben stehen. Eine lange Songliste scrollt daher nicht die Playlists mit und umgekehrt.
 
-- die linke Navigation mit Bibliothek und Playlists,
-- den rechten Inhaltsbereich mit der Songliste.
+## Player
 
-Der Header oben und der Player unten bleiben außerhalb dieser beiden Scrollbereiche stehen. Dadurch scrollt eine lange Songliste nicht mehr die linke Navigation mit und umgekehrt.
+Der Player arbeitet mit der aktuell sichtbaren Warteschlange. In der Bibliothek ist das die gespeicherte Bibliotheksreihenfolge, in einer Playlist deren `songIds`-Reihenfolge.
 
-## Player und Warteschlange
+Play/Pause, Vor, Zurück und der Fortschrittsregler verwenden ein einzelnes HTML-Audio-Element. Das `ended`-Ereignis startet automatisch den nächsten Song. Shuffle und Wiederholung bleiben verfügbar.
 
-Der Player arbeitet immer mit der aktuell sichtbaren Warteschlange:
+Im kompakten Player werden Playlists für den aktuellen Song per Plus/Minus verwaltet. Playlists, die den Song bereits enthalten, stehen zuerst.
 
-- In der Bibliothek besteht sie aus allen importierten Songs in der manuell gespeicherten Bibliotheksreihenfolge.
-- In einer Playlist besteht sie aus deren gespeicherter Song-Reihenfolge.
+Die Anzeige „Jetzt“ öffnet die Songdetailansicht. Sie verwendet denselben Audio-Player und zeigt Songname, Playlist-Zugehörigkeit, frei verschiebbare Wiedergabeposition sowie vorheriger Song, -10 Sekunden, Play/Pause, +10 Sekunden und nächster Song.
 
-Play/Pause, Vor, Zurück und die Fortschrittsanzeige steuern ein einzelnes HTML-Audio-Element. Das `ended`-Ereignis startet automatisch den nächsten Song der aktuellen Warteschlange.
+Unter jedem Songtitel in Bibliothek und Playlist wird ebenfalls die aktuelle Playlist-Zugehörigkeit angezeigt oder „In keiner Playlist“.
 
-Shuffle kann für die nächste Titelauswahl aktiviert werden. Repeat sorgt dafür, dass am Ende der Warteschlange wieder am Anfang weitergespielt wird.
+## Bearbeiten und Sortieren
 
-Im Player werden Playlists für den aktuellen Song sortiert angezeigt: zuerst Playlists, die den Song bereits enthalten, danach die übrigen nach letzter Verwendung. Plus/Minus aktualisiert die Playlist unmittelbar in IndexedDB.
+Songs in Bibliothek und geöffneter Playlist verwenden denselben Sortierablauf. Der Bearbeitungsmodus wird über „Reihenfolge ändern“ gestartet.
 
-Die kompakte Anzeige „Jetzt“ ist anklickbar und öffnet eine Songdetailansicht innerhalb der App. Sie verwendet denselben laufenden Audio-Player und bietet eine große Titelanzeige, die aktuelle Playlist-Zugehörigkeit, frei verschiebbare Wiedergabeposition sowie fünf Bedienelemente: tatsächlich zuvor abgespielter Song, 10 Sekunden zurück, Play/Pause, 10 Sekunden vor und nächster Song. Für den historischen Zurück-Button hält die Oberfläche eine kleine lokale Wiedergabehistorie im Arbeitsspeicher.
+Die Playlist-Liste links wird über einen etwa einsekündigen Langdruck auf die Überschrift „Playlists“ freigeschaltet. Danach erscheint der kleine Eintrag „Bearbeiten“. Ein Tipp außerhalb schließt ihn, ohne die darunterliegende Aktion auszulösen.
 
-Die frühere Herkunfts-/Originalpfad-Anzeige ist nicht mehr Teil der sichtbaren Songdetailansicht.
+Die frühere Drag-and-Drop-Logik wurde entfernt. Stattdessen gilt für Songs und Playlists:
 
-## Playlist- und Bibliotheksverwaltung
+1. Im Bearbeitungsmodus wird ein Element über das Verschiebe-Symbol ausgewählt.
+2. Das Element bleibt zunächst sichtbar an seiner ursprünglichen Position.
+3. Der Nutzer kann unabhängig bis zur gewünschten Stelle scrollen.
+4. Ein Tipp in den Zwischenraum zwischen zwei Einträgen setzt dort eine rote Zielmarkierung.
+5. Oben links erscheinen rechts neben Undo/Redo ein grüner Haken und ein rotes X.
+6. Erst der Haken schreibt die neue Reihenfolge nach IndexedDB; X verwirft die vorgemerkte Änderung.
 
-Playlists können direkt in der Oberfläche umbenannt und nach einer Bestätigung gelöscht werden. Beim Löschen einer Playlist bleiben die referenzierten Songs in der Bibliothek erhalten.
+Dadurch entfällt langsames automatisches Scrollen beim Ziehen über lange Listen.
 
-Songs können direkt aus einer geöffneten Playlist entfernt werden. Für die Reihenfolge einer geöffneten Playlist gibt es weiterhin den sichtbaren Bearbeitungsmodus „Reihenfolge ändern“.
+## Undo und Redo
 
-Die Bibliothek verwendet denselben Pointer-Event-basierten Touch-Sortiermechanismus. Ihr Bearbeitungsmodus wird jedoch nicht dauerhaft als Knopf gezeigt: Ein etwa einsekündiger Langdruck auf die Überschrift „Bibliothek“ blendet einen kleinen „Bearbeiten“-Eintrag ein. Danach erscheinen Griffe an den Songs. Beim Ziehen wird nur der rechte Inhaltsbereich automatisch weitergescrollt.
+Oben links befinden sich dauerhaft Undo und Redo. Der Verlauf wird für die laufende Sitzung im Arbeitsspeicher gehalten. Er umfasst die wesentlichen Bibliotheks- und Playlist-Änderungen wie Reihenfolge, Playlist-Zuordnung, Erstellen, Umbenennen, Cover-Änderung und Löschen von Playlists. Beim Wiederherstellen werden die betroffenen Zustände wieder nach IndexedDB geschrieben.
 
-Auch die Playlist-Liste in der linken Navigation ist manuell sortierbar. Ein etwa einsekündiger Langdruck auf „Playlists“ blendet den kleinen Eintrag „Bearbeiten“ ein. Ein transparenter Klickfänger liegt währenddessen über der restlichen Oberfläche; dadurch schließt ein Tipp daneben den Eintrag, ohne gleichzeitig die darunterliegende Aktion auszulösen. Im Bearbeitungsmodus erscheinen Griffe an den Playlists, und beim Ziehen scrollt nur die linke Navigation.
+Importierte Audiodateien selbst werden aktuell nicht per Undo aus IndexedDB gelöscht.
 
-Die Sortierlogik verwendet Pointer Events statt nativem HTML5-Drag-and-Drop. Dadurch funktioniert dieselbe Interaktion mit Finger, Pencil oder Maus und sie kollidiert auf dem iPad weniger mit normalem Scrollen.
+## Playlist-Verwaltung
 
-Ein optionales Playlist-Bild wird über den normalen Bild-Dateiauswahldialog gewählt und lokal gespeichert. Es dient ausschließlich zur besseren visuellen Unterscheidung der Playlists.
+Playlists können umbenannt, mit einem lokalen Bild versehen und nach Bestätigung gelöscht werden. Beim Löschen bleiben die Songs in der Bibliothek erhalten.
 
 ## PWA
 
-`vite-plugin-pwa` erzeugt beim Produktionsbuild das Web-App-Manifest und den Service Worker. Die App verwendet feste App-Icons aus `public/` und ein `apple-touch-icon` für iOS.
+`vite-plugin-pwa` erzeugt beim Produktionsbuild Manifest und Service Worker. Die App verwendet feste App-Icons aus `public/` und ein `apple-touch-icon` für iOS.
 
-`src/PullToRefresh.tsx` ergänzt auf Touch-Geräten ein eigenes Pull-to-Refresh. Durch die neuen internen Scrollbereiche ist dieses Verhalten auf der Hauptansicht weniger zentral und sollte auf dem Ziel-iPad praktisch mitgetestet werden.
-
-Der Vite-Basispfad ist relativ (`./`). Dadurch funktioniert derselbe Build sowohl lokal als auch als GitHub-Project-Page in einem Repository-Unterpfad.
+Der Vite-Basispfad ist relativ (`./`), damit derselbe Build lokal und als GitHub-Project-Page funktioniert.
 
 ## Google Login
 
-Die technische Google-Login-Basis aus dem ursprünglichen Template bleibt vorerst im Repository, wird vom Musik-PoC aber nicht in der Oberfläche verwendet. Der erste Produktablauf benötigt kein Nutzerkonto.
-
-Falls später Synchronisierung, Cloud-Speicher oder geschützte Daten hinzukommen, muss die Authentifizierungs- und Backend-Architektur neu bewertet werden.
+Die technische Google-Login-Basis des ursprünglichen Templates bleibt im Repository, wird im Musik-PoC aber nicht verwendet.
 
 ## Deployment
 
-`.github/workflows/deploy.yml` baut die App bei Änderungen auf `main` und veröffentlicht ausschließlich `dist` über GitHub Pages.
+`.github/workflows/deploy.yml` baut bei Änderungen auf `main` und veröffentlicht ausschließlich `dist` über GitHub Pages.
 
-GitHub Pages muss im Repository als Veröffentlichungsquelle **GitHub Actions** verwenden.
+## Grenzen
 
-## Grenzen des aktuellen Ansatzes
+IndexedDB-Speicher wird vom Browser bzw. Betriebssystem verwaltet. Vor einer produktiven Nutzung mit großen Musiksammlungen müssen Speichermenge, Bereinigung, Backup und Wiederherstellung auf iPadOS geprüft werden.
 
-IndexedDB-Speicher wird vom Browser bzw. Betriebssystem verwaltet. Für den Proof of Concept ist das bewusst akzeptiert. Vor einer produktiven Nutzung mit großen Musiksammlungen müssen verfügbare Speichermenge, Verhalten bei Speicherbereinigung sowie Backup und Wiederherstellung auf iPadOS geprüft werden.
-
-Die Touch-Sortiermodi sollten weiterhin praktisch auf den tatsächlich verwendeten iPadOS-/Safari-Versionen getestet werden, insbesondere bei sehr langen Song- und Playlist-Listen und beim automatischen Scrollen am Rand des jeweiligen Bereichs.
-
-Crossfade ist noch nicht implementiert. Es soll erst ergänzt werden, wenn die einfache Wiedergabe und Autoplay auf dem iPad zuverlässig funktionieren.
+Crossfade ist weiterhin noch nicht implementiert.
