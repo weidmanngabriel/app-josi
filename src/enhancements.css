@@ -1,0 +1,146 @@
+.history-controls button {
+  font-size: 24px;
+  line-height: 1;
+}
+
+.playlist-menu {
+  display: grid;
+  min-width: 132px;
+}
+
+.playlist-menu button {
+  width: 100%;
+  text-align: left;
+}
+
+.now-playing-copy {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.marquee {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.marquee strong {
+  display: inline-block;
+  width: max-content;
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  animation: josi-title-scroll 11s linear infinite;
+  will-change: transform;
+}
+
+@keyframes josi-title-scroll {
+  0%, 10% { transform: translateX(0); }
+  78%, 90% { transform: translateX(min(0px, calc(-100% + 170px))); }
+  100% { transform: translateX(0); }
+}
+
+.playlist-overview {
+  height: calc(100dvh - 68px - 164px);
+  overflow-y: auto;
+  padding: clamp(28px, 5vw, 64px);
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  background: radial-gradient(circle at top right, rgba(124,58,237,.12), transparent 32%), #0b0d12;
+}
+
+.playlist-overview-heading {
+  margin-bottom: 34px;
+}
+
+.playlist-overview-heading h1 {
+  margin-bottom: 8px;
+}
+
+.playlist-overview-heading > p:last-child {
+  margin: 0;
+  color: #8d96a6;
+}
+
+.playlist-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: clamp(24px, 4vw, 48px) clamp(18px, 3vw, 38px);
+  align-items: start;
+}
+
+.playlist-card {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.playlist-card-cover {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border: 1px solid #303645;
+  border-radius: 18px;
+  background: linear-gradient(135deg, #252a36, #171b24);
+  color: #a78bfa;
+  font-size: clamp(30px, 5vw, 58px);
+}
+
+.playlist-card-cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.playlist-card > strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  font-size: 15px;
+  line-height: 1.3;
+}
+
+.playlist-card > small {
+  color: #8d96a6;
+  font-size: 12px;
+}
+
+.song-detail {
+  padding-top: 68px;
+}
+
+.site-header {
+  z-index: 95;
+}
+
+@media (max-width: 880px) {
+  .playlist-overview {
+    height: calc(100dvh - 68px - 230px);
+  }
+  .playlist-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 26px 18px;
+  }
+}
+
+@media (max-width: 620px) {
+  .playlist-overview {
+    height: calc(100dvh - 68px - 310px);
+    padding: 28px 16px;
+  }
+  .playlist-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 24px 16px;
+  }
+  .playlist-card-cover {
+    border-radius: 14px;
+  }
+}

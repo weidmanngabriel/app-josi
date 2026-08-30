@@ -16,14 +16,17 @@ Nutzer mit eigenen Musikdateien auf dem iPad, die diese ohne Streamingdienst ein
 - Bibliothek aller importierten Songs.
 - Linke Navigation und Songbereich unabhängig voneinander scrollen.
 - Player mit Play/Pause, Vor, Zurück, Fortschrittsanzeige, Autoplay, Shuffle und Wiederholung.
+- Lange Songtitel im kompakten „Jetzt“-Bereich automatisch horizontal durchlaufen lassen: kurz am Anfang stehen, langsam bis zum Ende scrollen, dort kurz stehen und wieder von vorne beginnen.
 - Mehrere Playlists erstellen, umbenennen, bebildern und löschen.
 - Songs Playlists per Plus/Minus zuordnen.
 - Unter jedem Songtitel anzeigen, in welchen Playlists der Song enthalten ist; sonst „In keiner Playlist“.
 - Songdetailansicht mit Titel, Playlist-Zugehörigkeit, Scrubbing, vorherigem tatsächlich abgespieltem Song, ±10 Sekunden und nächstem Song.
 - Reihenfolge von Songs in Bibliothek und Playlist bearbeiten.
 - Reihenfolge der Playlists links bearbeiten; der Modus wird durch einen einsekündigen Langdruck auf „Playlists“ angeboten.
+- Derselbe Langdruck bietet zusätzlich „Übersicht“ an. Diese Ansicht zeigt Playlists bildschirmfüllend als Galerie mit vier Karten pro Reihe auf iPad-Größe, großem Bild/Icon, vollständigem Namen und Liedanzahl.
 - Sortieren ohne langes Ziehen: Element auswählen, zur Zielstelle scrollen, Zwischenraum antippen, rote Zielmarkierung sehen und mit Haken bestätigen oder mit X abbrechen.
-- Dauerhafte Undo-/Redo-Knöpfe oben links für die wesentlichen Bearbeitungen der laufenden Sitzung.
+- Oben links stehen Navigationspfeile für die vorherige und nächste App-Ansicht, ähnlich der Browser-Navigation.
+- Media-Session-Integration für System-Mediensteuerungen wie Play/Pause, vorheriger/nächster Song und Scrubbing, soweit der verwendete Browser/iPadOS dies bereitstellt.
 - Installierbare PWA ohne Backend.
 
 ## Zentrale Abläufe
@@ -43,6 +46,7 @@ Nutzer mit eigenen Musikdateien auf dem iPad, die diese ohne Streamingdienst ein
 4. Nach Songende startet automatisch der nächste Song.
 5. Shuffle und Wiederholung können optional aktiviert werden.
 6. Ein Tipp auf „Jetzt“ öffnet die Songdetailansicht ohne Wiedergabeunterbrechung.
+7. Ist der Songname im kompakten Player zu lang, läuft er automatisch horizontal durch, damit der vollständige Titel lesbar ist.
 
 ### Songdetailansicht
 
@@ -51,13 +55,22 @@ Nutzer mit eigenen Musikdateien auf dem iPad, die diese ohne Streamingdienst ein
 3. Der Fortschrittsregler lässt sich frei verschieben.
 4. Darunter stehen fünf Bedienelemente: vorheriger tatsächlich abgespielter Song, 10 Sekunden zurück, Play/Pause, 10 Sekunden vor und nächster Song.
 
+### Playlist-Übersicht
+
+1. Nutzer hält „Playlists“ links etwa eine Sekunde gedrückt.
+2. Neben „Bearbeiten“ erscheint „Übersicht“.
+3. „Übersicht“ öffnet eine bildschirmfüllende Playlist-Galerie.
+4. Auf iPad-Größe stehen vier Playlists in einer Reihe mit großzügigem Abstand.
+5. Jede Karte zeigt das Playlist-Bild bzw. Icon, den vollständigen Namen und darunter „1 Lied“ bzw. „X Lieder“.
+6. Ein Tipp auf eine Karte öffnet die Playlist.
+
 ### Songs sortieren
 
 1. In Bibliothek oder Playlist wird „Reihenfolge ändern“ gewählt.
 2. Ein Song wird über das Verschiebe-Symbol ausgewählt und bleibt zunächst an seinem ursprünglichen Platz.
 3. Der Nutzer scrollt frei zur gewünschten Position.
 4. Ein Tipp zwischen zwei Songs setzt dort einen roten Strich.
-5. Oben links erscheinen rechts neben Undo/Redo ein grüner Haken und ein rotes X.
+5. Oben links erscheinen ein grüner Haken und ein rotes X.
 6. Der Haken bestätigt die Verschiebung; X verwirft sie.
 7. „Fertig“ beendet den Bearbeitungsmodus.
 
@@ -72,12 +85,19 @@ Nutzer mit eigenen Musikdateien auf dem iPad, die diese ohne Streamingdienst ein
 7. Haken bestätigt, X verwirft.
 8. „Fertig“ beendet den Bearbeitungsmodus.
 
-### Undo und Redo
+### Navigation
 
-- Undo und Redo stehen dauerhaft oben links an der früheren Stelle des Josi-Namens.
-- Haken und X erscheinen bei einer vorgemerkten Verschiebung immer rechts daneben.
-- Der Verlauf deckt die wesentlichen Bearbeitungen an Playlists, Zuordnungen und Reihenfolgen ab.
-- Das Entfernen frisch importierter Audiodateien per Undo ist im aktuellen PoC nicht vorgesehen.
+- Oben links stehen dauerhaft „Zurück“ und „Vor“.
+- Zurück öffnet die zuletzt besuchte App-Ansicht, etwa Bibliothek, Playlist, Playlist-Übersicht oder Songdetail.
+- Vor wird aktiv, wenn nach einem Zurück-Schritt wieder eine spätere Ansicht verfügbar ist.
+- Haken und X für eine vorgemerkte Verschiebung erscheinen rechts neben diesen Navigationspfeilen.
+
+### System-Mediensteuerung
+
+- Josi meldet den aktuellen Song und den Wiedergabestatus über die Media Session API an den Browser.
+- Unterstützte Systemoberflächen können dadurch Play/Pause, vorherigen/nächsten Song und Positionswechsel anbieten, beispielsweise im Control Center oder Sperrbildschirm.
+- Die PWA versucht die Wiedergabe beim App-Wechsel fortzuführen. Das tatsächliche Hintergrundverhalten wird jedoch von Safari/iPadOS gesteuert und kann nicht in derselben Weise garantiert oder konfiguriert werden wie bei einer nativen iOS-Musik-App.
+- Unterbrechungen durch andere Audioquellen, Systemereignisse oder Browser-Lifecycle-Regeln werden vom Betriebssystem bzw. Browser behandelt.
 
 ## Abgrenzung
 
@@ -88,12 +108,14 @@ Noch nicht Teil der Minimum-Version:
 - automatische Metadaten-/Cover-Erkennung für Songs,
 - Suche,
 - Musik-Streaming,
-- Crossfade/Fading.
+- Crossfade/Fading,
+- native iOS-Hintergrund-Audio-Berechtigungen außerhalb der Möglichkeiten einer PWA.
 
 ## Offene Annahmen
 
 - Die lokale Browser-Speicherkapazität reicht für einen realistischen ersten Test.
 - Relevante Audioformate werden von Safari/iPadOS zuverlässig abgespielt.
-- Das neue zweistufige Sortieren ist bei langen Listen schneller und verständlicher als Drag-and-Drop mit automatischem Scrollen.
-- Undo/Redo innerhalb einer laufenden Sitzung reduziert Fehler beim Organisieren ausreichend.
-- Für eine spätere Produktversion müssen Backup, Speichergrenzen und Datenverlust bei Browser-/Gerätebereinigung geprüft werden.
+- Das zweistufige Sortieren ist bei langen Listen schneller und verständlicher als Drag-and-Drop mit automatischem Scrollen.
+- Die große Playlist-Übersicht verbessert die Auswahl bei vielen Playlists gegenüber der kompakten linken Liste.
+- Media-Session-Steuerungen funktionieren auf den verwendeten iPadOS-/Safari-Versionen ausreichend zuverlässig für den PoC.
+- Für eine spätere Produktversion müssen Backup, Speichergrenzen, Datenverlust bei Browser-/Gerätebereinigung und gegebenenfalls eine native App-Hülle für garantierte Hintergrundwiedergabe geprüft werden.
