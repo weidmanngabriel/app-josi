@@ -4,6 +4,7 @@ export type Song = {
   file: Blob
   type: string
   addedAt: number
+  sourcePath?: string
 }
 
 export type Playlist = {
@@ -54,13 +55,17 @@ export async function getSongs(): Promise<Song[]> {
 export async function saveSongs(files: File[]): Promise<Song[]> {
   const db = await openDb()
   const now = Date.now()
-  const songs: Song[] = files.map((file, index) => ({
-    id: crypto.randomUUID(),
-    name: file.name.replace(/\.[^.]+$/, '') || file.name,
-    file,
-    type: file.type || 'audio/mpeg',
-    addedAt: now + index,
-  }))
+  const songs: Song[] = files.map((file, index) => {
+    const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath?.trim()
+    return {
+      id: crypto.randomUUID(),
+      name: file.name.replace(/\.[^.]+$/, '') || file.name,
+      file,
+      type: file.type || 'audio/mpeg',
+      addedAt: now + index,
+      sourcePath: relativePath || undefined,
+    }
+  })
 
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(SONGS, 'readwrite')
