@@ -9,6 +9,7 @@ import {
   type Playlist,
   type Song,
 } from './musicDb'
+import './enhancements.css'
 
 function formatTime(seconds: number) {
   if (!Number.isFinite(seconds)) return '0:00'
@@ -21,6 +22,7 @@ type EditPrompt = 'playlists' | null
 type ReorderScope = 'library' | 'playlist' | 'sidebar' | null
 type MoveCandidate = { kind: 'song' | 'playlist'; id: string; targetIndex: number | null } | null
 type Snapshot = { songs: Song[]; playlists: Playlist[] }
+type NavigationEntry = { playlistId: string | null; detailOpen: boolean; playlistOverviewOpen: boolean }
 
 function App() {
   const [songs, setSongs] = useState<Song[]>([])
@@ -40,12 +42,15 @@ function App() {
   const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(null)
   const [message, setMessage] = useState('')
   const [detailOpen, setDetailOpen] = useState(false)
+  const [playlistOverviewOpen, setPlaylistOverviewOpen] = useState(false)
   const [playHistory, setPlayHistory] = useState<string[]>([])
   const [editPrompt, setEditPrompt] = useState<EditPrompt>(null)
   const [reorderScope, setReorderScope] = useState<ReorderScope>(null)
   const [moveCandidate, setMoveCandidate] = useState<MoveCandidate>(null)
   const [undoStack, setUndoStack] = useState<Snapshot[]>([])
   const [redoStack, setRedoStack] = useState<Snapshot[]>([])
+  const [navigation, setNavigation] = useState<NavigationEntry[]>([{ playlistId: null, detailOpen: false, playlistOverviewOpen: false }])
+  const [navigationIndex, setNavigationIndex] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
@@ -140,26 +145,41 @@ function App() {
     await persistSnapshot(target, previousPlaylists)
   }
 
-  const undo = async () => {
-    const target = undoStack[undoStack.length - 1]
-    if (!target || moveCandidate) return
-    setUndoStack((items) => items.slice(0, -1))
-    setRedoStack((items) => [...items, snapshot()].slice(-50))
-    await restoreSnapshot(target)
-  }
-
-  const redo = async () => {
-    const target = redoStack[redoStack.length - 1]
-    if (!target || moveCandidate) return
-    setRedoStack((items) => items.slice(0, -1))
-    setUndoStack((items) => [...items, snapshot()].slice(-50))
-    await restoreSnapshot(target)
-  }
-
   const updatePlaylist = async (updated: Playlist, addHistory = false) => {
     if (addHistory) recordHistory()
     setPlaylists((items) => items.map((item) => item.id === updated.id ? updated : item))
     await savePlaylist(updated)
+  }
+
+  const applyNavigation = (entry: NavigationEntry) => {
+    setActivePlaylistId(entry.playlistId)
+    setDetailOpen(entry.detailOpen)
+    setPlaylistOverviewOpen(entry.playlistOverviewOpen)
+    setIsEditingPlaylist(false)
+    setEditPrompt(null)
+    setMoveCandidate(null)
+  }
+
+  const navigateTo = (entry: NavigationEntry) => {
+    const current = navigation[navigationIndex]
+    if (current && current.playlistId === entry.playlistId && current.detailOpen === entry.detailOpen && current.playlistOverviewOpen === entry.playlistOverviewOpen) return
+    setNavigation((items) => [...items.slice(0, navigationIndex + 1), entry].slice(-60))
+    setNavigationIndex((index) => Math.min(index + 1, 59))
+    applyNavigation(entry)
+  }
+
+  const navigateBack = () => {
+    if (navigationIndex <= 0) return
+    const nextIndex = navigationIndex - 1
+    setNavigationIndex(nextIndex)
+    applyNavigation(navigation[nextIndex])
+  }
+
+  const navigateForward = () => {
+    if (navigationIndex >= navigation.length - 1) return
+    const nextIndex = navigationIndex + 1
+    setNavigationIndex(nextIndex)
+    applyNavigation(navigation[nextIndex])
   }
 
   const playSong = (id: string, rememberCurrent = true) => {
@@ -226,6 +246,42 @@ function App() {
     setCurrentTime(value)
   }
 
+  useEffect(() => {
+    if (!('mediaSession' in navigator)) return
+
+    if (currentSong) {
+      navigator.mediaSession.metadata = new MediaMetadata({ title: currentSong.name, artist: 'Josi' })
+    } else {
+      navigator.mediaSession.metadata = null
+    }
+    navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused'
+
+    const handlers: Array<[MediaSessionAction, MediaSessionActionHandler | null]> = [
+      ['play', () => {
+        const audio = audioRef.current
+        if (audio) audio.play().catch(() => undefined)
+      }],
+      ['pause', () => audioRef.current?.pause()],
+      ['previoustrack', () => moveSong(-1)],
+      ['nexttrack', () => moveSong(1)],
+      ['seekbackward', (details) => skipSeconds(-(details.seekOffset ?? 10))],
+      ['seekforward', (details) => skipSeconds(details.seekOffset ?? 10)],
+      ['seekto', (details) => {
+        if (details.seekTime !== undefined) seek(details.seekTime)
+      }],
+    ]
+
+    handlers.forEach(([action, handler]) => {
+      try { navigator.mediaSession.setActionHandler(action, handler) } catch { /* unsupported action */ }
+    })
+
+    return () => {
+      handlers.forEach(([action]) => {
+        try { navigator.mediaSession.setActionHandler(action, null) } catch { /* unsupported action */ }
+      })
+    }
+  }, [currentSong?.id, isPlaying, queue, shuffle, repeatQueue])
+
   const importFiles = async (files: FileList | null) => {
     if (!files?.length) return
     const audioFiles = Array.from(files).filter((file) => file.type.startsWith('audio/') || /\.(mp3|m4a|aac|wav|ogg|flac)$/i.test(file.name))
@@ -250,14 +306,12 @@ function App() {
     await savePlaylist(playlist)
     setPlaylists((existing) => [playlist, ...existing])
     setPlaylistName('')
-    setActivePlaylistId(playlist.id)
+    navigateTo({ playlistId: playlist.id, detailOpen: false, playlistOverviewOpen: false })
   }
 
   const openPlaylist = async (id: string | null) => {
     if (reorderScope === 'sidebar') return
-    setActivePlaylistId(id)
-    setIsEditingPlaylist(false)
-    setMoveCandidate(null)
+    navigateTo({ playlistId: id, detailOpen: false, playlistOverviewOpen: false })
     if (!id) return
     const playlist = playlists.find((item) => item.id === id)
     if (playlist) await updatePlaylist({ ...playlist, lastUsedAt: Date.now() })
@@ -304,14 +358,8 @@ function App() {
     setReorderScope(null)
   }
 
-  const chooseMoveItem = (kind: 'song' | 'playlist', id: string) => {
-    setMoveCandidate({ kind, id, targetIndex: null })
-  }
-
-  const chooseTarget = (targetIndex: number) => {
-    setMoveCandidate((candidate) => candidate ? { ...candidate, targetIndex } : candidate)
-  }
-
+  const chooseMoveItem = (kind: 'song' | 'playlist', id: string) => setMoveCandidate({ kind, id, targetIndex: null })
+  const chooseTarget = (targetIndex: number) => setMoveCandidate((candidate) => candidate ? { ...candidate, targetIndex } : candidate)
   const cancelPendingMove = () => setMoveCandidate(null)
 
   const reorderIds = (ids: string[], sourceId: string, targetIndex: number) => {
@@ -381,7 +429,7 @@ function App() {
     recordHistory()
     await deletePlaylist(playlistToDelete.id)
     setPlaylists((items) => items.filter((item) => item.id !== playlistToDelete.id))
-    if (activePlaylistId === playlistToDelete.id) setActivePlaylistId(null)
+    if (activePlaylistId === playlistToDelete.id) navigateTo({ playlistId: null, detailOpen: false, playlistOverviewOpen: false })
     setPlaylistToDelete(null)
   }
 
@@ -400,9 +448,9 @@ function App() {
   return (
     <div className="app-shell">
       <header className="site-header">
-        <div className="history-controls" aria-label="Bearbeitungsverlauf">
-          <button type="button" onClick={() => void undo()} disabled={!undoStack.length || Boolean(moveCandidate)} aria-label="Rückgängig">↶</button>
-          <button type="button" onClick={() => void redo()} disabled={!redoStack.length || Boolean(moveCandidate)} aria-label="Wiederholen">↷</button>
+        <div className="history-controls" aria-label="Navigation">
+          <button type="button" onClick={navigateBack} disabled={navigationIndex === 0} aria-label="Zurück">‹</button>
+          <button type="button" onClick={navigateForward} disabled={navigationIndex >= navigation.length - 1} aria-label="Vor">›</button>
           {moveCandidate && <>
             <button className="confirm-move" type="button" onClick={() => void confirmPendingMove()} disabled={moveCandidate.targetIndex === null} aria-label="Verschieben bestätigen">✓</button>
             <button className="cancel-move" type="button" onClick={cancelPendingMove} aria-label="Verschieben abbrechen">×</button>
@@ -412,16 +460,16 @@ function App() {
         <input ref={fileInputRef} className="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac" multiple onChange={(event) => importFiles(event.target.files)} />
       </header>
 
-      <main className="music-layout">
+      {!playlistOverviewOpen && <main className="music-layout">
         <aside className="sidebar">
-          <button className={`nav-item${activePlaylistId === null ? ' active' : ''}`} type="button" onClick={() => openPlaylist(null)} disabled={reorderScope === 'sidebar'}>
+          <button className={`nav-item${activePlaylistId === null ? ' active' : ''}`} type="button" onClick={() => void openPlaylist(null)} disabled={reorderScope === 'sidebar'}>
             <span>Bibliothek</span><strong>{songs.length}</strong>
           </button>
 
           <div className="sidebar-heading heading-with-popover">
             <button className="heading-longpress" type="button" onPointerDown={startLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={(event) => event.preventDefault()}>Playlists</button>
             {reorderScope === 'sidebar' && <button className="finish-inline" type="button" onClick={finishReorder}>Fertig</button>}
-            {editPrompt === 'playlists' && <div className="edit-popover"><button type="button" onClick={() => beginReorder('sidebar')}>Bearbeiten</button></div>}
+            {editPrompt === 'playlists' && <div className="edit-popover playlist-menu"><button type="button" onClick={() => beginReorder('sidebar')}>Bearbeiten</button><button type="button" onClick={() => navigateTo({ playlistId: activePlaylistId, detailOpen: false, playlistOverviewOpen: true })}>Übersicht</button></div>}
           </div>
 
           <div className="playlist-nav">
@@ -429,7 +477,7 @@ function App() {
             {sidebarPlaylists.map((playlist, index) => (
               <div key={playlist.id} className={`playlist-nav-row${moveCandidate?.kind === 'playlist' && moveCandidate.id === playlist.id ? ' move-source' : ''}`}>
                 {reorderScope === 'sidebar' && <button className="move-selector" type="button" onClick={() => chooseMoveItem('playlist', playlist.id)} aria-label={`${playlist.name} zum Verschieben auswählen`}>↕</button>}
-                <button className={`nav-item${activePlaylistId === playlist.id ? ' active' : ''}`} type="button" onClick={() => openPlaylist(playlist.id)} disabled={reorderScope === 'sidebar'}>
+                <button className={`nav-item${activePlaylistId === playlist.id ? ' active' : ''}`} type="button" onClick={() => void openPlaylist(playlist.id)} disabled={reorderScope === 'sidebar'}>
                   <span className="playlist-nav-name">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span className="playlist-mini-cover">♫</span>}<span>{playlist.name}</span></span>
                   <strong>{playlist.songIds.length}</strong>
                 </button>
@@ -491,12 +539,23 @@ function App() {
             </div>
           ) : <div className="empty-state"><div className="empty-icon">♫</div><h2>{activePlaylist ? 'Noch keine Songs in dieser Playlist.' : 'Noch keine Musik importiert.'}</h2></div>}
         </section>
-      </main>
+      </main>}
+
+      {playlistOverviewOpen && <section className="playlist-overview" aria-label="Playlist-Übersicht">
+        <div className="playlist-overview-heading"><p className="eyebrow">DEINE MUSIK</p><h1>Playlists</h1><p>{sidebarPlaylists.length} {sidebarPlaylists.length === 1 ? 'Playlist' : 'Playlists'}</p></div>
+        <div className="playlist-grid">
+          {sidebarPlaylists.map((playlist) => <button key={playlist.id} className="playlist-card" type="button" onClick={() => void openPlaylist(playlist.id)}>
+            <span className="playlist-card-cover">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span>♫</span>}</span>
+            <strong>{playlist.name}</strong>
+            <small>{playlist.songIds.length} {playlist.songIds.length === 1 ? 'Lied' : 'Lieder'}</small>
+          </button>)}
+        </div>
+      </section>}
 
       <section className={`player${currentSong ? ' visible' : ''}`} aria-label="Player">
-        <audio ref={audioRef} src={currentUrl ?? undefined} onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)} onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={() => moveSong(1)} />
-        <button className="now-playing" type="button" onClick={() => currentSong && setDetailOpen(true)} disabled={!currentSong}>
-          <span className="cover-placeholder">♫</span><span className="now-playing-copy"><small>JETZT</small><strong>{currentSong?.name ?? 'Kein Song ausgewählt'}</strong></span>
+        <audio ref={audioRef} src={currentUrl ?? undefined} playsInline onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)} onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={() => moveSong(1)} />
+        <button className="now-playing" type="button" onClick={() => currentSong && navigateTo({ playlistId: activePlaylistId, detailOpen: true, playlistOverviewOpen: false })} disabled={!currentSong}>
+          <span className="cover-placeholder">♫</span><span className="now-playing-copy"><small>JETZT</small><span className="marquee"><strong>{currentSong?.name ?? 'Kein Song ausgewählt'}</strong></span></span>
         </button>
         <div className="transport">
           <div className="transport-buttons">
@@ -517,7 +576,7 @@ function App() {
       </section>
 
       {detailOpen && currentSong && <section className="song-detail" aria-label="Songdetails">
-        <div className="detail-topbar"><button type="button" onClick={() => setDetailOpen(false)}>‹ Zurück</button></div>
+        <div className="detail-topbar"><button type="button" onClick={navigateBack}>‹ Zurück</button></div>
         <div className="detail-content"><p className="detail-label">JETZT</p><h2>{currentSong.name}</h2>
           <div className="playlist-membership"><span>IN PLAYLISTS</span><strong>{currentSongPlaylists.length ? currentSongPlaylists.map((playlist) => playlist.name).join(' · ') : 'In keiner Playlist'}</strong></div>
           <div className="detail-progress"><input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} /><div><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div></div>
@@ -525,7 +584,7 @@ function App() {
         </div>
       </section>}
 
-      {editPrompt && <button className="edit-popover-shield" type="button" aria-label="Bearbeiten schließen" onClick={() => setEditPrompt(null)} />}
+      {editPrompt && <button className="edit-popover-shield" type="button" aria-label="Menü schließen" onClick={() => setEditPrompt(null)} />}
       {playlistToDelete && <div className="modal-backdrop" onMouseDown={() => setPlaylistToDelete(null)}><div className="confirm-dialog" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><h2>Playlist löschen?</h2><p>„{playlistToDelete.name}“ wird gelöscht. Die Musikdateien bleiben erhalten.</p><div className="dialog-actions"><button type="button" onClick={() => setPlaylistToDelete(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void confirmDeletePlaylist()}>Playlist löschen</button></div></div></div>}
     </div>
   )
