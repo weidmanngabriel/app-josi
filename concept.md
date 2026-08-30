@@ -2,122 +2,105 @@
 
 ## Grundidee
 
-Josi ist eine kleine, lokal laufende Musik-App für das iPad. Nutzer importieren eigene Audiodateien aus der Dateien-App, organisieren sie in Playlists und spielen sie direkt in Josi ab.
+Josi ist eine lokal laufende Musik-App für das iPad. Nutzer importieren eigene Audiodateien, organisieren sie in Playlists, spielen sie ab und bearbeiten ihre Sammlung direkt auf dem Gerät.
 
-Der Proof of Concept validiert vor allem den Ablauf **Importieren → organisieren → zuverlässig abspielen** und erweitert ihn schrittweise um Funktionen für größere lokale Musiksammlungen.
+Der Proof of Concept validiert vor allem **Importieren → organisieren → zuverlässig abspielen → präzise verwalten**.
 
 ## Kernfunktionen
 
-- Mehrere lokale Audiodateien über den normalen Dateidialog importieren und lokal speichern.
-- Bibliothek aller importierten Songs.
-- Verlauf für zuletzt importierte Dateien und blaue Markierung des neuesten Imports.
-- Eigener „Loops“-Tab für Songs mit gespeichertem Loop.
-- Songs mit Loop durch eine rote Schleife am rechten Ende markieren.
-- Manueller Loop-Editor auf einer eigenen Seite statt automatischer Loop-Erkennung.
-- Player mit Play/Pause, Vor, Zurück, Fortschritt, Autoplay, Shuffle und Wiederholung.
-- Lange Songtitel im kompakten Player automatisch horizontal durchlaufen lassen.
-- Mehrere Playlists erstellen, umbenennen, bebildern und löschen.
-- Unter jedem Songtitel anzeigen, in welchen Playlists er enthalten ist.
-- In allen Songlisten mehrere Songs über „Auswählen“ markieren.
-- Die Playlist-Zuordnung für Einzel- und Mehrfachauswahl ausschließlich über „Alle Playlists“ unten rechts öffnen.
-- Playlist-Dialog nach Symbolen, Zahlen und anschließend Buchstaben gruppieren.
-- Zusatzfunktionen über sichtbare Drei-Punkte-Menüs `•••` anbieten.
-- Alle Songlisten nach mehreren Kriterien sortierbar machen, ohne die manuelle Reihenfolge zu überschreiben.
-- Lieddauer als `MM:SS` direkt in den Songzeilen anzeigen, sobald sie bekannt ist.
-- Vollständig gehörte Wiedergaben zählen; übersprungene Songs erhöhen den Zähler nicht.
-- Oben links Zurück, Vor, Undo und Redo; bei vorgemerkter manueller Verschiebung zusätzlich Haken und X.
-- Media-Session-Integration für System-Mediensteuerungen, soweit Browser/iPadOS dies bereitstellt.
+- Mehrere lokale Audiodateien über den normalen Dateidialog importieren.
+- Bibliothek, Verlauf und eigener Loops-Tab.
+- Neu importierte Songs blau markieren.
+- Songs und Playlists über sichtbare Drei-Punkte-Menüs verwalten.
+- Mehrere Songs auswählen und über „Alle Playlists“ einer Playlist zuordnen.
+- Songlisten nach Manuell, A–Z Anfang, A–Z Ende, Höranzahl, Dauer oder Chronik sortieren.
+- Lieddauer anzeigen, sobald sie vom Player ermittelt wurde.
+- Vollständig gehörte Wiedergaben zählen.
+- Manueller, präziser Loop-Editor statt automatischer Loop-Erkennung.
+- Media-Session-Integration für System-Mediensteuerung, soweit iPadOS/Safari sie bereitstellt.
+
+## Drei-Punkte-Menü für Songs
+
+Die Aktionen stehen in dieser Reihenfolge:
+
+1. **Umbenennen**
+2. **Kopieren**
+3. **Teilen**
+4. **Loop erstellen** bzw. **Loop bearbeiten**
+5. Nur bei blau markierten Songs in blauer Schrift: **Als gelesen markieren**
+6. Nur bei blau markierten Songs in blauer Schrift: **Alle als gelesen markieren**
+7. In roter Schrift: **Löschen**
+
+„Kopieren“ erstellt einen zweiten Bibliothekseintrag mit eigener ID. „Teilen“ öffnet nach Möglichkeit die iPad-Systemfreigabe mit der Audiodatei. „Löschen“ fragt vorher nach und entfernt den Song anschließend auch aus Playlists, ohne die Playlists selbst zu löschen.
+
+## Drei-Punkte-Menü für Playlists
+
+Einzelne Playlists bieten:
+
+1. **Umbenennen**
+2. **Kopieren**
+3. **Teilen**
+4. **Löschen** in Rot
+
+Eine kopierte Playlist verweist auf dieselben Songs; Audiodateien werden nicht verdoppelt. Beim Teilen wird eine Textübersicht der Playlist mit ihren Liedern an die Systemfreigabe übergeben.
+
+Der bisherige separate Löschknopf in einer geöffneten Playlist entfällt. Die Nachfrage „wirklich löschen?“ bleibt erhalten.
+
+Das `•••` neben der Überschrift „Playlists“ bleibt für **Bearbeiten** und **Übersicht** zuständig.
 
 ## Import und lokale Dateien
 
-Der Import soll so wenig Zusatzarbeit wie möglich auslösen:
+Der Import bleibt bewusst leichtgewichtig. Nur neu ausgewählte Dateien werden gespeichert; bestehende Audiodaten werden nicht bei jedem Import erneut geschrieben.
 
-1. Nutzer tippt auf „Musik importieren“.
-2. Der File-Input wird vorher geleert, damit auch dieselbe Datei erneut ausgewählt werden kann.
-3. Im iPad-Dateidialog werden eine oder mehrere Audiodateien ausgewählt und mit „Öffnen“ bestätigt.
-4. Josi speichert diese Dateien direkt lokal.
-5. Erst beim späteren Laden eines Songs wird dessen Dauer ergänzt.
+`--:--` bedeutet unbekannte Dauer. `FEHLT` bedeutet, dass der lokale Audioblob nicht mehr vorhanden ist und der Song neu importiert werden muss.
 
-Die App schreibt beim Import nicht mehr die gesamte bestehende Bibliothek erneut. Das reduziert Speicherlast und das Risiko, bei großen Audio-Bibliotheken an Browser-Quota-Grenzen zu stoßen.
+## Mehrfachauswahl
 
-`--:--` bedeutet: Die Dauer des Songs ist noch nicht bekannt. `FEHLT` bedeutet dagegen: Der lokal gespeicherte Audioblob ist nicht mehr vorhanden bzw. hat Größe 0. In diesem Fall muss die Originaldatei erneut importiert werden; die App kann verlorene Audiodaten nicht rekonstruieren.
+„Auswählen“ funktioniert in Bibliothek, Playlist, Verlauf und Loops. Mehrere markierte Songs werden ausschließlich über den Kasten **„Alle Playlists“** unten rechts einer Playlist zugeordnet.
 
-## Bedienprinzip Drei-Punkte-Menüs
+## Sortierung
 
-Langdruck wird nicht mehr für Funktionen verwendet, weil diese Geste mit Scrollen und iPadOS-Gesten kollidieren kann.
+Alle Songlisten bieten:
 
-Stattdessen steht ein sichtbarer `•••`-Knopf an Stellen mit zusätzlichen Funktionen:
+- **Manuell**
+- **A–Z Anfang**
+- **A–Z Ende**
+- **Anzahl des Hörens**
+- **Dauer**
+- **Chronik**
 
-- bei Songs,
-- bei Playlists,
-- neben der Überschrift „Playlists“.
+Der Pfeil kehrt die Sortierung um. Die manuelle Reihenfolge bleibt separat gespeichert und wird durch andere Sortierungen nicht verändert.
 
-Bei Songs enthält das Menü unter anderem „Als gesehen markieren“ und „Loop erstellen“ bzw. „Loop bearbeiten“.
+## Präziser Loop-Editor
 
-## Mehrere Songs auswählen
+`•••` → **Loop erstellen** öffnet eine eigene Vollbildansicht. Die automatische Loop-Erkennung bleibt entfernt.
 
-1. In Bibliothek, Playlist, Verlauf oder Loops wird „Auswählen“ gewählt.
-2. Mehrere Songs können markiert werden; „Alle“ markiert die komplette aktuell sichtbare Liste.
-3. Unten rechts bleibt „Alle Playlists“ aktiv und öffnet den Playlist-Dialog für die gesamte Auswahl.
-4. Ein Tipp auf eine Playlist fügt alle ausgewählten Songs hinzu, ohne Audiodateien zu duplizieren.
+Der Editor enthält:
 
-## Sortierung von Songlisten
+- einen **roten Loop-Kasten** mit verschiebbarem Gesamtbereich,
+- getrennte rote Start- und Endkanten,
+- **Zoom von 1× bis 16×** und horizontales Scrollen,
+- einen **blauen Abspielstrich**, der unabhängig vom roten Bereich bewegt werden kann,
+- einen Schalter, der den roten Loop-Bereich transparent und unbeweglich macht,
+- **−5 s**, **Play/Pause** und **+5 s**,
+- **orange Markierungen**, die an der Position des blauen Cursors gesetzt werden,
+- anklickbare orange Markierungen, die den blauen Cursor direkt dorthin bringen,
+- einen Schalter zum Aktivieren/Deaktivieren der Markierungsbedienung,
+- **−10 ms / +10 ms** für die zuletzt berührte rote Start- oder Endkante,
+- ein Eingabefeld für einen frei wählbaren Vorlauf in Sekunden, z. B. `0,5` oder `1`,
+- **vor Start abspielen** und **vor Ende abspielen**, die den blauen Cursor entsprechend vor die gewünschte rote Kante setzen und die Wiedergabe starten.
 
-Alle Listen mit Lieddateien bieten dieselben Optionen:
+Beim Abspielen innerhalb des Editors springt die Wiedergabe am Loop-Ende wieder zum Loop-Start. **Loop speichern** übernimmt Start, Ende, Marker und aktiviert den Loop. Gespeicherte Loops werden weiterhin mit einer roten Schleife markiert und im Tab **Loops** gesammelt.
 
-- **Manuell** – die selbst erstellte Reihenfolge.
-- **A–Z Anfang** – Vergleich ab dem Anfang des Titels.
-- **A–Z Ende** – Vergleich ab dem Ende des Titels nach vorne.
-- **Anzahl des Hörens** – Zahl vollständig gehörter Wiedergaben.
-- **Dauer** – Länge des Liedes.
-- **Chronik** – Zeitpunkt des Imports.
+## Teilen
 
-Neben der Sortieroption steht ein Pfeil. Pfeil nach unten zeigt die normale Richtung des gewählten Kriteriums, Pfeil nach oben kehrt sie um. Bei „Manuell“ ist der Pfeil deaktiviert.
+Songs werden, soweit die Web Share API und iPadOS es erlauben, als tatsächliche Audiodatei geteilt. Wenn der Browser Dateifreigabe nicht unterstützt, zeigt Josi eine verständliche Meldung statt still zu scheitern.
 
-Wichtig: Keine automatische Sortierung verändert die manuelle Reihenfolge.
-
-## Lieddauer und Höranzahl
-
-Die App analysiert die Lieddauer nicht mehr beim Import. Sobald ein Song das erste Mal im normalen Player geladen wird, übernimmt Josi die vom Audio-Element gemeldete Dauer und speichert sie.
-
-Ein Song zählt als vollständig gehört, wenn der Player sein natürliches Ende erreicht. Manuelles Überspringen erhöht den Zähler nicht.
-
-## Manueller Loop-Editor
-
-Die bisherige automatische Loop-Erkennung wird entfernt, weil sie auf realen Musikdateien nicht zuverlässig genug funktioniert.
-
-Der neue Ablauf orientiert sich an einem Clip-Editor:
-
-1. Nutzer wählt bei einem Song `•••` → „Loop erstellen“ oder öffnet in der Songdetailansicht „Loop erstellen“.
-2. Eine eigene Vollbildseite öffnet sich.
-3. Auf dem kompletten Zeitstrahl liegt ein roter Auswahlkasten.
-4. Der gesamte Kasten kann nach links und rechts verschoben werden.
-5. Linke und rechte Kante können separat gezogen werden, um Start und Ende einzustellen.
-6. „Loop testen“ spielt den ausgewählten Abschnitt und springt am Ende wieder zum Start.
-7. „Loop speichern“ übernimmt den Bereich und aktiviert ihn.
-8. Gespeicherte Loops tragen die rote Schleife und erscheinen im Tab „Loops“.
-
-Der Nutzer bestimmt damit selbst den musikalisch passenden Bereich; es gibt keinen automatisch behaupteten Loop-Vorschlag mehr.
-
-## Playlist-Verwaltung
-
-Das `•••` neben „Playlists“ bietet insbesondere:
-
-- Bearbeiten der manuellen Playlist-Reihenfolge,
-- Öffnen der großen Playlist-Übersicht.
-
-Auch einzelne Playlist-Einträge besitzen `•••` für playlistbezogene Aktionen.
+Playlists sind keine einzelne Datei. Deshalb teilt Josi bei Playlists eine Textübersicht mit Playlistname und Liedliste.
 
 ## Navigation und Bearbeitungsverlauf
 
-- Zurück und Vor öffnen die vorherige bzw. nächste besuchte Ansicht.
-- Undo und Redo stehen direkt rechts daneben.
-- Bei einer vorgemerkten manuellen Verschiebung erscheinen rechts von diesen vier Knöpfen ein grüner Haken und ein rotes X.
-- Im Loop-Editor schließt Zurück zunächst den Editor.
-
-## System-Mediensteuerung
-
-Josi meldet aktuellen Song und Wiedergabestatus über die Media Session API. Unterstützte Systemoberflächen können Play/Pause, vorherigen/nächsten Song und Positionswechsel anbieten. Die tatsächliche Hintergrundwiedergabe wird weiterhin von Safari/iPadOS gesteuert.
+Zurück und Vor öffnen vorherige bzw. nächste App-Ansichten. Undo und Redo bleiben rechts daneben. Bei einer vorgemerkten manuellen Verschiebung folgen Haken und X. Im Loop-Editor schließt Zurück zuerst den Editor.
 
 ## Abgrenzung
 
@@ -136,9 +119,8 @@ Der experimentelle Ordnerimport bleibt entfernt.
 
 ## Offene Annahmen
 
-- Die lokale Browser-Speicherkapazität reicht für einen realistischen ersten Test.
-- Relevante Audioformate werden von Safari/iPadOS zuverlässig abgespielt.
-- Der vereinfachte Import reduziert Fehler bei großen lokalen Musikbibliotheken.
-- Die manuelle Loop-Auswahl ist zuverlässiger und verständlicher als die bisherige automatische Heuristik.
-- Drei-Punkte-Menüs sind auf dem iPad robuster als Langdruck-Gesten.
-- Für eine spätere Produktversion müssen Backup, Speichergrenzen, Wiederherstellung verlorener Audiodaten und gegebenenfalls eine native App-Hülle geprüft werden.
+- Die lokale Browser-Speicherkapazität reicht für einen realistischen Test.
+- Das neue Datei-Löschen und Kopieren bleibt auch bei größeren Bibliotheken schnell genug.
+- Systemfreigabe von Audiodateien funktioniert auf den tatsächlich verwendeten iPadOS-/Safari-Versionen ausreichend zuverlässig.
+- Der präzise manuelle Loop-Editor ist für echte Musikdateien nützlicher als eine automatische Heuristik.
+- Für eine spätere Produktversion müssen Backup, Speichergrenzen, Wiederherstellung verlorener Audiodaten und eventuell eine native App-Hülle geprüft werden.
