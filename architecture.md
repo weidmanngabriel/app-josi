@@ -72,8 +72,11 @@ Die automatische Loop-Erkennung bleibt entfernt. Der Editor arbeitet mit dem bes
 Funktionen:
 
 - Zoom von 1× bis 16×; bei Zoom wird die Zeitachse horizontal scrollbar.
+- Klassische Audio-Wellenform als **Amplitude über Zeit**. Dafür wird die Datei beim Öffnen des Editors einmal mit `AudioContext.decodeAudioData()` dekodiert und auf eine begrenzte Zahl von Spitzenwerten reduziert.
+- Die Wellenform ist nur eine Anzeigehilfe. Wenn das Dekodieren für ein Format fehlschlägt, bleibt die normale Wiedergabe vollständig verfügbar; der Editor zeigt dann lediglich keine Wellenform.
 - Roter Loop-Bereich mit verschiebbarem Gesamtfenster und getrennten Start-/Endgriffen.
-- Der zuletzt berührte rote Rand wird hervorgehoben und kann in 10-ms-Schritten vor/zurück bewegt werden.
+- Der zuletzt berührte rote Rand wird hervorgehoben.
+- Die Schrittweite für die Feinkorrektur ist frei in Sekunden eingebbar, z. B. `0,01` für 10 ms, `0,1` für 100 ms oder `1` für eine Sekunde.
 - Der rote Bereich kann gesperrt werden. Dann wird er transparenter und reagiert nicht auf Pointer-Eingaben, damit der Abspielcursor ohne Konflikt bewegt werden kann.
 - Blauer Abspielcursor, der unabhängig vom roten Bereich durch Tippen/Ziehen oder Wiedergabe bewegt wird.
 - Transport im Editor: −5 Sekunden, Play/Pause, +5 Sekunden.
@@ -81,6 +84,12 @@ Funktionen:
 - Ein frei eingebbarer Vorlaufwert in Sekunden (Komma oder Punkt möglich) steuert „vor Start abspielen“ und „vor Ende abspielen“.
 - Beim Erreichen des aktuellen Loop-Endes springt die Wiedergabe im Editor zum Loop-Start zurück.
 - „Loop speichern“ persistiert Start, Ende, Aktivstatus und Marker.
+
+## Player-Stabilität bei Song-Metadaten
+
+Der Player verwendet für die aktuelle Audiodatei eine Objekt-URL. Diese URL darf nicht bei jeder Änderung des Song-Objekts neu erzeugt werden, weil Änderungen wie Loop speichern, Loop an/aus, Dauer ergänzen oder Umbenennen sonst das Audio-Element neu laden und die Wiedergabe unterbrechen können.
+
+Deshalb hängt die Objekt-URL nur noch von der **Song-ID und dem tatsächlichen Blob** ab. Reine Metadatenänderungen lassen die Audioquelle unverändert. Das behebt insbesondere das Problem, dass ein Song nach dem Speichern eines Loops nicht mehr zuverlässig startete.
 
 ## Player und Media Session
 
@@ -92,4 +101,4 @@ Ein einzelnes HTML-Audio-Element übernimmt Wiedergabe, Fortschritt, Systemsteue
 
 ## Grenzen
 
-IndexedDB und Web Share werden vom Browser/iPadOS kontrolliert. Verlorene lokale Audiodaten können ohne erneuten Import nicht rekonstruiert werden. Dateifreigabe kann je nach Safari-/PWA-Version eingeschränkt sein. Für eine Produktversion bleiben Backup, Wiederherstellung und gegebenenfalls eine native App-Hülle wichtige Themen.
+IndexedDB und Web Share werden vom Browser/iPadOS kontrolliert. Verlorene lokale Audiodaten können ohne erneuten Import nicht rekonstruiert werden. Dateifreigabe kann je nach Safari-/PWA-Version eingeschränkt sein. Die Wellenform benötigt lokale Dekodierunterstützung für das jeweilige Audioformat. Für eine Produktversion bleiben Backup, Wiederherstellung und gegebenenfalls eine native App-Hülle wichtige Themen.
