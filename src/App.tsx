@@ -4,6 +4,7 @@ import {
   getPlaylists,
   getSongs,
   savePlaylist,
+  saveSongOrder,
   saveSongs,
   type Playlist,
   type Song,
@@ -16,12 +17,7 @@ function formatTime(seconds: number) {
   return `${minutes}:${rest.toString().padStart(2, '0')}`
 }
 
-function sourceLocation(song: Song | null) {
-  if (!song?.sourcePath) return null
-  const parts = song.sourcePath.split('/').filter(Boolean)
-  if (parts.length > 1) parts.pop()
-  return parts.length ? `Auf diesem iPad › ${parts.join(' › ')}` : null
-}
+type EditPrompt = 'library' | 'playlists' | null
 
 function App() {
   const [songs, setSongs] = useState<Song[]>([])
@@ -39,16 +35,24 @@ function App() {
   const [editingName, setEditingName] = useState('')
   const [isEditingPlaylist, setIsEditingPlaylist] = useState(false)
   const [isReordering, setIsReordering] = useState(false)
+  const [isLibraryReordering, setIsLibraryReordering] = useState(false)
+  const [isSidebarReordering, setIsSidebarReordering] = useState(false)
+  const [editPrompt, setEditPrompt] = useState<EditPrompt>(null)
   const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(null)
   const [message, setMessage] = useState('')
   const [draggedSongId, setDraggedSongId] = useState<string | null>(null)
+  const [draggedPlaylistId, setDraggedPlaylistId] = useState<string | null>(null)
   const [detailOpen, setDetailOpen] = useState(false)
   const [playHistory, setPlayHistory] = useState<string[]>([])
   const fileInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
+  const libraryScrollRef = useRef<HTMLElement>(null)
+  const sidebarRef = useRef<HTMLElement>(null)
   const shouldAutoPlayRef = useRef(false)
   const reorderOrderRef = useRef<string[]>([])
+  const playlistOrderRef = useRef<string[]>([])
+  const longPressTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     Promise.all([getSongs(), getPlaylists()])
@@ -66,6 +70,18 @@ function App() {
     const byId = new Map(songs.map((song) => [song.id, song]))
     return activePlaylist.songIds.map((id) => byId.get(id)).filter((song): song is Song => Boolean(song))
   }, [activePlaylist, songs])
+
+  const sidebarPlaylists = useMemo(() => [...playlists].sort((a, b) => {
+    if (a.sortOrder !== undefined || b.sortOrder !== undefined) {
+      return (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) || b.lastUsedAt - a.lastUsedAt
+    }
+    return b.lastUsedAt - a.lastUsedAt
+  }), [playlists])
+
+  const currentSongPlaylists = useMemo(() => {
+    if (!currentSong) return []
+    return playlists.filter((playlist) => playlist.songIds.includes(currentSong.id))
+  }, [currentSong, playlists])
 
   useEffect(() => {
     const nextUrls: Record<string, string> = {}
@@ -105,9 +121,7 @@ function App() {
       audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false))
       return
     }
-    if (rememberCurrent && currentSongId) {
-      setPlayHistory((history) => [...history, currentSongId].slice(-50))
-    }
+    if (rememberCurrent && currentSongId) setPlayHistory((history) => [...history, currentSongId].slice(-50))
     shouldAutoPlayRef.current = true
     setCurrentSongId(id)
     setCurrentTime(0)
@@ -187,7 +201,14 @@ function App() {
     event.preventDefault()
     const name = playlistName.trim()
     if (!name) return
-    const playlist: Playlist = { id: crypto.randomUUID(), name, songIds: [], createdAt: Date.now(), lastUsedAt: Date.now() }
+    const playlist: Playlist = {
+      id: crypto.randomUUID(),
+      name,
+      songIds: [],
+      createdAt: Date.now(),
+      lastUsedAt: Date.now(),
+      sortOrder: -Date.now(),
+    }
     await savePlaylist(playlist)
     setPlaylists((existing) => [playlist, ...existing])
     setPlaylistName('')
@@ -195,9 +216,11 @@ function App() {
   }
 
   const openPlaylist = async (id: string | null) => {
+    if (isSidebarReordering) return
     setActivePlaylistId(id)
     setIsEditingPlaylist(false)
     setIsReordering(false)
+    setIsLibraryReordering(false)
     setDraggedSongId(null)
     reorderOrderRef.current = []
     if (!id) return
@@ -226,19 +249,46 @@ function App() {
     setIsReordering((value) => !value)
   }
 
-  const beginTouchReorder = (songId: string, event: React.PointerEvent<HTMLButtonElement>) => {
-    if (!activePlaylist || !isReordering) return
+  const startLongPress = (target: Exclude<EditPrompt, null>) => {
+    if (longPressTimerRef.current !== null) window.clearTimeout(longPressTimerRef.current)
+    longPressTimerRef.current = window.setTimeout(() => {
+      setEditPrompt(target)
+      longPressTimerRef.current = null
+    }, 1000)
+  }
+
+  const cancelLongPress = () => {
+    if (longPressTimerRef.current !== null) {
+      window.clearTimeout(longPressTimerRef.current)
+      longPressTimerRef.current = null
+    }
+  }
+
+  const activatePrompt = () => {
+    if (editPrompt === 'library') setIsLibraryReordering(true)
+    if (editPrompt === 'playlists') setIsSidebarReordering(true)
+    setEditPrompt(null)
+  }
+
+  const beginSongReorder = (songId: string, event: React.PointerEvent<HTMLButtonElement>) => {
+    const canReorder = activePlaylist ? isReordering : isLibraryReordering
+    if (!canReorder) return
     event.preventDefault()
-    reorderOrderRef.current = [...activePlaylist.songIds]
+    reorderOrderRef.current = activePlaylist ? [...activePlaylist.songIds] : songs.map((song) => song.id)
     setDraggedSongId(songId)
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
-  const moveTouchReorder = (event: React.PointerEvent<HTMLButtonElement>) => {
-    if (!activePlaylist || !isReordering || !draggedSongId) return
+  const moveSongReorder = (event: React.PointerEvent<HTMLButtonElement>) => {
+    const canReorder = activePlaylist ? isReordering : isLibraryReordering
+    if (!canReorder || !draggedSongId) return
     event.preventDefault()
-    if (event.clientY < 100) window.scrollBy(0, -18)
-    if (event.clientY > window.innerHeight - 180) window.scrollBy(0, 18)
+    const scrollArea = libraryScrollRef.current
+    if (scrollArea) {
+      const rect = scrollArea.getBoundingClientRect()
+      if (event.clientY < rect.top + 90) scrollArea.scrollBy(0, -18)
+      if (event.clientY > rect.bottom - 90) scrollArea.scrollBy(0, 18)
+    }
     const row = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-song-id]')
     const targetSongId = row?.dataset.songId
     if (!targetSongId || targetSongId === draggedSongId) return
@@ -249,16 +299,72 @@ function App() {
     const [moved] = songIds.splice(fromIndex, 1)
     songIds.splice(toIndex, 0, moved)
     reorderOrderRef.current = songIds
-    setPlaylists((items) => items.map((item) => item.id === activePlaylist.id ? { ...item, songIds } : item))
+    if (activePlaylist) {
+      setPlaylists((items) => items.map((item) => item.id === activePlaylist.id ? { ...item, songIds } : item))
+    } else {
+      const byId = new Map(songs.map((song) => [song.id, song]))
+      setSongs(songIds.map((id) => byId.get(id)).filter((song): song is Song => Boolean(song)))
+    }
   }
 
-  const finishTouchReorder = async () => {
-    if (!activePlaylist || !draggedSongId) return
-    const songIds = reorderOrderRef.current.length ? [...reorderOrderRef.current] : [...activePlaylist.songIds]
-    const updated = { ...activePlaylist, songIds, lastUsedAt: Date.now() }
+  const finishSongReorder = async () => {
+    if (!draggedSongId) return
+    const songIds = [...reorderOrderRef.current]
     setDraggedSongId(null)
     reorderOrderRef.current = []
-    await updatePlaylist(updated)
+    if (activePlaylist) {
+      await updatePlaylist({ ...activePlaylist, songIds, lastUsedAt: Date.now() })
+      return
+    }
+    const byId = new Map(songs.map((song) => [song.id, song]))
+    const ordered = songIds.map((id, index) => {
+      const song = byId.get(id)
+      return song ? { ...song, libraryOrder: index } : null
+    }).filter((song): song is Song => Boolean(song))
+    setSongs(ordered)
+    await saveSongOrder(ordered)
+  }
+
+  const beginPlaylistReorder = (playlistId: string, event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!isSidebarReordering) return
+    event.preventDefault()
+    playlistOrderRef.current = sidebarPlaylists.map((playlist) => playlist.id)
+    setDraggedPlaylistId(playlistId)
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const movePlaylistReorder = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!isSidebarReordering || !draggedPlaylistId) return
+    event.preventDefault()
+    const scrollArea = sidebarRef.current
+    if (scrollArea) {
+      const rect = scrollArea.getBoundingClientRect()
+      if (event.clientY < rect.top + 70) scrollArea.scrollBy(0, -16)
+      if (event.clientY > rect.bottom - 70) scrollArea.scrollBy(0, 16)
+    }
+    const row = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-playlist-id]')
+    const targetId = row?.dataset.playlistId
+    if (!targetId || targetId === draggedPlaylistId) return
+    const ids = [...playlistOrderRef.current]
+    const fromIndex = ids.indexOf(draggedPlaylistId)
+    const toIndex = ids.indexOf(targetId)
+    if (fromIndex < 0 || toIndex < 0) return
+    const [moved] = ids.splice(fromIndex, 1)
+    ids.splice(toIndex, 0, moved)
+    playlistOrderRef.current = ids
+    const order = new Map(ids.map((id, index) => [id, index]))
+    setPlaylists((items) => items.map((playlist) => ({ ...playlist, sortOrder: order.get(playlist.id) ?? playlist.sortOrder })))
+  }
+
+  const finishPlaylistReorder = async () => {
+    if (!draggedPlaylistId) return
+    const ids = [...playlistOrderRef.current]
+    setDraggedPlaylistId(null)
+    playlistOrderRef.current = []
+    const order = new Map(ids.map((id, index) => [id, index]))
+    const updated = playlists.map((playlist) => ({ ...playlist, sortOrder: order.get(playlist.id) ?? playlist.sortOrder }))
+    setPlaylists(updated)
+    await Promise.all(updated.map((playlist) => savePlaylist(playlist)))
   }
 
   const startEditingPlaylist = () => {
@@ -313,7 +419,7 @@ function App() {
     setCurrentTime(value)
   }
 
-  const location = sourceLocation(currentSong)
+  const songReordering = activePlaylist ? isReordering : isLibraryReordering
 
   return (
     <div className="app-shell">
@@ -324,24 +430,46 @@ function App() {
       </header>
 
       <main className="music-layout">
-        <aside className="sidebar">
-          <button className={`nav-item${activePlaylistId === null ? ' active' : ''}`} type="button" onClick={() => openPlaylist(null)}><span>Bibliothek</span><strong>{songs.length}</strong></button>
-          <div className="sidebar-heading"><span>Playlists</span></div>
-          <div className="playlist-nav">
-            {[...playlists].sort((a, b) => b.lastUsedAt - a.lastUsedAt).map((playlist) => (
-              <button key={playlist.id} className={`nav-item${activePlaylistId === playlist.id ? ' active' : ''}`} type="button" onClick={() => openPlaylist(playlist.id)}>
-                <span className="playlist-nav-name">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span className="playlist-mini-cover">♫</span>}<span>{playlist.name}</span></span>
-                <strong>{playlist.songIds.length}</strong>
-              </button>
+        <aside className="sidebar" ref={sidebarRef}>
+          <button className={`nav-item${activePlaylistId === null ? ' active' : ''}`} type="button" onClick={() => openPlaylist(null)} disabled={isSidebarReordering}>
+            <span>Bibliothek</span><strong>{songs.length}</strong>
+          </button>
+
+          <div className="sidebar-heading heading-with-popover">
+            <button
+              className="heading-longpress"
+              type="button"
+              onPointerDown={() => startLongPress('playlists')}
+              onPointerUp={cancelLongPress}
+              onPointerCancel={cancelLongPress}
+              onPointerLeave={cancelLongPress}
+              onContextMenu={(event) => event.preventDefault()}
+            >Playlists</button>
+            {isSidebarReordering && <button className="finish-inline" type="button" onClick={() => setIsSidebarReordering(false)}>Fertig</button>}
+            {editPrompt === 'playlists' && <div className="edit-popover"><button type="button" onClick={activatePrompt}>Bearbeiten</button></div>}
+          </div>
+
+          <div className={`playlist-nav${isSidebarReordering ? ' reordering' : ''}`}>
+            {sidebarPlaylists.map((playlist) => (
+              <div key={playlist.id} data-playlist-id={playlist.id} className={`playlist-nav-row${draggedPlaylistId === playlist.id ? ' dragging' : ''}`}>
+                {isSidebarReordering && (
+                  <button className="playlist-drag-handle" type="button" aria-label={`${playlist.name} verschieben`} onPointerDown={(event) => beginPlaylistReorder(playlist.id, event)} onPointerMove={movePlaylistReorder} onPointerUp={() => void finishPlaylistReorder()} onPointerCancel={() => void finishPlaylistReorder()}>⋮⋮</button>
+                )}
+                <button className={`nav-item${activePlaylistId === playlist.id ? ' active' : ''}`} type="button" onClick={() => openPlaylist(playlist.id)} disabled={isSidebarReordering}>
+                  <span className="playlist-nav-name">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span className="playlist-mini-cover">♫</span>}<span>{playlist.name}</span></span>
+                  <strong>{playlist.songIds.length}</strong>
+                </button>
+              </div>
             ))}
           </div>
+
           <form className="new-playlist" onSubmit={createPlaylist}>
-            <input value={playlistName} onChange={(event) => setPlaylistName(event.target.value)} placeholder="Neue Playlist" aria-label="Name der neuen Playlist" />
-            <button type="submit" disabled={!playlistName.trim()} aria-label="Playlist erstellen">+</button>
+            <input value={playlistName} onChange={(event) => setPlaylistName(event.target.value)} placeholder="Neue Playlist" aria-label="Name der neuen Playlist" disabled={isSidebarReordering} />
+            <button type="submit" disabled={!playlistName.trim() || isSidebarReordering} aria-label="Playlist erstellen">+</button>
           </form>
         </aside>
 
-        <section className="library-panel">
+        <section className="library-panel" ref={libraryScrollRef}>
           <div className={`library-heading${activePlaylist ? ' playlist-heading' : ''}`}>
             {activePlaylist && <button className="playlist-cover" type="button" onClick={() => coverInputRef.current?.click()} aria-label="Playlist-Bild ändern">{coverUrls[activePlaylist.id] ? <img src={coverUrls[activePlaylist.id]} alt="" /> : <span>+ Bild</span>}</button>}
             <div className="library-title">
@@ -352,7 +480,21 @@ function App() {
                   <button type="submit" disabled={!editingName.trim()}>Speichern</button>
                   <button type="button" onClick={() => setIsEditingPlaylist(false)}>Abbrechen</button>
                 </form>
-              ) : <h1>{activePlaylist?.name ?? 'Bibliothek'}</h1>}
+              ) : activePlaylist ? <h1>{activePlaylist.name}</h1> : (
+                <div className="library-heading-trigger heading-with-popover">
+                  <button
+                    className="library-name-trigger"
+                    type="button"
+                    onPointerDown={() => startLongPress('library')}
+                    onPointerUp={cancelLongPress}
+                    onPointerCancel={cancelLongPress}
+                    onPointerLeave={cancelLongPress}
+                    onContextMenu={(event) => event.preventDefault()}
+                  >Bibliothek</button>
+                  {isLibraryReordering && <button className="finish-inline" type="button" onClick={() => setIsLibraryReordering(false)}>Fertig</button>}
+                  {editPrompt === 'library' && <div className="edit-popover"><button type="button" onClick={activatePrompt}>Bearbeiten</button></div>}
+                </div>
+              )}
               <p>{queue.length} {queue.length === 1 ? 'Song' : 'Songs'}</p>
             </div>
             {activePlaylist ? (
@@ -367,19 +509,19 @@ function App() {
           </div>
 
           {message && <div className="message" role="status">{message}</div>}
-          {activePlaylist && isReordering && <div className="reorder-hint">Ziehe Songs am Griff links an die gewünschte Position. Tippe danach auf „Fertig“.</div>}
+          {songReordering && <div className="reorder-hint">Ziehe Songs am Griff links an die gewünschte Position. Tippe danach auf „Fertig“.</div>}
 
           {queue.length ? (
-            <div className={`song-list${isReordering ? ' reordering' : ''}`}>
+            <div className={`song-list${songReordering ? ' reordering' : ''}`}>
               {queue.map((song, index) => (
-                <div key={song.id} data-song-id={song.id} className={`song-row${isReordering ? ' reorder-mode' : ''}${song.id === currentSongId ? ' current' : ''}${draggedSongId === song.id ? ' dragging' : ''}`}>
-                  {activePlaylist && isReordering && <button className="drag-handle" type="button" aria-label={`${song.name} verschieben`} onPointerDown={(event) => beginTouchReorder(song.id, event)} onPointerMove={moveTouchReorder} onPointerUp={() => void finishTouchReorder()} onPointerCancel={() => void finishTouchReorder()}>⋮⋮</button>}
-                  <button className="song-main" type="button" onClick={() => playSong(song.id)} disabled={isReordering}>
+                <div key={song.id} data-song-id={song.id} className={`song-row${songReordering ? ' reorder-mode' : ''}${song.id === currentSongId ? ' current' : ''}${draggedSongId === song.id ? ' dragging' : ''}`}>
+                  {songReordering && <button className="drag-handle" type="button" aria-label={`${song.name} verschieben`} onPointerDown={(event) => beginSongReorder(song.id, event)} onPointerMove={moveSongReorder} onPointerUp={() => void finishSongReorder()} onPointerCancel={() => void finishSongReorder()}>⋮⋮</button>}
+                  <button className="song-main" type="button" onClick={() => playSong(song.id)} disabled={songReordering}>
                     <span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span>
                     <span className="song-copy"><strong>{song.name}</strong></span>
                     <span className="song-action">▶</span>
                   </button>
-                  {activePlaylist && !isReordering && <button className="remove-song" type="button" onClick={() => removeSongFromActivePlaylist(song.id)} aria-label={`${song.name} aus Playlist entfernen`}>Entfernen</button>}
+                  {activePlaylist && !songReordering && <button className="remove-song" type="button" onClick={() => removeSongFromActivePlaylist(song.id)} aria-label={`${song.name} aus Playlist entfernen`}>Entfernen</button>}
                 </div>
               ))}
             </div>
@@ -425,9 +567,9 @@ function App() {
           <div className="detail-content">
             <p className="detail-label">JETZT</p>
             <h2>{currentSong.name}</h2>
-            <div className="source-card">
-              <span>Original</span>
-              <strong>{location ?? 'Originalordner wird von Safari bei dieser Dateiauswahl nicht freigegeben.'}</strong>
+            <div className="playlist-membership">
+              <span>IN PLAYLISTS</span>
+              <strong>{currentSongPlaylists.length ? currentSongPlaylists.map((playlist) => playlist.name).join(' · ') : 'In keiner Playlist'}</strong>
             </div>
             <div className="detail-progress">
               <input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} aria-label="Wiedergabeposition" />
@@ -443,6 +585,8 @@ function App() {
           </div>
         </section>
       )}
+
+      {editPrompt && <button className="edit-popover-shield" type="button" aria-label="Bearbeiten schließen" onClick={() => setEditPrompt(null)} />}
 
       {playlistToDelete && <div className="modal-backdrop" role="presentation" onMouseDown={() => setPlaylistToDelete(null)}><div className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-playlist-title" onMouseDown={(event) => event.stopPropagation()}><h2 id="delete-playlist-title">Playlist löschen?</h2><p>„{playlistToDelete.name}“ wird gelöscht. Die Musikdateien selbst bleiben in deiner Bibliothek.</p><div className="dialog-actions"><button type="button" onClick={() => setPlaylistToDelete(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={confirmDeletePlaylist}>Playlist löschen</button></div></div></div>}
     </div>

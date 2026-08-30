@@ -5,6 +5,7 @@ export type Song = {
   type: string
   addedAt: number
   sourcePath?: string
+  libraryOrder?: number
 }
 
 export type Playlist = {
@@ -14,6 +15,7 @@ export type Playlist = {
   createdAt: number
   lastUsedAt: number
   cover?: Blob
+  sortOrder?: number
 }
 
 const DB_NAME = 'josi-music'
@@ -46,7 +48,7 @@ export async function getSongs(): Promise<Song[]> {
   try {
     const tx = db.transaction(SONGS, 'readonly')
     const songs = await requestResult(tx.objectStore(SONGS).getAll() as IDBRequest<Song[]>)
-    return songs.sort((a, b) => a.addedAt - b.addedAt)
+    return songs.sort((a, b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt))
   } finally {
     db.close()
   }
@@ -64,6 +66,7 @@ export async function saveSongs(files: File[]): Promise<Song[]> {
       type: file.type || 'audio/mpeg',
       addedAt: now + index,
       sourcePath: relativePath || undefined,
+      libraryOrder: now + index,
     }
   })
 
@@ -77,6 +80,19 @@ export async function saveSongs(files: File[]): Promise<Song[]> {
   })
   db.close()
   return songs
+}
+
+export async function saveSongOrder(songs: Song[]): Promise<void> {
+  const db = await openDb()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(SONGS, 'readwrite')
+    const store = tx.objectStore(SONGS)
+    songs.forEach((song, index) => store.put({ ...song, libraryOrder: index }))
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+    tx.onabort = () => reject(tx.error)
+  })
+  db.close()
 }
 
 export async function getPlaylists(): Promise<Playlist[]> {
