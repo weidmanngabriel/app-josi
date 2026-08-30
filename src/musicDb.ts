@@ -6,6 +6,8 @@ export type Song = {
   addedAt: number
   sourcePath?: string
   libraryOrder?: number
+  importBatchId?: string
+  isNew?: boolean
 }
 
 export type Playlist = {
@@ -54,7 +56,7 @@ export async function getSongs(): Promise<Song[]> {
   }
 }
 
-export async function saveSongs(files: File[]): Promise<Song[]> {
+export async function saveSongs(files: File[], importBatchId = crypto.randomUUID()): Promise<Song[]> {
   const db = await openDb()
   const now = Date.now()
   const songs: Song[] = files.map((file, index) => {
@@ -67,6 +69,8 @@ export async function saveSongs(files: File[]): Promise<Song[]> {
       addedAt: now + index,
       sourcePath: relativePath || undefined,
       libraryOrder: now + index,
+      importBatchId,
+      isNew: true,
     }
   })
 
