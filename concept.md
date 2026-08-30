@@ -1,49 +1,66 @@
 # Produktkonzept
 
-Diese Datei ist die fachliche Quelle für die App, die aus diesem Template entsteht. Beim Start eines neuen Projekts sollte sie früh mit dem tatsächlichen Produktkonzept gefüllt und danach laufend aktuell gehalten werden.
-
 ## Grundidee
 
-**Noch festzulegen.**
+Josi ist eine kleine, lokal laufende Musik-App für das iPad. Nutzer importieren eigene Audiodateien aus der Dateien-App, organisieren sie in Playlists und spielen sie anschließend direkt in Josi ab.
 
-Beschreibe hier in wenigen Absätzen:
-
-- welches Problem die App löst,
-- für wen sie gedacht ist,
-- welchen konkreten Nutzen sie bietet,
-- was die wichtigste Annahme hinter dem Produkt ist.
+Der erste Proof of Concept soll vor allem validieren, ob der Ablauf **Importieren → Playlist organisieren → zuverlässig abspielen** einen echten praktischen Nutzen bietet.
 
 ## Zielgruppe
 
-**Noch festzulegen.**
+Erste Zielgruppe sind Nutzer, die bereits eigene Musikdateien lokal auf ihrem iPad haben und diese ohne Streamingdienst einfach in Playlists organisieren und abspielen möchten.
 
-## Kernfunktionen
+## Kernfunktionen des Proof of Concept
 
-Noch keine produktspezifischen Funktionen definiert.
-
-Als technische Ausgangsbasis vorhanden:
-
-- installierbare PWA,
-- responsive Startoberfläche,
-- optionaler Google Login,
-- mehrere lokal gespeicherte Google-Konten mit Accountwechsel,
-- automatisches Deployment über GitHub Pages.
-
-Diese technischen Funktionen sind keine Vorgabe für das spätere Geschäftsmodell und dürfen angepasst oder entfernt werden.
+- Mehrere lokale Audiodateien über den normalen Dateiauswahldialog importieren.
+- Audiodateien dauerhaft im lokalen Browser-Speicher der App ablegen.
+- Bibliothek aller importierten Songs anzeigen.
+- Player mit Play/Pause, vorherigem Song, nächstem Song und Fortschrittsanzeige.
+- Nach Ende eines Songs automatisch den nächsten Song der aktuellen Bibliothek oder Playlist abspielen.
+- Mehrere Playlists erstellen.
+- Songs Playlists zuordnen, ohne die Audiodatei zu duplizieren.
+- Im Player Playlists schnell per Plus/Minus verwalten: Playlists, in denen der aktuelle Song bereits enthalten ist, stehen zuerst; danach folgen zuletzt verwendete Playlists.
+- Die Anwendung bleibt als PWA installierbar und funktioniert ohne Backend.
 
 ## Zentrale Abläufe
 
-**Noch festzulegen.**
+### Musik importieren
 
-Dokumentiere hier die wenigen wichtigsten Nutzerabläufe, sobald sie definiert sind.
+1. Nutzer tippt auf „Musik importieren“.
+2. Der normale Dateidialog des Geräts öffnet sich.
+3. Eine oder mehrere Audiodateien werden ausgewählt.
+4. Josi speichert die Dateien lokal und zeigt sie in der Bibliothek an.
 
-## Abgrenzung
+### Musik abspielen
 
-Das Template enthält bewusst keine fachliche Datenbank, keine Rollenlogik, keine Zahlungsabwicklung und keine produktspezifischen Prozesse. Solche Funktionen werden erst ergänzt, wenn sie für das neue Produkt erforderlich sind.
+1. Nutzer öffnet Bibliothek oder Playlist.
+2. Ein Song wird angetippt und startet.
+3. Play/Pause sowie Vor/Zurück steuern die Wiedergabe.
+4. Nach Songende startet automatisch der nächste Song der aktuellen Ansicht.
+
+### Song schnell einer Playlist zuordnen
+
+1. Während ein Song im Player aktiv ist, zeigt der Player die Playlists an.
+2. Playlists, die den Song bereits enthalten, stehen oben und zeigen ein Minus.
+3. Ein Klick auf Minus entfernt den Song.
+4. Andere Playlists folgen nach letzter Verwendung und zeigen ein Plus.
+5. Ein Klick auf Plus fügt den Song sofort hinzu.
+
+## Abgrenzung des ersten Proof of Concept
+
+Bewusst noch nicht Teil der Minimum-Version:
+
+- Cloud-Synchronisierung oder Backend,
+- Nutzerkonten oder Google Login im Produktablauf,
+- Metadaten-/Cover-Erkennung,
+- Suche, Shuffle oder Repeat,
+- Musik-Streaming,
+- Crossfade/Fading zwischen Songs.
+
+Crossfade ist als mögliche nächste Erweiterung vorgesehen, sobald Import, Playlist-Verwaltung und Autoplay auf dem iPad stabil funktionieren.
 
 ## Offene Annahmen
 
-- Welche Nutzergruppe soll zuerst validiert werden?
-- Welches Verhalten zeigt, dass das Produkt echten Nutzen bietet?
-- Welche Funktionen sind für einen ersten validierbaren Prototyp wirklich nötig?
-- Welche Funktionen können zunächst bewusst manuell oder außerhalb der App gelöst werden?
+- Die vom Browser bereitgestellte lokale Speicherkapazität reicht für einen realistischen ersten Test mit der persönlichen Musiksammlung aus.
+- Die relevanten Audioformate werden von Safari/iPadOS zuverlässig abgespielt.
+- Für eine spätere Produktversion muss geprüft werden, wie Backups, Speichergrenzen und Datenverlust bei Browser-/Gerätebereinigung behandelt werden.
