@@ -8,6 +8,10 @@ export type Song = {
   libraryOrder?: number
   importBatchId?: string
   isNew?: boolean
+  loopStart?: number
+  loopEnd?: number
+  loopEnabled?: boolean
+  loopConfidence?: number
 }
 
 export type Playlist = {
@@ -45,6 +49,19 @@ function requestResult<T>(request: IDBRequest<T>): Promise<T> {
   })
 }
 
+async function putSongs(songs: Song[]): Promise<void> {
+  const db = await openDb()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(SONGS, 'readwrite')
+    const store = tx.objectStore(SONGS)
+    songs.forEach((song) => store.put(song))
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+    tx.onabort = () => reject(tx.error)
+  })
+  db.close()
+}
+
 export async function getSongs(): Promise<Song[]> {
   const db = await openDb()
   try {
@@ -57,46 +74,27 @@ export async function getSongs(): Promise<Song[]> {
 }
 
 export async function saveSongs(files: File[], importBatchId = crypto.randomUUID()): Promise<Song[]> {
-  const db = await openDb()
   const now = Date.now()
-  const songs: Song[] = files.map((file, index) => {
-    const relativePath = (file as File & { webkitRelativePath?: string }).webkitRelativePath?.trim()
-    return {
-      id: crypto.randomUUID(),
-      name: file.name.replace(/\.[^.]+$/, '') || file.name,
-      file,
-      type: file.type || 'audio/mpeg',
-      addedAt: now + index,
-      sourcePath: relativePath || undefined,
-      libraryOrder: now + index,
-      importBatchId,
-      isNew: true,
-    }
-  })
-
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(SONGS, 'readwrite')
-    const store = tx.objectStore(SONGS)
-    songs.forEach((song) => store.put(song))
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
-    tx.onabort = () => reject(tx.error)
-  })
-  db.close()
+  const songs: Song[] = files.map((file, index) => ({
+    id: crypto.randomUUID(),
+    name: file.name.replace(/\.[^.]+$/, '') || file.name,
+    file,
+    type: file.type || 'audio/mpeg',
+    addedAt: now + index,
+    libraryOrder: now + index,
+    importBatchId,
+    isNew: true,
+  }))
+  await putSongs(songs)
   return songs
 }
 
+export async function saveSong(song: Song): Promise<void> {
+  await putSongs([song])
+}
+
 export async function saveSongOrder(songs: Song[]): Promise<void> {
-  const db = await openDb()
-  await new Promise<void>((resolve, reject) => {
-    const tx = db.transaction(SONGS, 'readwrite')
-    const store = tx.objectStore(SONGS)
-    songs.forEach((song, index) => store.put({ ...song, libraryOrder: index }))
-    tx.oncomplete = () => resolve()
-    tx.onerror = () => reject(tx.error)
-    tx.onabort = () => reject(tx.error)
-  })
-  db.close()
+  await putSongs(songs.map((song, index) => ({ ...song, libraryOrder: index })))
 }
 
 export async function getPlaylists(): Promise<Playlist[]> {
