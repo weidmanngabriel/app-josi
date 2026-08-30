@@ -2,109 +2,94 @@
 
 ## Überblick
 
-Die Anwendung ist eine rein clientseitige React-App mit TypeScript und Vite. Der Einstieg liegt in `src/main.tsx`, die Musikoberfläche in `src/App.tsx`, die lokale Musikdatenbank in `src/musicDb.ts` und das globale Styling in `src/styles.css`. Zusätzliche Styles liegen in `src/enhancements.css`; der manuelle Loop-Editor hat eigene Styles in `src/loopEditor.css`.
+Die Anwendung ist eine rein clientseitige React-App mit TypeScript und Vite. `src/App.tsx` enthält die Musikoberfläche und Interaktionslogik, `src/musicDb.ts` kapselt IndexedDB, `src/styles.css` enthält das Grundlayout, `src/enhancements.css` Zusatzfunktionen und `src/loopEditor.css` den präzisen Loop-Editor.
 
-Josi ist im aktuellen Proof of Concept eine lokale Musik-App ohne Backend. Audiodateien und Playlists bleiben auf dem jeweiligen Gerät im Browser-Speicher.
+Josi bleibt eine lokale Musik-PWA ohne Backend. Audiodateien und Playlists liegen ausschließlich im Browser-Speicher des jeweiligen Geräts.
 
 ## Lokale Musikdaten
 
 ### Songs
 
-Ein Song enthält ID, Anzeigename, Audiodatei als Blob, MIME-Typ, Importzeitpunkt, optionale Bibliotheksposition, Import-Batch-ID, Neu-Status sowie optionale Wiedergabe- und Loop-Daten:
+Ein Song enthält unter anderem ID, Name, Audiodatei als Blob, MIME-Typ, Importzeitpunkt, manuelle Bibliotheksposition, Neu-Status, Dauer, vollständig gehörte Wiedergaben sowie Loop-Daten:
 
-- `duration`: Lieddauer in Sekunden,
-- `completedPlays`: Anzahl vollständig beendeter Wiedergaben,
-- `loopStart`, `loopEnd`, `loopEnabled`.
+- `loopStart`
+- `loopEnd`
+- `loopEnabled`
+- `loopMarkers` für orange Hilfsmarkierungen im Loop-Editor
 
-`loopConfidence` kann in älteren Datensätzen noch vorkommen, wird vom aktuellen manuellen Loop-Editor aber nicht mehr verwendet.
-
-Die Dauer wird nicht mehr beim Import über `AudioContext` analysiert. Sie wird erst gespeichert, wenn das normale HTML-Audio-Element die Datei tatsächlich lädt und `loadedmetadata` liefert. Dadurch bleibt der Import möglichst leichtgewichtig.
-
-`completedPlays` wird ausschließlich beim normalen `ended`-Ereignis erhöht. Manuelles Überspringen zählt nicht als vollständig gehört.
+`deleteSong()` löscht einen Song gezielt aus IndexedDB. Beim Löschen entfernt `App.tsx` die Song-ID zusätzlich aus allen Playlists. Beim Kopieren eines Songs entsteht eine neue Song-ID mit eigenem Bibliothekseintrag; der Audiodaten-Blob wird als Teil des neuen Datensatzes gespeichert.
 
 ### Playlists
 
-Playlists enthalten ID, Name, geordnete Song-IDs, optionales Bild, Erstellungs-/Nutzungszeit und optionale manuelle Sortierposition. Audiodateien werden nicht pro Playlist dupliziert.
+Playlists enthalten ID, Name, geordnete Song-IDs, optionales Bild, Erstellungs-/Nutzungszeit und manuelle Sortierposition. Eine kopierte Playlist erhält eine neue ID, verweist aber auf dieselben Songs; Audiodateien werden dadurch nicht dupliziert.
 
-## Dateiimport und Speicherstabilität
+## Import und Speicherstabilität
 
-Der Import verwendet ausschließlich `<input type="file" multiple>`. Vor dem Öffnen wird der Wert des File-Inputs geleert, damit auch eine erneute Auswahl derselben Datei zuverlässig ein neues `change`-Ereignis auslösen kann.
+Der Import verwendet ausschließlich `<input type="file" multiple>`. Beim Import werden nur neue Dateien geschrieben. Vorherige Neu-Markierungen werden nur an den betroffenen Songs geändert; die gesamte Bibliothek wird nicht erneut gespeichert.
 
-Beim Import werden nur die tatsächlich neu ausgewählten Dateien in IndexedDB geschrieben. Die frühere Implementierung schrieb vor jedem Import die gesamte vorhandene Bibliothek erneut, um den Neu-Status zu ändern. Das wurde entfernt, weil große Audio-Blobs dabei unnötig erneut geschrieben wurden und auf iPadOS zusätzlichen Speicher- und Quota-Druck erzeugen konnten.
-
-Vorherige Neu-Markierungen werden nur noch bei den tatsächlich als neu markierten Songs einzeln aktualisiert. Neue Dateien werden anschließend direkt gespeichert. Eine Daueranalyse blockiert den Import nicht mehr.
-
-`--:--` bedeutet ausschließlich, dass die Dauer noch nicht bekannt ist. Wenn der gespeicherte Blob fehlt oder Größe `0` hat, zeigt die Oberfläche stattdessen `FEHLT`. Ein solcher Blob kann technisch nicht aus Metadaten rekonstruiert werden und muss neu importiert werden.
-
-Der Browser bzw. iPadOS verwaltet IndexedDB-Speicher. Bei Speicherknappheit kann Web-Speicher begrenzt oder entfernt werden; Josi kann verlorene Audiodaten ohne erneuten Zugriff auf die Originaldatei nicht wiederherstellen.
-
-## Ansichten und Navigation
-
-Die Hauptansichten sind Bibliothek bzw. geöffnete Playlist, Verlauf, Loops, Playlist-Übersicht, Songdetail und der bildschirmfüllende Loop-Editor. Zurück/Vor bewegen sich im Sitzungsverlauf; beim offenen Loop-Editor schließt Zurück zunächst den Editor.
-
-Undo/Redo bleibt davon getrennt und arbeitet mit Snapshots von Songs und Playlists. Bei einer vorgemerkten manuellen Verschiebung folgen Haken und X.
+Die Lieddauer wird erst beim tatsächlichen Laden im HTML-Audio-Element gespeichert. `--:--` bedeutet unbekannte Dauer, `FEHLT` bedeutet, dass der lokale Blob fehlt oder Größe 0 hat.
 
 ## Drei-Punkte-Menüs
 
-Langdruck-Gesten werden nicht mehr für Funktionen verwendet. Stattdessen gibt es sichtbare `•••`-Knöpfe bei Songs, Playlists und neben der Überschrift „Playlists“.
+Langdruck wird nicht verwendet. Zusatzfunktionen liegen in sichtbaren `•••`-Menüs.
 
-Das Song-Menü enthält unter anderem „Als gesehen markieren“ und „Loop erstellen“ bzw. „Loop bearbeiten“. „Loop erstellen“ öffnet direkt den manuellen Loop-Editor und führt keine automatische Audioanalyse mehr aus.
+### Song-Menü
 
-## Songlisten und Mehrfachauswahl
+In dieser Reihenfolge:
 
-Bibliothek, geöffnete Playlist, Verlauf und Loops verwenden denselben Auswahlmechanismus. „Auswählen“ aktiviert den Modus, „Alle“ markiert die aktuell sichtbare Liste.
+1. Umbenennen
+2. Kopieren
+3. Teilen
+4. Loop erstellen bzw. Loop bearbeiten
+5. Nur bei blau markierten Songs: „Als gelesen markieren“ in Blau
+6. Nur bei blau markierten Songs: „Alle als gelesen markieren“ in Blau
+7. Löschen in Rot
 
-Die Playlist-Zuordnung erfolgt ausschließlich über „Alle Playlists“ unten rechts. Im Auswahlmodus wird damit die gesamte Auswahl einer Playlist zugeordnet.
+Beim Teilen wird aus dem gespeicherten Blob eine `File` erzeugt und über die Web Share API an die Systemfreigabe übergeben, sofern Browser/iPadOS Dateifreigabe unterstützt. Bei fehlender Unterstützung zeigt Josi eine Meldung.
 
-## Playlist-Dialog
+### Playlist-Menü
 
-Playlists werden numerisch/alphabetisch sortiert und nach erstem Zeichen gruppiert: Symbole (`#`), Zahlen (`0–9`) und danach Buchstaben.
+Einzelne Playlists bieten Umbenennen, Kopieren, Teilen und Löschen. „Teilen“ übergibt eine Textübersicht mit Playlistname und Liedliste an die Systemfreigabe. Der separate Löschknopf in der geöffneten Playlist wurde entfernt; die Bestätigungsabfrage bleibt erhalten.
+
+Das `•••` neben der Überschrift „Playlists“ bleibt für „Bearbeiten“ und „Übersicht“ zuständig.
+
+## Löschen und Undo/Redo
+
+Song- und Playlist-Löschen verwenden Bestätigungsdialoge. Der Snapshot-Verlauf berücksichtigt fehlende Song-IDs und kann bei Undo/Redo deshalb auch kopierte oder gelöschte Songs wiederherstellen bzw. entfernen. Frisch importierte Dateien werden weiterhin nicht automatisch durch Undo gelöscht.
+
+## Mehrfachauswahl und Playlist-Zuordnung
+
+Bibliothek, Playlists, Verlauf und Loops verwenden denselben Auswahlmodus. Die Zuordnung erfolgt ausschließlich über „Alle Playlists“ unten rechts. Die Playlist-Liste ist nach Symbolen, Zahlen und danach Buchstaben gruppiert.
 
 ## Sortierung
 
-Alle Songlisten verwenden dieselbe Sortiersteuerung:
+Alle Songlisten unterstützen `Manuell`, `A–Z Anfang`, `A–Z Ende`, `Anzahl des Hörens`, `Dauer` und `Chronik`. Die Sortieransicht verändert die manuelle Reihenfolge nicht. Die gewählte Ansicht und Richtung werden in `localStorage` gespeichert.
 
-- `Manuell`
-- `A–Z Anfang`
-- `A–Z Ende`
-- `Anzahl des Hörens`
-- `Dauer`
-- `Chronik`
+## Präziser Loop-Editor
 
-Für alle Modi außer `Manuell` kann die Richtung umgekehrt werden. Die Sortieransicht verändert niemals `libraryOrder` oder `playlist.songIds`; die manuelle Reihenfolge bleibt separat erhalten.
+Die automatische Loop-Erkennung bleibt entfernt. Der Editor arbeitet mit dem bestehenden HTML-Audio-Element und einer zoombaren Zeitachse.
 
-## Manueller Loop-Editor
+Funktionen:
 
-Die automatische Loop-Heuristik wurde entfernt, weil sie auf realen Dateien nicht zuverlässig genug war.
-
-Der neue Loop-Editor arbeitet ausschließlich mit dem vorhandenen HTML-Audio-Element:
-
-1. „Loop erstellen“ oder „Loop bearbeiten“ öffnet eine eigene Vollbildansicht.
-2. Ein roter Auswahlkasten liegt auf dem kompletten Zeitstrahl.
-3. Der Kasten kann als Ganzes horizontal verschoben werden.
-4. Linke und rechte Kante können getrennt gezogen werden, um Start und Ende zu verändern.
-5. „Loop testen“ setzt die Wiedergabe an den Startpunkt; während der Editor offen ist springt der Player beim Endpunkt zurück zum aktuellen Entwurf.
-6. „Loop speichern“ schreibt `loopStart`, `loopEnd` und `loopEnabled: true` in den Song.
-7. Erst gespeicherte Loops bekommen die rote Schleife in Songlisten und erscheinen im Tab „Loops“.
+- Zoom von 1× bis 16×; bei Zoom wird die Zeitachse horizontal scrollbar.
+- Roter Loop-Bereich mit verschiebbarem Gesamtfenster und getrennten Start-/Endgriffen.
+- Der zuletzt berührte rote Rand wird hervorgehoben und kann in 10-ms-Schritten vor/zurück bewegt werden.
+- Der rote Bereich kann gesperrt werden. Dann wird er transparenter und reagiert nicht auf Pointer-Eingaben, damit der Abspielcursor ohne Konflikt bewegt werden kann.
+- Blauer Abspielcursor, der unabhängig vom roten Bereich durch Tippen/Ziehen oder Wiedergabe bewegt wird.
+- Transport im Editor: −5 Sekunden, Play/Pause, +5 Sekunden.
+- Orange Markierungen können am blauen Cursor gesetzt werden. Markierungen sind anklickbar und springen den Cursor an ihre Position. Die Markierungsfunktion kann ein-/ausgeschaltet werden; gespeicherte Markierungen bleiben im Song erhalten.
+- Ein frei eingebbarer Vorlaufwert in Sekunden (Komma oder Punkt möglich) steuert „vor Start abspielen“ und „vor Ende abspielen“.
+- Beim Erreichen des aktuellen Loop-Endes springt die Wiedergabe im Editor zum Loop-Start zurück.
+- „Loop speichern“ persistiert Start, Ende, Aktivstatus und Marker.
 
 ## Player und Media Session
 
-Der Player verwendet ein einzelnes HTML-Audio-Element für Play/Pause, Fortschritt, Vor/Zurück, Autoplay, Shuffle, Wiederholung und Loop-Vorschau.
-
-Beim `loadedmetadata`-Ereignis wird eine bisher unbekannte Lieddauer gespeichert. Beim `error`-Ereignis zeigt die App einen Hinweis, dass die lokale Audiodatei nicht geladen werden konnte und neu importiert werden muss.
-
-Wenn `navigator.mediaSession` verfügbar ist, werden Metadaten und Systemaktionen registriert. Eine PWA kann keine native `AVAudioSession` oder iOS-Background-Mode-Berechtigung konfigurieren; tatsächliche Hintergrundwiedergabe bleibt von Safari/WebKit und iPadOS abhängig.
-
-## Manuelles Sortieren und Playlist-Verwaltung
-
-Songs in Bibliothek und Playlist sowie Playlists in der linken Leiste behalten das zweistufige manuelle Verschieben: Element auswählen, Zielzwischenraum markieren, anschließend mit Haken bestätigen oder X abbrechen.
-
-Playlists können erstellt, umbenannt, bebildert und gelöscht werden. Beim Löschen bleiben Songdateien erhalten.
+Ein einzelnes HTML-Audio-Element übernimmt Wiedergabe, Fortschritt, Systemsteuerung und Loop-Vorschau. Vollständig gehörte Songs werden nur beim natürlichen `ended`-Ereignis gezählt. Media Session wird genutzt, soweit Safari/iPadOS sie bereitstellt.
 
 ## PWA und Deployment
 
-`vite-plugin-pwa` erzeugt Manifest und Service Worker. Der Vite-Basispfad bleibt relativ (`./`). `.github/workflows/deploy.yml` baut Änderungen auf `main` und veröffentlicht `dist` über GitHub Pages.
+`vite-plugin-pwa` erzeugt Manifest und Service Worker. Der Vite-Basispfad bleibt relativ (`./`). `.github/workflows/deploy.yml` baut `main` und veröffentlicht `dist` auf GitHub Pages.
 
 ## Grenzen
 
-Die lokale Browser-Speicherkapazität und Speicherbereinigung durch iPadOS bleiben ein wesentliches Produktrisiko. Eine reine PWA kann keine bereits aus IndexedDB verlorene Audiodatei wiederherstellen. Für eine produktive Version müssen Backup, Wiederherstellung und gegebenenfalls eine native App-Hülle geprüft werden.
+IndexedDB und Web Share werden vom Browser/iPadOS kontrolliert. Verlorene lokale Audiodaten können ohne erneuten Import nicht rekonstruiert werden. Dateifreigabe kann je nach Safari-/PWA-Version eingeschränkt sein. Für eine Produktversion bleiben Backup, Wiederherstellung und gegebenenfalls eine native App-Hülle wichtige Themen.

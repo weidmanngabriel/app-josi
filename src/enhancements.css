@@ -73,6 +73,11 @@
 .overflow-menu { position: fixed; z-index: 141; top: 76px; left: 18px; display: grid; min-width: 220px; max-width: min(330px, calc(100vw - 36px)); padding: 6px; border: 1px solid #3a4050; border-radius: 13px; background: #171b24; box-shadow: 0 18px 50px rgba(0,0,0,.5); }
 .overflow-menu button { min-height: 42px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; text-align: left; cursor: pointer; }
 .overflow-menu button:hover { background: #252a36; }
+.overflow-menu .blue-menu-action { color: #60a5fa; }
+.overflow-menu .blue-menu-action:hover { background: rgba(37,99,235,.16); }
+.overflow-menu .danger-menu-action { color: #f87171; }
+.overflow-menu .danger-menu-action:hover { background: rgba(127,29,29,.22); }
+.rename-dialog input { width: 100%; min-height: 44px; margin: 8px 0 18px; padding: 0 12px; border: 1px solid #3b4352; border-radius: 10px; background: #0f131b; color: #fff; font: inherit; }
 
 .all-playlists-button { display: flex; align-items: center; justify-content: space-between; width: 100%; min-height: 52px; padding: 0 16px; border: 1px solid #3b4354; border-radius: 14px; background: #171c27; cursor: pointer; }
 .all-playlists-button span { font-weight: 750; }
