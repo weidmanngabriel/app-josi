@@ -12,12 +12,14 @@ Josi ist im aktuellen Proof of Concept eine lokale Musik-App ohne Backend. Audio
 
 Es gibt zwei Datenarten:
 
-- **Songs**: ID, Anzeigename, Audiodatei als Blob, MIME-Typ und Importzeitpunkt.
+- **Songs**: ID, Anzeigename, Audiodatei als Blob, MIME-Typ, Importzeitpunkt und – falls vom Browser geliefert – relativer Quellpfad.
 - **Playlists**: ID, Name, geordnete Song-IDs, optionales Playlist-Bild als Blob sowie Zeitpunkte für Erstellung und letzte Verwendung.
 
 Audiodateien werden beim Import vollständig in IndexedDB gespeichert. Playlists referenzieren nur Song-IDs; die Audiodatei wird nicht pro Playlist dupliziert. Playlist-Bilder werden ebenfalls lokal in der jeweiligen Playlist gespeichert.
 
 Für die Wiedergabe erzeugt die App für den aktuell ausgewählten Audio-Blob temporär eine Object-URL und gibt sie an ein HTML-Audio-Element weiter. Dasselbe Prinzip wird für die Anzeige lokaler Playlist-Bilder verwendet. Nicht mehr benötigte Object-URLs werden wieder freigegeben.
+
+Ein normaler Browser-Dateidialog liefert auf iPadOS aus Datenschutzgründen nicht zuverlässig den vollständigen Originalpfad aus der Dateien-App. Wenn `webkitRelativePath` vorhanden ist, speichert Josi diesen relativen Pfad. Andernfalls zeigt die Songdetailansicht ausdrücklich an, dass Safari den Originalordner nicht freigibt; ein vollständiger Pfad wird nicht erfunden.
 
 ## Player und Warteschlange
 
@@ -31,6 +33,8 @@ Play/Pause, Vor, Zurück und die Fortschrittsanzeige steuern ein einzelnes HTML-
 Shuffle kann für die nächste Titelauswahl aktiviert werden. Repeat sorgt dafür, dass am Ende der Warteschlange wieder am Anfang weitergespielt wird.
 
 Im Player werden Playlists für den aktuellen Song sortiert angezeigt: zuerst Playlists, die den Song bereits enthalten, danach die übrigen nach letzter Verwendung. Plus/Minus aktualisiert die Playlist unmittelbar in IndexedDB.
+
+Die kompakte Anzeige „Jetzt“ ist anklickbar und öffnet eine Songdetailansicht innerhalb der App. Sie verwendet denselben laufenden Audio-Player und bietet eine große Titelanzeige, verfügbare Herkunftsinformationen, frei verschiebbare Wiedergabeposition sowie fünf Bedienelemente: tatsächlich zuvor abgespielter Song, 10 Sekunden zurück, Play/Pause, 10 Sekunden vor und nächster Song. Für den historischen Zurück-Button hält die Oberfläche eine kleine lokale Wiedergabehistorie im Arbeitsspeicher.
 
 ## Playlist-Verwaltung
 
@@ -65,5 +69,7 @@ GitHub Pages muss im Repository als Veröffentlichungsquelle **GitHub Actions** 
 IndexedDB-Speicher wird vom Browser bzw. Betriebssystem verwaltet. Für den Proof of Concept ist das bewusst akzeptiert. Vor einer produktiven Nutzung mit großen Musiksammlungen müssen verfügbare Speichermenge, Verhalten bei Speicherbereinigung sowie Backup und Wiederherstellung auf iPadOS geprüft werden.
 
 Der eigene Touch-Reorder-Modus sollte weiterhin praktisch auf den tatsächlich verwendeten iPadOS-/Safari-Versionen getestet werden, insbesondere bei sehr langen Playlists und automatischem Scrollen am Bildschirmrand.
+
+Der vollständige physische Originalpfad einer einzeln über den Browser-Dateidialog ausgewählten Datei ist auf iPadOS nicht zuverlässig verfügbar. Die App zeigt nur Pfadinformationen an, die der Browser tatsächlich bereitstellt.
 
 Crossfade ist noch nicht implementiert. Es soll erst ergänzt werden, wenn die einfache Wiedergabe und Autoplay auf dem iPad zuverlässig funktionieren.

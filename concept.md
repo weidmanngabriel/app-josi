@@ -25,6 +25,8 @@ Erste Zielgruppe sind Nutzer, die bereits eigene Musikdateien lokal auf ihrem iP
 - Songs direkt in einer Playlist entfernen.
 - Die Reihenfolge einer Playlist in einem eigenen Bearbeitungsmodus per Finger-Drag ändern.
 - Im Player Playlists schnell per Plus/Minus verwalten: Playlists, in denen der aktuelle Song bereits enthalten ist, stehen zuerst; danach folgen zuletzt verwendete Playlists.
+- Die kompakte „Jetzt“-Anzeige des Players öffnet eine eigene Detailansicht des laufenden Songs.
+- In der Songdetailansicht stehen der vollständige Songname, verfügbare Herkunftsinformationen, eine frei verschiebbare Wiedergabeposition sowie fünf Bedienelemente für vorherigen tatsächlich abgespielten Song, 10 Sekunden zurück, Play/Pause, 10 Sekunden vor und nächsten Song zur Verfügung.
 - Die Anwendung bleibt als PWA installierbar und funktioniert ohne Backend.
 
 ## Zentrale Abläufe
@@ -35,6 +37,7 @@ Erste Zielgruppe sind Nutzer, die bereits eigene Musikdateien lokal auf ihrem iP
 2. Der normale Dateidialog des Geräts öffnet sich.
 3. Eine oder mehrere Audiodateien werden ausgewählt.
 4. Josi speichert die Dateien lokal und zeigt sie in der Bibliothek an.
+5. Falls Safari einen relativen Quellpfad mitliefert, wird dieser für die spätere Anzeige gespeichert. Ein vom Browser nicht freigegebener vollständiger Gerätepfad wird nicht erfunden.
 
 ### Musik abspielen
 
@@ -44,6 +47,15 @@ Erste Zielgruppe sind Nutzer, die bereits eigene Musikdateien lokal auf ihrem iP
 4. Shuffle kann die nächste Titelauswahl zufällig bestimmen.
 5. Nach Songende startet automatisch der nächste Song der aktuellen Ansicht.
 6. Wenn Wiederholung aktiv ist, beginnt die Liste nach dem letzten Song wieder von vorne.
+7. Ein Tipp auf die „Jetzt“-Anzeige öffnet die Songdetailansicht, ohne die Wiedergabe zu unterbrechen.
+
+### Songdetailansicht
+
+1. Oben steht der vollständige Name des laufenden Songs.
+2. Darunter wird der verfügbare Originalordner angezeigt. Gibt Safari bei der normalen Dateiauswahl keinen Pfad frei, wird diese Einschränkung klar angezeigt.
+3. Der Nutzer kann die Wiedergabeposition über einen Schieberegler direkt verändern.
+4. Darunter stehen fünf große Bedienelemente: vorheriger tatsächlich abgespielter Song, 10 Sekunden zurück, Play/Pause, 10 Sekunden vor und nächster Song.
+5. Der Zurück-Button ist deaktiviert, solange in der aktuellen Sitzung kein vorheriger Song abgespielt wurde.
 
 ### Playlist verwalten
 
@@ -81,4 +93,5 @@ Crossfade ist als mögliche nächste Erweiterung vorgesehen, sobald Import, Play
 - Die vom Browser bereitgestellte lokale Speicherkapazität reicht für einen realistischen ersten Test mit der persönlichen Musiksammlung aus.
 - Die relevanten Audioformate werden von Safari/iPadOS zuverlässig abgespielt.
 - Der eigene Touch-Sortiermodus funktioniert auf den für den Test verwendeten iPadOS-/Safari-Versionen zuverlässig genug, auch bei längeren Playlists.
+- Der nicht zuverlässig verfügbare vollständige Originalpfad ist für den PoC akzeptabel, solange die App transparent anzeigt, welche Herkunftsinformation Safari tatsächlich bereitstellt.
 - Für eine spätere Produktversion muss geprüft werden, wie Backups, Speichergrenzen und Datenverlust bei Browser-/Gerätebereinigung behandelt werden.
