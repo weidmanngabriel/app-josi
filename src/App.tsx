@@ -31,6 +31,7 @@ function App() {
   const [playlistName, setPlaylistName] = useState('')
   const [editingName, setEditingName] = useState('')
   const [isEditingPlaylist, setIsEditingPlaylist] = useState(false)
+  const [isReordering, setIsReordering] = useState(false)
   const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(null)
   const [message, setMessage] = useState('')
   const [draggedSongId, setDraggedSongId] = useState<string | null>(null)
@@ -38,6 +39,7 @@ function App() {
   const coverInputRef = useRef<HTMLInputElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
   const shouldAutoPlayRef = useRef(false)
+  const reorderOrderRef = useRef<string[]>([])
 
   useEffect(() => {
     Promise.all([getSongs(), getPlaylists()])
@@ -176,6 +178,9 @@ function App() {
   const openPlaylist = async (id: string | null) => {
     setActivePlaylistId(id)
     setIsEditingPlaylist(false)
+    setIsReordering(false)
+    setDraggedSongId(null)
+    reorderOrderRef.current = []
     if (!id) return
     const playlist = playlists.find((item) => item.id === id)
     if (!playlist) return
@@ -203,16 +208,49 @@ function App() {
     })
   }
 
-  const reorderPlaylist = async (targetSongId: string) => {
-    if (!activePlaylist || !draggedSongId || draggedSongId === targetSongId) return
-    const songIds = [...activePlaylist.songIds]
+  const toggleReorderMode = () => {
+    setDraggedSongId(null)
+    reorderOrderRef.current = []
+    setIsReordering((value) => !value)
+  }
+
+  const beginTouchReorder = (songId: string, event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!activePlaylist || !isReordering) return
+    event.preventDefault()
+    reorderOrderRef.current = [...activePlaylist.songIds]
+    setDraggedSongId(songId)
+    event.currentTarget.setPointerCapture(event.pointerId)
+  }
+
+  const moveTouchReorder = (event: React.PointerEvent<HTMLButtonElement>) => {
+    if (!activePlaylist || !isReordering || !draggedSongId) return
+    event.preventDefault()
+
+    if (event.clientY < 100) window.scrollBy(0, -18)
+    if (event.clientY > window.innerHeight - 180) window.scrollBy(0, 18)
+
+    const row = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>('[data-song-id]')
+    const targetSongId = row?.dataset.songId
+    if (!targetSongId || targetSongId === draggedSongId) return
+
+    const songIds = [...reorderOrderRef.current]
     const fromIndex = songIds.indexOf(draggedSongId)
     const toIndex = songIds.indexOf(targetSongId)
     if (fromIndex < 0 || toIndex < 0) return
+
     const [moved] = songIds.splice(fromIndex, 1)
     songIds.splice(toIndex, 0, moved)
+    reorderOrderRef.current = songIds
+    setPlaylists((items) => items.map((item) => item.id === activePlaylist.id ? { ...item, songIds } : item))
+  }
+
+  const finishTouchReorder = async () => {
+    if (!activePlaylist || !draggedSongId) return
+    const songIds = reorderOrderRef.current.length ? [...reorderOrderRef.current] : [...activePlaylist.songIds]
+    const updated = { ...activePlaylist, songIds, lastUsedAt: Date.now() }
     setDraggedSongId(null)
-    await updatePlaylist({ ...activePlaylist, songIds, lastUsedAt: Date.now() })
+    reorderOrderRef.current = []
+    await updatePlaylist(updated)
   }
 
   const startEditingPlaylist = () => {
@@ -325,6 +363,7 @@ function App() {
               <div className="playlist-actions">
                 <button type="button" onClick={startEditingPlaylist}>Name ändern</button>
                 <button type="button" onClick={() => coverInputRef.current?.click()}>Bild ändern</button>
+                <button className={isReordering ? 'active-action' : ''} type="button" onClick={toggleReorderMode}>{isReordering ? 'Fertig' : 'Reihenfolge ändern'}</button>
                 <button className="danger-button" type="button" onClick={() => setPlaylistToDelete(activePlaylist)}>Playlist löschen</button>
                 <input ref={coverInputRef} className="file-input" type="file" accept="image/*" onChange={(event) => changePlaylistCover(event.target.files)} />
               </div>
@@ -332,26 +371,33 @@ function App() {
           </div>
 
           {message && <div className="message" role="status">{message}</div>}
+          {activePlaylist && isReordering && <div className="reorder-hint">Ziehe Songs am Griff links an die gewünschte Position. Tippe danach auf „Fertig“.</div>}
 
           {queue.length ? (
-            <div className="song-list">
+            <div className={`song-list${isReordering ? ' reordering' : ''}`}>
               {queue.map((song, index) => (
                 <div
                   key={song.id}
-                  className={`song-row${song.id === currentSongId ? ' current' : ''}${draggedSongId === song.id ? ' dragging' : ''}`}
-                  draggable={Boolean(activePlaylist)}
-                  onDragStart={() => setDraggedSongId(song.id)}
-                  onDragEnd={() => setDraggedSongId(null)}
-                  onDragOver={(event) => activePlaylist && event.preventDefault()}
-                  onDrop={() => reorderPlaylist(song.id)}
+                  data-song-id={song.id}
+                  className={`song-row${isReordering ? ' reorder-mode' : ''}${song.id === currentSongId ? ' current' : ''}${draggedSongId === song.id ? ' dragging' : ''}`}
                 >
-                  <span className="drag-handle" aria-hidden="true">{activePlaylist ? '⋮⋮' : ''}</span>
-                  <button className="song-main" type="button" onClick={() => playSong(song.id)}>
+                  {activePlaylist && isReordering && (
+                    <button
+                      className="drag-handle"
+                      type="button"
+                      aria-label={`${song.name} verschieben`}
+                      onPointerDown={(event) => beginTouchReorder(song.id, event)}
+                      onPointerMove={moveTouchReorder}
+                      onPointerUp={() => void finishTouchReorder()}
+                      onPointerCancel={() => void finishTouchReorder()}
+                    >⋮⋮</button>
+                  )}
+                  <button className="song-main" type="button" onClick={() => playSong(song.id)} disabled={isReordering}>
                     <span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span>
                     <span className="song-copy"><strong>{song.name}</strong><small>{song.type || 'Audiodatei'}</small></span>
                     <span className="song-action">▶</span>
                   </button>
-                  {activePlaylist && <button className="remove-song" type="button" onClick={() => removeSongFromActivePlaylist(song.id)} aria-label={`${song.name} aus Playlist entfernen`}>Entfernen</button>}
+                  {activePlaylist && !isReordering && <button className="remove-song" type="button" onClick={() => removeSongFromActivePlaylist(song.id)} aria-label={`${song.name} aus Playlist entfernen`}>Entfernen</button>}
                 </div>
               ))}
             </div>

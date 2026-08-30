@@ -36,7 +36,7 @@ Im Player werden Playlists für den aktuellen Song sortiert angezeigt: zuerst Pl
 
 Playlists können direkt in der Oberfläche umbenannt und nach einer Bestätigung gelöscht werden. Beim Löschen einer Playlist bleiben die referenzierten Songs in der Bibliothek erhalten.
 
-Songs können direkt aus einer geöffneten Playlist entfernt werden. Die Reihenfolge der Song-IDs kann per Drag-and-Drop geändert und anschließend wieder in IndexedDB gespeichert werden.
+Songs können direkt aus einer geöffneten Playlist entfernt werden. Für die Reihenfolge gibt es einen eigenen Bearbeitungsmodus. Statt des nativen HTML5-Drag-and-Drop verwendet die App Pointer-Events auf einem Griff pro Song. Dadurch lässt sich dieselbe Interaktion mit Finger, Pencil oder Maus verwenden und sie kollidiert auf dem iPad weniger mit dem normalen Scrollen. Die Reihenfolge wird während des Ziehens lokal aktualisiert und nach dem Loslassen in IndexedDB gespeichert.
 
 Ein optionales Playlist-Bild wird über den normalen Bild-Dateiauswahldialog gewählt und lokal gespeichert. Es dient ausschließlich zur besseren visuellen Unterscheidung der Playlists.
 
@@ -64,6 +64,6 @@ GitHub Pages muss im Repository als Veröffentlichungsquelle **GitHub Actions** 
 
 IndexedDB-Speicher wird vom Browser bzw. Betriebssystem verwaltet. Für den Proof of Concept ist das bewusst akzeptiert. Vor einer produktiven Nutzung mit großen Musiksammlungen müssen verfügbare Speichermenge, Verhalten bei Speicherbereinigung sowie Backup und Wiederherstellung auf iPadOS geprüft werden.
 
-Das aktuelle Drag-and-Drop basiert auf den Browser-Funktionen und muss insbesondere auf der tatsächlich verwendeten iPadOS-/Safari-Version praktisch getestet werden.
+Der eigene Touch-Reorder-Modus sollte weiterhin praktisch auf den tatsächlich verwendeten iPadOS-/Safari-Versionen getestet werden, insbesondere bei sehr langen Playlists und automatischem Scrollen am Bildschirmrand.
 
 Crossfade ist noch nicht implementiert. Es soll erst ergänzt werden, wenn die einfache Wiedergabe und Autoplay auf dem iPad zuverlässig funktionieren.
