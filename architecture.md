@@ -17,7 +17,17 @@ Ein Song enthält unter anderem ID, Name, Audiodatei als Blob, MIME-Typ, Importz
 - `loopEnabled`
 - `loopMarkers` für orange Hilfsmarkierungen im Loop-Editor
 
-`deleteSong()` löscht einen Song gezielt aus IndexedDB. Beim Löschen entfernt `App.tsx` die Song-ID zusätzlich aus allen Playlists. Beim Kopieren eines Songs entsteht eine neue Song-ID mit eigenem Bibliothekseintrag; der Audiodaten-Blob wird als Teil des neuen Datensatzes gespeichert.
+### Audiodatei und Metadaten sind getrennt geschützt
+
+Seit IndexedDB-Version 2 werden Änderungen an Song-Metadaten **nicht mehr in den Datensatz mit dem Audio-Blob zurückgeschrieben**. Der bestehende Store `songs` bleibt die Basis für die eigentliche importierte Audiodatei. Der zusätzliche Store `songMetadata` enthält nur kleine Werte wie Name, Dauer, Sortierposition, Neu-Status, Hörzähler und Loop-Daten.
+
+`getSongs()` lädt die Basis-Songs und legt die Metadaten darüber. Dabei hat die Audiodatei aus `songs` immer Vorrang und kann nicht durch einen Metadaten-Eintrag ersetzt werden.
+
+`saveSong()` und `saveSongOrder()` schreiben bei bereits vorhandenen Songs nur nach `songMetadata`. Der große Audio-Blob wird dadurch beim Loop-Speichern, Umbenennen, Markieren als gelesen, Aktualisieren der Dauer, Zählen einer Wiedergabe oder Ändern der Reihenfolge nicht mehr erneut serialisiert.
+
+Ein vollständiger Song inklusive Blob wird nur geschrieben, wenn noch kein Basis-Song mit dieser ID existiert, zum Beispiel bei Import, Kopieren oder Wiederherstellen eines gelöschten Songs per Undo. `deleteSong()` entfernt Basis-Song und Metadaten gemeinsam.
+
+Diese Trennung ist eine Datenintegritätsmaßnahme für Safari/iPadOS. Sie verhindert insbesondere, dass eine reine Loop-Änderung die lokal gespeicherte Audiodatei erneut schreiben muss.
 
 ### Playlists
 
@@ -28,6 +38,8 @@ Playlists enthalten ID, Name, geordnete Song-IDs, optionales Bild, Erstellungs-/
 Der Import verwendet ausschließlich `<input type="file" multiple>`. Beim Import werden nur neue Dateien geschrieben. Vorherige Neu-Markierungen werden nur an den betroffenen Songs geändert; die gesamte Bibliothek wird nicht erneut gespeichert.
 
 Die Lieddauer wird erst beim tatsächlichen Laden im HTML-Audio-Element gespeichert. `--:--` bedeutet unbekannte Dauer, `FEHLT` bedeutet, dass der lokale Blob fehlt oder Größe 0 hat.
+
+Bereits vor der Trennung beschädigte oder verlorene Blobs können nicht rekonstruiert werden. Solche Dateien müssen erneut importiert werden. Die neue Speicherstruktur verhindert nur zukünftige unnötige Blob-Schreibvorgänge.
 
 ## Drei-Punkte-Menüs
 
@@ -56,6 +68,8 @@ Das `•••` neben der Überschrift „Playlists“ bleibt für „Bearbeiten
 ## Löschen und Undo/Redo
 
 Song- und Playlist-Löschen verwenden Bestätigungsdialoge. Der Snapshot-Verlauf berücksichtigt fehlende Song-IDs und kann bei Undo/Redo deshalb auch kopierte oder gelöschte Songs wiederherstellen bzw. entfernen. Frisch importierte Dateien werden weiterhin nicht automatisch durch Undo gelöscht.
+
+Die sichere Metadaten-Speicherung prüft bei Undo, ob der Basis-Song noch existiert. Nur wenn er fehlt, wird der Blob aus dem Snapshot einmalig wiederhergestellt; vorhandene Blobs werden nicht überschrieben.
 
 ## Mehrfachauswahl und Playlist-Zuordnung
 
@@ -86,13 +100,13 @@ Funktionen:
 - Transport im Editor: −5 Sekunden, Play/Pause, +5 Sekunden.
 - Orange Markierungen können am blauen Cursor gesetzt werden. Markierungen sind anklickbar und springen den Cursor an ihre Position. Die Markierungsfunktion kann ein-/ausgeschaltet werden; gespeicherte Markierungen bleiben im Song erhalten.
 - Ein frei eingebbarer Vorlaufwert in Sekunden (Komma oder Punkt möglich) steuert „vor Start abspielen“ und „vor Ende abspielen“.
-- „Loop speichern“ persistiert Start, Ende, Aktivstatus und Marker.
+- „Loop speichern“ persistiert Start, Ende, Aktivstatus und Marker ausschließlich als Metadaten.
 
 ## Player-Stabilität bei Song-Metadaten
 
 Der Player verwendet für die aktuelle Audiodatei eine Objekt-URL. Diese URL darf nicht bei jeder Änderung des Song-Objekts neu erzeugt werden, weil Änderungen wie Loop speichern, Loop an/aus, Dauer ergänzen oder Umbenennen sonst das Audio-Element neu laden und die Wiedergabe unterbrechen können.
 
-Deshalb hängt die Objekt-URL nur noch von der **Song-ID und dem tatsächlichen Blob** ab. Reine Metadatenänderungen lassen die Audioquelle unverändert.
+Deshalb hängt die Objekt-URL nur noch von der **Song-ID und dem tatsächlichen Blob** ab. Reine Metadatenänderungen lassen die Audioquelle unverändert. Zusätzlich werden diese Metadatenänderungen nun auch in IndexedDB getrennt vom Blob gespeichert.
 
 ## Player und Media Session
 
