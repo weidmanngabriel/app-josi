@@ -12,6 +12,7 @@ export type Playlist = {
   songIds: string[]
   createdAt: number
   lastUsedAt: number
+  cover?: Blob
 }
 
 const DB_NAME = 'josi-music'
@@ -88,6 +89,18 @@ export async function savePlaylist(playlist: Playlist): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(PLAYLISTS, 'readwrite')
     tx.objectStore(PLAYLISTS).put(playlist)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+    tx.onabort = () => reject(tx.error)
+  })
+  db.close()
+}
+
+export async function deletePlaylist(id: string): Promise<void> {
+  const db = await openDb()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(PLAYLISTS, 'readwrite')
+    tx.objectStore(PLAYLISTS).delete(id)
     tx.oncomplete = () => resolve()
     tx.onerror = () => reject(tx.error)
     tx.onabort = () => reject(tx.error)

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
+  deletePlaylist,
   getPlaylists,
   getSongs,
   savePlaylist,
@@ -21,12 +22,20 @@ function App() {
   const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null)
   const [currentSongId, setCurrentSongId] = useState<string | null>(null)
   const [currentUrl, setCurrentUrl] = useState<string | null>(null)
+  const [coverUrls, setCoverUrls] = useState<Record<string, string>>({})
   const [isPlaying, setIsPlaying] = useState(false)
+  const [repeatQueue, setRepeatQueue] = useState(false)
+  const [shuffle, setShuffle] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [playlistName, setPlaylistName] = useState('')
+  const [editingName, setEditingName] = useState('')
+  const [isEditingPlaylist, setIsEditingPlaylist] = useState(false)
+  const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(null)
   const [message, setMessage] = useState('')
+  const [draggedSongId, setDraggedSongId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const coverInputRef = useRef<HTMLInputElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
   const shouldAutoPlayRef = useRef(false)
 
@@ -48,6 +57,15 @@ function App() {
   }, [activePlaylist, songs])
 
   useEffect(() => {
+    const nextUrls: Record<string, string> = {}
+    playlists.forEach((playlist) => {
+      if (playlist.cover) nextUrls[playlist.id] = URL.createObjectURL(playlist.cover)
+    })
+    setCoverUrls(nextUrls)
+    return () => Object.values(nextUrls).forEach((url) => URL.revokeObjectURL(url))
+  }, [playlists])
+
+  useEffect(() => {
     if (!currentSong) {
       setCurrentUrl(null)
       return
@@ -66,6 +84,11 @@ function App() {
     }
   }, [currentUrl])
 
+  const updatePlaylist = async (updated: Playlist) => {
+    setPlaylists((items) => items.map((item) => item.id === updated.id ? updated : item))
+    await savePlaylist(updated)
+  }
+
   const playSong = (id: string) => {
     if (id === currentSongId && audioRef.current) {
       audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false))
@@ -79,12 +102,24 @@ function App() {
   const moveSong = (direction: 1 | -1) => {
     if (!queue.length) return
     const currentIndex = queue.findIndex((song) => song.id === currentSongId)
-    const nextIndex = currentIndex < 0 ? 0 : currentIndex + direction
-    if (nextIndex < 0 || nextIndex >= queue.length) {
-      setIsPlaying(false)
+
+    if (shuffle && direction === 1 && queue.length > 1) {
+      const choices = queue.filter((song) => song.id !== currentSongId)
+      playSong(choices[Math.floor(Math.random() * choices.length)].id)
       return
     }
-    playSong(queue[nextIndex].id)
+
+    const nextIndex = currentIndex < 0 ? (direction === 1 ? 0 : queue.length - 1) : currentIndex + direction
+    if (nextIndex >= 0 && nextIndex < queue.length) {
+      playSong(queue[nextIndex].id)
+      return
+    }
+    if (repeatQueue) {
+      playSong(queue[direction === 1 ? 0 : queue.length - 1].id)
+      return
+    }
+    setIsPlaying(false)
+    shouldAutoPlayRef.current = false
   }
 
   const togglePlayback = () => {
@@ -140,26 +175,79 @@ function App() {
 
   const openPlaylist = async (id: string | null) => {
     setActivePlaylistId(id)
+    setIsEditingPlaylist(false)
     if (!id) return
     const playlist = playlists.find((item) => item.id === id)
     if (!playlist) return
-    const updated = { ...playlist, lastUsedAt: Date.now() }
-    setPlaylists((items) => items.map((item) => item.id === id ? updated : item))
-    await savePlaylist(updated)
+    await updatePlaylist({ ...playlist, lastUsedAt: Date.now() })
   }
 
   const togglePlaylistSong = async (playlist: Playlist) => {
     if (!currentSong) return
     const contains = playlist.songIds.includes(currentSong.id)
-    const updated: Playlist = {
+    await updatePlaylist({
       ...playlist,
       songIds: contains
         ? playlist.songIds.filter((id) => id !== currentSong.id)
         : [...playlist.songIds, currentSong.id],
       lastUsedAt: Date.now(),
+    })
+  }
+
+  const removeSongFromActivePlaylist = async (songId: string) => {
+    if (!activePlaylist) return
+    await updatePlaylist({
+      ...activePlaylist,
+      songIds: activePlaylist.songIds.filter((id) => id !== songId),
+      lastUsedAt: Date.now(),
+    })
+  }
+
+  const reorderPlaylist = async (targetSongId: string) => {
+    if (!activePlaylist || !draggedSongId || draggedSongId === targetSongId) return
+    const songIds = [...activePlaylist.songIds]
+    const fromIndex = songIds.indexOf(draggedSongId)
+    const toIndex = songIds.indexOf(targetSongId)
+    if (fromIndex < 0 || toIndex < 0) return
+    const [moved] = songIds.splice(fromIndex, 1)
+    songIds.splice(toIndex, 0, moved)
+    setDraggedSongId(null)
+    await updatePlaylist({ ...activePlaylist, songIds, lastUsedAt: Date.now() })
+  }
+
+  const startEditingPlaylist = () => {
+    if (!activePlaylist) return
+    setEditingName(activePlaylist.name)
+    setIsEditingPlaylist(true)
+  }
+
+  const savePlaylistName = async (event: React.FormEvent) => {
+    event.preventDefault()
+    if (!activePlaylist) return
+    const name = editingName.trim()
+    if (!name) return
+    await updatePlaylist({ ...activePlaylist, name, lastUsedAt: Date.now() })
+    setIsEditingPlaylist(false)
+  }
+
+  const changePlaylistCover = async (files: FileList | null) => {
+    if (!activePlaylist || !files?.[0]) return
+    const cover = files[0]
+    if (!cover.type.startsWith('image/')) {
+      setMessage('Bitte wähle eine Bilddatei aus.')
+      return
     }
-    setPlaylists((items) => items.map((item) => item.id === playlist.id ? updated : item))
-    await savePlaylist(updated)
+    await updatePlaylist({ ...activePlaylist, cover, lastUsedAt: Date.now() })
+    if (coverInputRef.current) coverInputRef.current.value = ''
+  }
+
+  const confirmDeletePlaylist = async () => {
+    if (!playlistToDelete) return
+    await deletePlaylist(playlistToDelete.id)
+    setPlaylists((items) => items.filter((item) => item.id !== playlistToDelete.id))
+    if (activePlaylistId === playlistToDelete.id) setActivePlaylistId(null)
+    setPlaylistToDelete(null)
+    setMessage('Playlist wurde gelöscht. Deine Musikdateien bleiben erhalten.')
   }
 
   const playerPlaylists = useMemo(() => {
@@ -200,7 +288,11 @@ function App() {
           <div className="playlist-nav">
             {[...playlists].sort((a, b) => b.lastUsedAt - a.lastUsedAt).map((playlist) => (
               <button key={playlist.id} className={`nav-item${activePlaylistId === playlist.id ? ' active' : ''}`} type="button" onClick={() => openPlaylist(playlist.id)}>
-                <span>{playlist.name}</span><strong>{playlist.songIds.length}</strong>
+                <span className="playlist-nav-name">
+                  {coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span className="playlist-mini-cover">♫</span>}
+                  <span>{playlist.name}</span>
+                </span>
+                <strong>{playlist.songIds.length}</strong>
               </button>
             ))}
           </div>
@@ -212,13 +304,31 @@ function App() {
         </aside>
 
         <section className="library-panel">
-          <div className="library-heading">
-            <div>
+          <div className={`library-heading${activePlaylist ? ' playlist-heading' : ''}`}>
+            {activePlaylist && (
+              <button className="playlist-cover" type="button" onClick={() => coverInputRef.current?.click()} aria-label="Playlist-Bild ändern">
+                {coverUrls[activePlaylist.id] ? <img src={coverUrls[activePlaylist.id]} alt="" /> : <span>+ Bild</span>}
+              </button>
+            )}
+            <div className="library-title">
               <p className="eyebrow">{activePlaylist ? 'PLAYLIST' : 'DEINE MUSIK'}</p>
-              <h1>{activePlaylist?.name ?? 'Bibliothek'}</h1>
+              {activePlaylist && isEditingPlaylist ? (
+                <form className="rename-playlist" onSubmit={savePlaylistName}>
+                  <input value={editingName} onChange={(event) => setEditingName(event.target.value)} autoFocus aria-label="Playlist-Name" />
+                  <button type="submit" disabled={!editingName.trim()}>Speichern</button>
+                  <button type="button" onClick={() => setIsEditingPlaylist(false)}>Abbrechen</button>
+                </form>
+              ) : <h1>{activePlaylist?.name ?? 'Bibliothek'}</h1>}
               <p>{queue.length} {queue.length === 1 ? 'Song' : 'Songs'}</p>
             </div>
-            {!songs.length && <button className="large-import" type="button" onClick={() => fileInputRef.current?.click()}>Musikdateien auswählen</button>}
+            {activePlaylist ? (
+              <div className="playlist-actions">
+                <button type="button" onClick={startEditingPlaylist}>Name ändern</button>
+                <button type="button" onClick={() => coverInputRef.current?.click()}>Bild ändern</button>
+                <button className="danger-button" type="button" onClick={() => setPlaylistToDelete(activePlaylist)}>Playlist löschen</button>
+                <input ref={coverInputRef} className="file-input" type="file" accept="image/*" onChange={(event) => changePlaylistCover(event.target.files)} />
+              </div>
+            ) : !songs.length && <button className="large-import" type="button" onClick={() => fileInputRef.current?.click()}>Musikdateien auswählen</button>}
           </div>
 
           {message && <div className="message" role="status">{message}</div>}
@@ -226,11 +336,23 @@ function App() {
           {queue.length ? (
             <div className="song-list">
               {queue.map((song, index) => (
-                <button key={song.id} type="button" className={`song-row${song.id === currentSongId ? ' current' : ''}`} onClick={() => playSong(song.id)}>
-                  <span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span>
-                  <span className="song-copy"><strong>{song.name}</strong><small>{song.type || 'Audiodatei'}</small></span>
-                  <span className="song-action">▶</span>
-                </button>
+                <div
+                  key={song.id}
+                  className={`song-row${song.id === currentSongId ? ' current' : ''}${draggedSongId === song.id ? ' dragging' : ''}`}
+                  draggable={Boolean(activePlaylist)}
+                  onDragStart={() => setDraggedSongId(song.id)}
+                  onDragEnd={() => setDraggedSongId(null)}
+                  onDragOver={(event) => activePlaylist && event.preventDefault()}
+                  onDrop={() => reorderPlaylist(song.id)}
+                >
+                  <span className="drag-handle" aria-hidden="true">{activePlaylist ? '⋮⋮' : ''}</span>
+                  <button className="song-main" type="button" onClick={() => playSong(song.id)}>
+                    <span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span>
+                    <span className="song-copy"><strong>{song.name}</strong><small>{song.type || 'Audiodatei'}</small></span>
+                    <span className="song-action">▶</span>
+                  </button>
+                  {activePlaylist && <button className="remove-song" type="button" onClick={() => removeSongFromActivePlaylist(song.id)} aria-label={`${song.name} aus Playlist entfernen`}>Entfernen</button>}
+                </div>
               ))}
             </div>
           ) : (
@@ -261,9 +383,11 @@ function App() {
 
         <div className="transport">
           <div className="transport-buttons">
+            <button className={shuffle ? 'active-control' : ''} type="button" onClick={() => setShuffle((value) => !value)} aria-pressed={shuffle} aria-label="Shuffle">⇄</button>
             <button type="button" onClick={() => moveSong(-1)} aria-label="Vorheriger Song">⏮</button>
             <button className="play-button" type="button" onClick={togglePlayback} aria-label={isPlaying ? 'Pause' : 'Abspielen'}>{isPlaying ? '❚❚' : '▶'}</button>
             <button type="button" onClick={() => moveSong(1)} aria-label="Nächster Song">⏭</button>
+            <button className={repeatQueue ? 'active-control' : ''} type="button" onClick={() => setRepeatQueue((value) => !value)} aria-pressed={repeatQueue} aria-label="Playlist wiederholen">↻</button>
           </div>
           <div className="progress-row">
             <span>{formatTime(currentTime)}</span>
@@ -286,6 +410,19 @@ function App() {
           </div>
         </div>
       </section>
+
+      {playlistToDelete && (
+        <div className="modal-backdrop" role="presentation" onMouseDown={() => setPlaylistToDelete(null)}>
+          <div className="confirm-dialog" role="dialog" aria-modal="true" aria-labelledby="delete-playlist-title" onMouseDown={(event) => event.stopPropagation()}>
+            <h2 id="delete-playlist-title">Playlist löschen?</h2>
+            <p>„{playlistToDelete.name}“ wird gelöscht. Die Musikdateien selbst bleiben in deiner Bibliothek.</p>
+            <div className="dialog-actions">
+              <button type="button" onClick={() => setPlaylistToDelete(null)}>Abbrechen</button>
+              <button className="danger-button" type="button" onClick={confirmDeletePlaylist}>Playlist löschen</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

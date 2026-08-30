@@ -13,11 +13,11 @@ Josi ist im aktuellen Proof of Concept eine lokale Musik-App ohne Backend. Audio
 Es gibt zwei Datenarten:
 
 - **Songs**: ID, Anzeigename, Audiodatei als Blob, MIME-Typ und Importzeitpunkt.
-- **Playlists**: ID, Name, geordnete Song-IDs sowie Zeitpunkte für Erstellung und letzte Verwendung.
+- **Playlists**: ID, Name, geordnete Song-IDs, optionales Playlist-Bild als Blob sowie Zeitpunkte für Erstellung und letzte Verwendung.
 
-Audiodateien werden beim Import vollständig in IndexedDB gespeichert. Playlists referenzieren nur Song-IDs; die Audiodatei wird nicht pro Playlist dupliziert.
+Audiodateien werden beim Import vollständig in IndexedDB gespeichert. Playlists referenzieren nur Song-IDs; die Audiodatei wird nicht pro Playlist dupliziert. Playlist-Bilder werden ebenfalls lokal in der jeweiligen Playlist gespeichert.
 
-Für die Wiedergabe erzeugt die App für den aktuell ausgewählten Blob temporär eine Object-URL und gibt sie an ein HTML-Audio-Element weiter. Beim Songwechsel wird die bisherige URL wieder freigegeben.
+Für die Wiedergabe erzeugt die App für den aktuell ausgewählten Audio-Blob temporär eine Object-URL und gibt sie an ein HTML-Audio-Element weiter. Dasselbe Prinzip wird für die Anzeige lokaler Playlist-Bilder verwendet. Nicht mehr benötigte Object-URLs werden wieder freigegeben.
 
 ## Player und Warteschlange
 
@@ -28,7 +28,17 @@ Der Player arbeitet immer mit der aktuell sichtbaren Warteschlange:
 
 Play/Pause, Vor, Zurück und die Fortschrittsanzeige steuern ein einzelnes HTML-Audio-Element. Das `ended`-Ereignis startet automatisch den nächsten Song der aktuellen Warteschlange.
 
+Shuffle kann für die nächste Titelauswahl aktiviert werden. Repeat sorgt dafür, dass am Ende der Warteschlange wieder am Anfang weitergespielt wird.
+
 Im Player werden Playlists für den aktuellen Song sortiert angezeigt: zuerst Playlists, die den Song bereits enthalten, danach die übrigen nach letzter Verwendung. Plus/Minus aktualisiert die Playlist unmittelbar in IndexedDB.
+
+## Playlist-Verwaltung
+
+Playlists können direkt in der Oberfläche umbenannt und nach einer Bestätigung gelöscht werden. Beim Löschen einer Playlist bleiben die referenzierten Songs in der Bibliothek erhalten.
+
+Songs können direkt aus einer geöffneten Playlist entfernt werden. Die Reihenfolge der Song-IDs kann per Drag-and-Drop geändert und anschließend wieder in IndexedDB gespeichert werden.
+
+Ein optionales Playlist-Bild wird über den normalen Bild-Dateiauswahldialog gewählt und lokal gespeichert. Es dient ausschließlich zur besseren visuellen Unterscheidung der Playlists.
 
 ## PWA
 
@@ -53,5 +63,7 @@ GitHub Pages muss im Repository als Veröffentlichungsquelle **GitHub Actions** 
 ## Grenzen des aktuellen Ansatzes
 
 IndexedDB-Speicher wird vom Browser bzw. Betriebssystem verwaltet. Für den Proof of Concept ist das bewusst akzeptiert. Vor einer produktiven Nutzung mit großen Musiksammlungen müssen verfügbare Speichermenge, Verhalten bei Speicherbereinigung sowie Backup und Wiederherstellung auf iPadOS geprüft werden.
+
+Das aktuelle Drag-and-Drop basiert auf den Browser-Funktionen und muss insbesondere auf der tatsächlich verwendeten iPadOS-/Safari-Version praktisch getestet werden.
 
 Crossfade ist noch nicht implementiert. Es soll erst ergänzt werden, wenn die einfache Wiedergabe und Autoplay auf dem iPad zuverlässig funktionieren.

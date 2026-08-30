@@ -24,8 +24,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid #8b5cf6; outline-
 .sidebar { padding: 24px 14px; border-right: 1px solid #232733; background: #10131a; }
 .nav-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: #b8c0cf; text-align: left; cursor: pointer; }
 .nav-item:hover, .nav-item.active { background: #202431; color: white; }
-.nav-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.nav-item strong { color: #7f8999; font-size: 12px; }
+.nav-item > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.nav-item > strong { color: #7f8999; font-size: 12px; }
+.playlist-nav-name { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.playlist-nav-name > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.playlist-nav-name img, .playlist-mini-cover { width: 28px; height: 28px; flex: 0 0 28px; border-radius: 7px; object-fit: cover; }
+.playlist-mini-cover { display: grid; place-items: center; background: #292e3b; color: #a78bfa; }
 .sidebar-heading { margin: 26px 12px 8px; color: #7f8999; font-size: 11px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase; }
 .playlist-nav { display: grid; gap: 2px; }
 .new-playlist { display: grid; grid-template-columns: minmax(0,1fr) 42px; gap: 6px; margin-top: 14px; }
@@ -35,18 +39,32 @@ button:focus-visible, input:focus-visible { outline: 2px solid #8b5cf6; outline-
 
 .library-panel { min-width: 0; padding: clamp(28px, 5vw, 64px); }
 .library-heading { display: flex; align-items: end; justify-content: space-between; gap: 24px; margin-bottom: 30px; }
+.library-heading.playlist-heading { align-items: center; justify-content: flex-start; }
+.library-title { min-width: 0; flex: 1; }
 .eyebrow { margin: 0 0 8px; color: #a78bfa; font-size: 11px; font-weight: 850; letter-spacing: .13em; }
 h1 { margin: 0 0 6px; font-size: clamp(34px,5vw,64px); line-height: 1; letter-spacing: -.045em; }
 .library-heading p:last-child { margin: 0; color: #8d96a6; }
+.playlist-cover { display: grid; flex: 0 0 clamp(92px, 12vw, 150px); place-items: center; width: clamp(92px, 12vw, 150px); height: clamp(92px, 12vw, 150px); padding: 0; overflow: hidden; border: 1px solid #303645; border-radius: 18px; background: #171b24; color: #a78bfa; cursor: pointer; }
+.playlist-cover img { width: 100%; height: 100%; object-fit: cover; }
+.playlist-cover span { font-weight: 800; font-size: 13px; }
+.playlist-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: 260px; }
+.playlist-actions button, .rename-playlist button, .dialog-actions button { min-height: 40px; padding: 0 12px; border: 1px solid #303645; border-radius: 10px; background: #1a1f2a; cursor: pointer; }
+.danger-button { border-color: #6e3037 !important; background: #31171c !important; color: #fecaca; }
+.rename-playlist { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }
+.rename-playlist input { min-width: min(360px, 100%); min-height: 48px; padding: 0 12px; border: 1px solid #4b5568; border-radius: 10px; background: #11141b; color: white; font-size: clamp(24px,4vw,42px); font-weight: 800; }
 .message { margin-bottom: 18px; padding: 12px 14px; border: 1px solid #313747; border-radius: 12px; background: #171b24; color: #cbd5e1; font-size: 13px; }
 .song-list { overflow: hidden; border: 1px solid #252a36; border-radius: 16px; background: #11141b; }
-.song-row { display: grid; grid-template-columns: 34px minmax(0,1fr) 36px; align-items: center; gap: 10px; width: 100%; min-height: 64px; padding: 8px 14px; border: 0; border-bottom: 1px solid #202530; background: transparent; text-align: left; cursor: pointer; }
+.song-row { display: grid; grid-template-columns: 28px minmax(0,1fr) auto; align-items: center; min-height: 64px; border-bottom: 1px solid #202530; background: transparent; }
 .song-row:last-child { border-bottom: 0; }
 .song-row:hover, .song-row.current { background: #1a1f2a; }
+.song-row.dragging { opacity: .45; }
+.drag-handle { color: #626d7f; text-align: center; cursor: grab; user-select: none; }
+.song-main { display: grid; grid-template-columns: 34px minmax(0,1fr) 36px; align-items: center; gap: 10px; width: 100%; min-height: 63px; padding: 8px 10px; border: 0; background: transparent; text-align: left; cursor: pointer; }
 .song-number, .song-action { color: #768092; font-size: 13px; text-align: center; }
 .song-copy { display: grid; min-width: 0; }
 .song-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .song-copy small { margin-top: 4px; color: #7f8999; font-size: 11px; }
+.remove-song { margin-right: 10px; padding: 8px 10px; border: 1px solid #3b414f; border-radius: 9px; background: #181c25; color: #aeb7c5; font-size: 11px; cursor: pointer; }
 .empty-state { display: grid; justify-items: center; padding: 76px 24px; border: 1px dashed #303645; border-radius: 18px; text-align: center; color: #8d96a6; }
 .empty-state h2 { margin: 14px 0 8px; color: #f8fafc; font-size: 22px; }
 .empty-state p { max-width: 480px; margin: 0; line-height: 1.6; }
@@ -60,9 +78,10 @@ h1 { margin: 0 0 6px; font-size: clamp(34px,5vw,64px); line-height: 1; letter-sp
 .now-playing small { margin-bottom: 4px; color: #7f8999; font-size: 9px; font-weight: 800; letter-spacing: .12em; }
 .now-playing strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .transport { display: grid; gap: 10px; }
-.transport-buttons { display: flex; justify-content: center; gap: 10px; }
+.transport-buttons { display: flex; justify-content: center; gap: 8px; }
 .transport-buttons button { width: 42px; height: 42px; border: 0; border-radius: 50%; background: #252a36; cursor: pointer; }
 .transport-buttons .play-button { width: 48px; height: 48px; background: #f8fafc; color: #111827; }
+.transport-buttons .active-control { background: #6d4bd1; color: white; }
 .progress-row { display: grid; grid-template-columns: 42px minmax(0,1fr) 42px; gap: 8px; align-items: center; color: #7f8999; font-size: 10px; }
 .progress-row input { width: 100%; accent-color: #8b5cf6; }
 .quick-playlists { min-width: 0; }
@@ -77,6 +96,12 @@ h1 { margin: 0 0 6px; font-size: clamp(34px,5vw,64px); line-height: 1; letter-sp
 .quick-list button.included strong { background: #6d4bd1; }
 .no-playlists { color: #7f8999; font-size: 12px; }
 
+.modal-backdrop { position: fixed; inset: 0; z-index: 80; display: grid; place-items: center; padding: 20px; background: rgba(0,0,0,.68); }
+.confirm-dialog { width: min(440px, 100%); padding: 24px; border: 1px solid #3a4050; border-radius: 18px; background: #141821; box-shadow: 0 24px 80px rgba(0,0,0,.45); }
+.confirm-dialog h2 { margin: 0 0 10px; }
+.confirm-dialog p { margin: 0; color: #aeb7c5; line-height: 1.5; }
+.dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 22px; }
+
 .pull-to-refresh-shell { position: relative; min-height: 100vh; }
 .pull-to-refresh-content { min-height: 100vh; transition: transform 160ms ease; }
 .pull-to-refresh-shell.is-pulling .pull-to-refresh-content { transition: none; }
@@ -88,6 +113,8 @@ h1 { margin: 0 0 6px; font-size: clamp(34px,5vw,64px); line-height: 1; letter-sp
 @media (max-width: 880px) {
   .app-shell { padding-bottom: 250px; }
   .music-layout { grid-template-columns: 180px minmax(0,1fr); }
+  .playlist-heading { flex-wrap: wrap; }
+  .playlist-actions { max-width: none; justify-content: flex-start; }
   .player { grid-template-columns: 1fr 1fr; min-height: 230px; }
   .quick-playlists { grid-column: 1 / -1; }
 }
@@ -105,7 +132,15 @@ h1 { margin: 0 0 6px; font-size: clamp(34px,5vw,64px); line-height: 1; letter-sp
   .new-playlist { max-width: 320px; }
   .library-panel { padding: 28px 16px; }
   .library-heading { align-items: flex-start; flex-direction: column; }
+  .library-heading.playlist-heading { align-items: flex-start; }
+  .playlist-cover { width: 104px; height: 104px; flex-basis: 104px; }
+  .playlist-actions { width: 100%; }
+  .playlist-actions button { flex: 1 1 auto; }
+  .song-row { grid-template-columns: 24px minmax(0,1fr) auto; }
+  .remove-song { padding: 8px; }
   .player { grid-template-columns: 1fr; gap: 14px; min-height: 310px; padding: 14px 16px 18px; }
   .quick-playlists { grid-column: auto; }
   .transport { order: -1; }
+  .transport-buttons { gap: 6px; }
+  .transport-buttons button { width: 38px; height: 38px; }
 }
