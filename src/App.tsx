@@ -1,226 +1,291 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
-  readActiveGoogleAccount,
-  readStoredGoogleAccounts,
-  removeGoogleAccount,
-  setActiveGoogleAccount,
-  storeGoogleAccount,
-  type GoogleUser,
-} from './auth/google'
+  getPlaylists,
+  getSongs,
+  savePlaylist,
+  saveSongs,
+  type Playlist,
+  type Song,
+} from './musicDb'
 
-const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID
-
-function initials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('')
+function formatTime(seconds: number) {
+  if (!Number.isFinite(seconds)) return '0:00'
+  const minutes = Math.floor(seconds / 60)
+  const rest = Math.floor(seconds % 60)
+  return `${minutes}:${rest.toString().padStart(2, '0')}`
 }
 
 function App() {
-  const [accounts, setAccounts] = useState<GoogleUser[]>([])
-  const [user, setUser] = useState<GoogleUser | null>(null)
-  const [menuOpen, setMenuOpen] = useState(false)
-  const [googleReady, setGoogleReady] = useState(false)
-  const googleButtonRef = useRef<HTMLDivElement>(null)
-  const addGoogleButtonRef = useRef<HTMLDivElement>(null)
+  const [songs, setSongs] = useState<Song[]>([])
+  const [playlists, setPlaylists] = useState<Playlist[]>([])
+  const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null)
+  const [currentSongId, setCurrentSongId] = useState<string | null>(null)
+  const [currentUrl, setCurrentUrl] = useState<string | null>(null)
+  const [isPlaying, setIsPlaying] = useState(false)
+  const [currentTime, setCurrentTime] = useState(0)
+  const [duration, setDuration] = useState(0)
+  const [playlistName, setPlaylistName] = useState('')
+  const [message, setMessage] = useState('')
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const audioRef = useRef<HTMLAudioElement>(null)
+  const shouldAutoPlayRef = useRef(false)
 
   useEffect(() => {
-    const storedAccounts = readStoredGoogleAccounts()
-    setAccounts(storedAccounts)
-    setUser(readActiveGoogleAccount(storedAccounts))
+    Promise.all([getSongs(), getPlaylists()])
+      .then(([storedSongs, storedPlaylists]) => {
+        setSongs(storedSongs)
+        setPlaylists(storedPlaylists)
+      })
+      .catch(() => setMessage('Lokale Musikdaten konnten nicht geladen werden.'))
   }, [])
 
-  useEffect(() => {
-    if (!GOOGLE_CLIENT_ID) return
-
-    const target = user ? (menuOpen ? addGoogleButtonRef.current : null) : googleButtonRef.current
-    if (!target) return
-
-    const initializeGoogle = () => {
-      if (!window.google?.accounts.id) return false
-
-      window.google.accounts.id.initialize({
-        client_id: GOOGLE_CLIENT_ID,
-        auto_select: false,
-        cancel_on_tap_outside: true,
-        callback: ({ credential }) => {
-          const nextUser = storeGoogleAccount(credential)
-          if (!nextUser) return
-          const nextAccounts = readStoredGoogleAccounts()
-          setAccounts(nextAccounts)
-          setUser(nextUser)
-          setMenuOpen(false)
-        },
-      })
-
-      target.replaceChildren()
-      window.google.accounts.id.renderButton(target, {
-        type: 'standard',
-        theme: 'outline',
-        size: 'medium',
-        shape: 'pill',
-        text: user ? 'continue_with' : 'signin_with',
-        locale: 'de',
-        width: 220,
-      })
-      setGoogleReady(true)
-      return true
-    }
-
-    setGoogleReady(false)
-    if (initializeGoogle()) return
-
-    const timer = window.setInterval(() => {
-      if (initializeGoogle()) window.clearInterval(timer)
-    }, 150)
-
-    return () => window.clearInterval(timer)
-  }, [menuOpen, user?.email])
+  const currentSong = songs.find((song) => song.id === currentSongId) ?? null
+  const activePlaylist = playlists.find((playlist) => playlist.id === activePlaylistId) ?? null
+  const queue = useMemo(() => {
+    if (!activePlaylist) return songs
+    const byId = new Map(songs.map((song) => [song.id, song]))
+    return activePlaylist.songIds.map((id) => byId.get(id)).filter((song): song is Song => Boolean(song))
+  }, [activePlaylist, songs])
 
   useEffect(() => {
-    if (!menuOpen) return
-    const closeMenu = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      if (!target.closest('.account-area')) setMenuOpen(false)
+    if (!currentSong) {
+      setCurrentUrl(null)
+      return
     }
-    window.addEventListener('click', closeMenu)
-    return () => window.removeEventListener('click', closeMenu)
-  }, [menuOpen])
+    const url = URL.createObjectURL(currentSong.file)
+    setCurrentUrl(url)
+    return () => URL.revokeObjectURL(url)
+  }, [currentSong])
 
-  const switchAccount = (nextUser: GoogleUser) => {
-    setActiveGoogleAccount(nextUser.email)
-    setUser(nextUser)
-    setMenuOpen(false)
+  useEffect(() => {
+    const audio = audioRef.current
+    if (!audio || !currentUrl) return
+    audio.load()
+    if (shouldAutoPlayRef.current) {
+      audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false))
+    }
+  }, [currentUrl])
+
+  const playSong = (id: string) => {
+    if (id === currentSongId && audioRef.current) {
+      audioRef.current.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false))
+      return
+    }
+    shouldAutoPlayRef.current = true
+    setCurrentSongId(id)
+    setCurrentTime(0)
   }
 
-  const logout = () => {
-    if (!user) return
-    const { accounts: nextAccounts, active } = removeGoogleAccount(user.email)
-    setAccounts(nextAccounts)
-    setUser(active)
-    setMenuOpen(false)
-    if (!active) window.google?.accounts.id.disableAutoSelect()
+  const moveSong = (direction: 1 | -1) => {
+    if (!queue.length) return
+    const currentIndex = queue.findIndex((song) => song.id === currentSongId)
+    const nextIndex = currentIndex < 0 ? 0 : currentIndex + direction
+    if (nextIndex < 0 || nextIndex >= queue.length) {
+      setIsPlaying(false)
+      return
+    }
+    playSong(queue[nextIndex].id)
+  }
+
+  const togglePlayback = () => {
+    const audio = audioRef.current
+    if (!currentSong) {
+      if (queue[0]) playSong(queue[0].id)
+      return
+    }
+    if (!audio) return
+    if (audio.paused) {
+      shouldAutoPlayRef.current = true
+      audio.play().then(() => setIsPlaying(true)).catch(() => setIsPlaying(false))
+    } else {
+      audio.pause()
+      setIsPlaying(false)
+    }
+  }
+
+  const importFiles = async (files: FileList | null) => {
+    if (!files?.length) return
+    const audioFiles = Array.from(files).filter((file) => file.type.startsWith('audio/') || /\.(mp3|m4a|aac|wav|ogg|flac)$/i.test(file.name))
+    if (!audioFiles.length) {
+      setMessage('Keine unterstützten Audiodateien ausgewählt.')
+      return
+    }
+    try {
+      const imported = await saveSongs(audioFiles)
+      setSongs((existing) => [...existing, ...imported])
+      setMessage(`${imported.length} ${imported.length === 1 ? 'Song wurde' : 'Songs wurden'} importiert.`)
+    } catch {
+      setMessage('Import fehlgeschlagen. Möglicherweise ist der lokale Speicher voll.')
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  const createPlaylist = async (event: React.FormEvent) => {
+    event.preventDefault()
+    const name = playlistName.trim()
+    if (!name) return
+    const playlist: Playlist = {
+      id: crypto.randomUUID(),
+      name,
+      songIds: [],
+      createdAt: Date.now(),
+      lastUsedAt: Date.now(),
+    }
+    await savePlaylist(playlist)
+    setPlaylists((existing) => [playlist, ...existing])
+    setPlaylistName('')
+    setActivePlaylistId(playlist.id)
+  }
+
+  const openPlaylist = async (id: string | null) => {
+    setActivePlaylistId(id)
+    if (!id) return
+    const playlist = playlists.find((item) => item.id === id)
+    if (!playlist) return
+    const updated = { ...playlist, lastUsedAt: Date.now() }
+    setPlaylists((items) => items.map((item) => item.id === id ? updated : item))
+    await savePlaylist(updated)
+  }
+
+  const togglePlaylistSong = async (playlist: Playlist) => {
+    if (!currentSong) return
+    const contains = playlist.songIds.includes(currentSong.id)
+    const updated: Playlist = {
+      ...playlist,
+      songIds: contains
+        ? playlist.songIds.filter((id) => id !== currentSong.id)
+        : [...playlist.songIds, currentSong.id],
+      lastUsedAt: Date.now(),
+    }
+    setPlaylists((items) => items.map((item) => item.id === playlist.id ? updated : item))
+    await savePlaylist(updated)
+  }
+
+  const playerPlaylists = useMemo(() => {
+    if (!currentSong) return []
+    return [...playlists].sort((a, b) => {
+      const aContains = a.songIds.includes(currentSong.id)
+      const bContains = b.songIds.includes(currentSong.id)
+      if (aContains !== bContains) return aContains ? -1 : 1
+      return b.lastUsedAt - a.lastUsedAt
+    })
+  }, [playlists, currentSong])
+
+  const seek = (value: number) => {
+    const audio = audioRef.current
+    if (!audio) return
+    audio.currentTime = value
+    setCurrentTime(value)
   }
 
   return (
     <div className="app-shell">
       <header className="site-header">
-        <a className="brand" href="#top" aria-label="PWA Template Startseite">
-          <span className="brand-mark">P</span>
-          <span>PWA Template</span>
-        </a>
-
-        <div className="header-actions">
-          <span className="status-pill"><span /> PWA ready</span>
-          <div className="account-area">
-            {user ? (
-              <>
-                <button className="account-button" type="button" onClick={() => setMenuOpen((open) => !open)} aria-expanded={menuOpen}>
-                  {user.picture ? <img src={user.picture} alt="" referrerPolicy="no-referrer" /> : <span className="avatar-fallback">{initials(user.name)}</span>}
-                  <span className="account-button-copy"><strong>{user.name}</strong><small>{user.email}</small></span>
-                  <span aria-hidden="true">⌄</span>
-                </button>
-
-                {menuOpen && (
-                  <div className="account-menu">
-                    <p className="menu-label">Google-Konten</p>
-                    <div className="account-list">
-                      {accounts.map((account) => {
-                        const active = account.email.toLowerCase() === user.email.toLowerCase()
-                        return (
-                          <button key={account.email} type="button" className={`account-option${active ? ' is-active' : ''}`} onClick={() => switchAccount(account)}>
-                            {account.picture ? <img src={account.picture} alt="" referrerPolicy="no-referrer" /> : <span className="avatar-fallback small">{initials(account.name)}</span>}
-                            <span><strong>{account.name}</strong><small>{account.email}</small></span>
-                            {active && <span className="active-dot" title="Aktiv" />}
-                          </button>
-                        )
-                      })}
-                    </div>
-                    <div className="menu-divider" />
-                    <p className="menu-label">Weiteres Konto hinzufügen</p>
-                    <div className="google-button-slot" ref={addGoogleButtonRef} />
-                    {!googleReady && <small className="google-note">Google Login wird geladen …</small>}
-                    <button className="logout-button" type="button" onClick={logout}>Aktives Konto abmelden</button>
-                  </div>
-                )}
-              </>
-            ) : (
-              <div className="login-slot">
-                <div className="google-button-slot" ref={googleButtonRef} />
-                {!GOOGLE_CLIENT_ID && <span className="config-note">Google Login noch nicht konfiguriert</span>}
-                {GOOGLE_CLIENT_ID && !googleReady && <span className="config-note">Google Login wird geladen …</span>}
-              </div>
-            )}
-          </div>
-        </div>
+        <button className="brand" type="button" onClick={() => openPlaylist(null)} aria-label="Musikbibliothek öffnen">
+          <span className="brand-mark">J</span>
+          <span>Josi</span>
+        </button>
+        <button className="import-button" type="button" onClick={() => fileInputRef.current?.click()}>+ Musik importieren</button>
+        <input ref={fileInputRef} className="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac" multiple onChange={(event) => importFiles(event.target.files)} />
       </header>
 
-      <main id="top">
-        <section className="hero">
-          <div className="hero-copy">
-            <p className="eyebrow">STARTER TEMPLATE</p>
-            <h1>Deine neue App startet hier.</h1>
-            <p className="hero-text">Eine kleine, installierbare Web-App mit React, TypeScript, PWA-Support, Google Login und automatischem Deployment über GitHub Pages.</p>
-            <div className="hero-actions">
-              <a className="primary-button" href="#basis">Basis ansehen</a>
-              <a className="secondary-button" href="https://github.com/weidmanngabriel/pwa-template" target="_blank" rel="noreferrer">Repository öffnen</a>
+      <main className="music-layout">
+        <aside className="sidebar">
+          <button className={`nav-item${activePlaylistId === null ? ' active' : ''}`} type="button" onClick={() => openPlaylist(null)}>
+            <span>Bibliothek</span><strong>{songs.length}</strong>
+          </button>
+
+          <div className="sidebar-heading"><span>Playlists</span></div>
+          <div className="playlist-nav">
+            {[...playlists].sort((a, b) => b.lastUsedAt - a.lastUsedAt).map((playlist) => (
+              <button key={playlist.id} className={`nav-item${activePlaylistId === playlist.id ? ' active' : ''}`} type="button" onClick={() => openPlaylist(playlist.id)}>
+                <span>{playlist.name}</span><strong>{playlist.songIds.length}</strong>
+              </button>
+            ))}
+          </div>
+
+          <form className="new-playlist" onSubmit={createPlaylist}>
+            <input value={playlistName} onChange={(event) => setPlaylistName(event.target.value)} placeholder="Neue Playlist" aria-label="Name der neuen Playlist" />
+            <button type="submit" disabled={!playlistName.trim()} aria-label="Playlist erstellen">+</button>
+          </form>
+        </aside>
+
+        <section className="library-panel">
+          <div className="library-heading">
+            <div>
+              <p className="eyebrow">{activePlaylist ? 'PLAYLIST' : 'DEINE MUSIK'}</p>
+              <h1>{activePlaylist?.name ?? 'Bibliothek'}</h1>
+              <p>{queue.length} {queue.length === 1 ? 'Song' : 'Songs'}</p>
             </div>
+            {!songs.length && <button className="large-import" type="button" onClick={() => fileInputRef.current?.click()}>Musikdateien auswählen</button>}
           </div>
 
-          <aside className="status-card" aria-label="Template Status">
-            <p className="card-kicker">SYSTEM STATUS</p>
-            <h2>Bereit zum Anpassen</h2>
-            <div className="status-row"><span>React + TypeScript</span><strong>bereit</strong></div>
-            <div className="status-row"><span>Installierbare PWA</span><strong>bereit</strong></div>
-            <div className="status-row"><span>Google Login</span><strong>{GOOGLE_CLIENT_ID ? 'konfiguriert' : 'Setup nötig'}</strong></div>
-            <div className="status-row"><span>GitHub Pages</span><strong>vorbereitet</strong></div>
-          </aside>
-        </section>
+          {message && <div className="message" role="status">{message}</div>}
 
-        <section className="basis-section" id="basis">
-          <div className="section-heading">
-            <p className="eyebrow">DIE BASIS</p>
-            <h2>Genug Struktur, ohne Produktballast.</h2>
-          </div>
-          <div className="feature-grid">
-            <article className="feature-card">
-              <span className="feature-index">01</span>
-              <h3>PWA</h3>
-              <p>Manifest, Service Worker, App-Icons und Pull-to-Refresh sind vorbereitet.</p>
-            </article>
-            <article className="feature-card">
-              <span className="feature-index">02</span>
-              <h3>Google Login</h3>
-              <p>Google-Anmeldung mit mehreren lokal gespeicherten Konten und einfachem Wechsel.</p>
-            </article>
-            <article className="feature-card">
-              <span className="feature-index">03</span>
-              <h3>Deployment</h3>
-              <p>Ein GitHub-Actions-Workflow baut die App und veröffentlicht ausschließlich den Build.</p>
-            </article>
-          </div>
-        </section>
-
-        <section className="account-demo-section">
-          <div>
-            <p className="eyebrow">LOGIN CHECK</p>
-            <h2>{user ? `Google Login funktioniert, ${user.name}.` : 'Google Login direkt testbar.'}</h2>
-            <p>{user ? 'Das aktive Konto wird lokal gespeichert. Weitere Google-Konten können oben im Kontomenü ergänzt und gewechselt werden.' : 'Sobald eine Google Client-ID hinterlegt ist, erscheint der Anmeldebutton oben im Header.'}</p>
-          </div>
-          <div className={`login-state-card${user ? ' is-signed-in' : ''}`}>
-            <span className="login-state-dot" />
-            <div><strong>{user ? 'Angemeldet' : 'Nicht angemeldet'}</strong><small>{user ? user.email : 'Kein Google-Konto aktiv'}</small></div>
-          </div>
+          {queue.length ? (
+            <div className="song-list">
+              {queue.map((song, index) => (
+                <button key={song.id} type="button" className={`song-row${song.id === currentSongId ? ' current' : ''}`} onClick={() => playSong(song.id)}>
+                  <span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span>
+                  <span className="song-copy"><strong>{song.name}</strong><small>{song.type || 'Audiodatei'}</small></span>
+                  <span className="song-action">▶</span>
+                </button>
+              ))}
+            </div>
+          ) : (
+            <div className="empty-state">
+              <div className="empty-icon">♫</div>
+              <h2>{activePlaylist ? 'Noch keine Songs in dieser Playlist.' : 'Noch keine Musik importiert.'}</h2>
+              <p>{activePlaylist ? 'Starte einen Song aus der Bibliothek und füge ihn im Player per Plus hinzu.' : 'Wähle Musikdateien aus der Dateien-App deines iPads aus.'}</p>
+            </div>
+          )}
         </section>
       </main>
 
-      <footer>
-        <span>PWA Template</span>
-        <span>React · TypeScript · Vite</span>
-      </footer>
+      <section className={`player${currentSong ? ' visible' : ''}`} aria-label="Player">
+        <audio
+          ref={audioRef}
+          src={currentUrl ?? undefined}
+          onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)}
+          onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)}
+          onPlay={() => setIsPlaying(true)}
+          onPause={() => setIsPlaying(false)}
+          onEnded={() => moveSong(1)}
+        />
+
+        <div className="now-playing">
+          <span className="cover-placeholder">♫</span>
+          <div><small>JETZT</small><strong>{currentSong?.name ?? 'Kein Song ausgewählt'}</strong></div>
+        </div>
+
+        <div className="transport">
+          <div className="transport-buttons">
+            <button type="button" onClick={() => moveSong(-1)} aria-label="Vorheriger Song">⏮</button>
+            <button className="play-button" type="button" onClick={togglePlayback} aria-label={isPlaying ? 'Pause' : 'Abspielen'}>{isPlaying ? '❚❚' : '▶'}</button>
+            <button type="button" onClick={() => moveSong(1)} aria-label="Nächster Song">⏭</button>
+          </div>
+          <div className="progress-row">
+            <span>{formatTime(currentTime)}</span>
+            <input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} aria-label="Wiedergabeposition" />
+            <span>{formatTime(duration)}</span>
+          </div>
+        </div>
+
+        <div className="quick-playlists">
+          <div className="quick-heading"><strong>Playlists</strong><small>Song schnell zuordnen</small></div>
+          <div className="quick-list">
+            {playerPlaylists.length ? playerPlaylists.map((playlist) => {
+              const contains = currentSong ? playlist.songIds.includes(currentSong.id) : false
+              return (
+                <button key={playlist.id} type="button" className={contains ? 'included' : ''} onClick={() => togglePlaylistSong(playlist)} disabled={!currentSong}>
+                  <span>{playlist.name}</span><strong aria-label={contains ? 'Aus Playlist entfernen' : 'Zur Playlist hinzufügen'}>{contains ? '−' : '+'}</strong>
+                </button>
+              )
+            }) : <span className="no-playlists">Noch keine Playlist</span>}
+          </div>
+        </div>
+      </section>
     </div>
   )
 }
