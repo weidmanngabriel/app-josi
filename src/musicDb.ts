@@ -8,6 +8,8 @@ export type Song = {
   libraryOrder?: number
   importBatchId?: string
   isNew?: boolean
+  duration?: number
+  completedPlays?: number
   loopStart?: number
   loopEnd?: number
   loopEnabled?: boolean
@@ -84,6 +86,7 @@ export async function saveSongs(files: File[], importBatchId = crypto.randomUUID
     libraryOrder: now + index,
     importBatchId,
     isNew: true,
+    completedPlays: 0,
   }))
   await putSongs(songs)
   return songs
