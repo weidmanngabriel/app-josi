@@ -18,11 +18,17 @@ function formatTime(seconds: number) {
   return `${minutes}:${rest.toString().padStart(2, '0')}`
 }
 
+function formatImportDate(timestamp: number) {
+  return new Intl.DateTimeFormat('de-DE', { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(timestamp))
+}
+
 type EditPrompt = 'playlists' | null
 type ReorderScope = 'library' | 'playlist' | 'sidebar' | null
 type MoveCandidate = { kind: 'song' | 'playlist'; id: string; targetIndex: number | null } | null
 type Snapshot = { songs: Song[]; playlists: Playlist[] }
-type NavigationEntry = { playlistId: string | null; detailOpen: boolean; playlistOverviewOpen: boolean }
+type NavigationEntry = { playlistId: string | null; detailOpen: boolean; playlistOverviewOpen: boolean; historyOpen: boolean }
+
+type SongPrompt = { songId: string; x: number; y: number } | null
 
 function App() {
   const [songs, setSongs] = useState<Song[]>([])
@@ -43,21 +49,27 @@ function App() {
   const [message, setMessage] = useState('')
   const [detailOpen, setDetailOpen] = useState(false)
   const [playlistOverviewOpen, setPlaylistOverviewOpen] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
   const [playHistory, setPlayHistory] = useState<string[]>([])
   const [editPrompt, setEditPrompt] = useState<EditPrompt>(null)
+  const [songPrompt, setSongPrompt] = useState<SongPrompt>(null)
   const [reorderScope, setReorderScope] = useState<ReorderScope>(null)
   const [moveCandidate, setMoveCandidate] = useState<MoveCandidate>(null)
   const [undoStack, setUndoStack] = useState<Snapshot[]>([])
   const [redoStack, setRedoStack] = useState<Snapshot[]>([])
-  const [navigation, setNavigation] = useState<NavigationEntry[]>([{ playlistId: null, detailOpen: false, playlistOverviewOpen: false }])
+  const [navigation, setNavigation] = useState<NavigationEntry[]>([{ playlistId: null, detailOpen: false, playlistOverviewOpen: false, historyOpen: false }])
   const [navigationIndex, setNavigationIndex] = useState(0)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const folderInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
   const audioRef = useRef<HTMLAudioElement>(null)
   const shouldAutoPlayRef = useRef(false)
   const longPressTimerRef = useRef<number | null>(null)
+  const songLongPressTimerRef = useRef<number | null>(null)
+  const songLongPressTriggeredRef = useRef(false)
 
   useEffect(() => {
+    folderInputRef.current?.setAttribute('webkitdirectory', '')
     Promise.all([getSongs(), getPlaylists()])
       .then(([storedSongs, storedPlaylists]) => {
         setSongs(storedSongs)
@@ -82,11 +94,8 @@ function App() {
     return activePlaylist.songIds.map((id) => byId.get(id)).filter((song): song is Song => Boolean(song))
   }, [activePlaylist, songs])
 
-  const currentSongPlaylists = useMemo(() => {
-    if (!currentSong) return []
-    return playlists.filter((playlist) => playlist.songIds.includes(currentSong.id))
-  }, [currentSong, playlists])
-
+  const importHistory = useMemo(() => [...songs].sort((a, b) => b.addedAt - a.addedAt), [songs])
+  const currentSongPlaylists = useMemo(() => currentSong ? playlists.filter((playlist) => playlist.songIds.includes(currentSong.id)) : [], [currentSong, playlists])
   const playerPlaylists = useMemo(() => {
     if (!currentSong) return []
     return [...playlists].sort((a, b) => {
@@ -124,7 +133,6 @@ function App() {
   }, [currentUrl])
 
   const snapshot = (): Snapshot => ({ songs: [...songs], playlists: [...playlists] })
-
   const recordHistory = () => {
     setUndoStack((items) => [...items, snapshot()].slice(-50))
     setRedoStack([])
@@ -145,6 +153,22 @@ function App() {
     await persistSnapshot(target, previousPlaylists)
   }
 
+  const undo = async () => {
+    const target = undoStack[undoStack.length - 1]
+    if (!target || moveCandidate) return
+    setUndoStack((items) => items.slice(0, -1))
+    setRedoStack((items) => [...items, snapshot()].slice(-50))
+    await restoreSnapshot(target)
+  }
+
+  const redo = async () => {
+    const target = redoStack[redoStack.length - 1]
+    if (!target || moveCandidate) return
+    setRedoStack((items) => items.slice(0, -1))
+    setUndoStack((items) => [...items, snapshot()].slice(-50))
+    await restoreSnapshot(target)
+  }
+
   const updatePlaylist = async (updated: Playlist, addHistory = false) => {
     if (addHistory) recordHistory()
     setPlaylists((items) => items.map((item) => item.id === updated.id ? updated : item))
@@ -155,14 +179,16 @@ function App() {
     setActivePlaylistId(entry.playlistId)
     setDetailOpen(entry.detailOpen)
     setPlaylistOverviewOpen(entry.playlistOverviewOpen)
+    setHistoryOpen(entry.historyOpen)
     setIsEditingPlaylist(false)
     setEditPrompt(null)
+    setSongPrompt(null)
     setMoveCandidate(null)
   }
 
   const navigateTo = (entry: NavigationEntry) => {
     const current = navigation[navigationIndex]
-    if (current && current.playlistId === entry.playlistId && current.detailOpen === entry.detailOpen && current.playlistOverviewOpen === entry.playlistOverviewOpen) return
+    if (current && current.playlistId === entry.playlistId && current.detailOpen === entry.detailOpen && current.playlistOverviewOpen === entry.playlistOverviewOpen && current.historyOpen === entry.historyOpen) return
     setNavigation((items) => [...items.slice(0, navigationIndex + 1), entry].slice(-60))
     setNavigationIndex((index) => Math.min(index + 1, 59))
     applyNavigation(entry)
@@ -248,53 +274,77 @@ function App() {
 
   useEffect(() => {
     if (!('mediaSession' in navigator)) return
-
-    if (currentSong) {
-      navigator.mediaSession.metadata = new MediaMetadata({ title: currentSong.name, artist: 'Josi' })
-    } else {
-      navigator.mediaSession.metadata = null
-    }
+    navigator.mediaSession.metadata = currentSong ? new MediaMetadata({ title: currentSong.name, artist: 'Josi' }) : null
     navigator.mediaSession.playbackState = isPlaying ? 'playing' : 'paused'
-
     const handlers: Array<[MediaSessionAction, MediaSessionActionHandler | null]> = [
-      ['play', () => {
-        const audio = audioRef.current
-        if (audio) audio.play().catch(() => undefined)
-      }],
+      ['play', () => audioRef.current?.play().catch(() => undefined)],
       ['pause', () => audioRef.current?.pause()],
       ['previoustrack', () => moveSong(-1)],
       ['nexttrack', () => moveSong(1)],
       ['seekbackward', (details) => skipSeconds(-(details.seekOffset ?? 10))],
       ['seekforward', (details) => skipSeconds(details.seekOffset ?? 10)],
-      ['seekto', (details) => {
-        if (details.seekTime !== undefined) seek(details.seekTime)
-      }],
+      ['seekto', (details) => { if (details.seekTime !== undefined) seek(details.seekTime) }],
     ]
-
-    handlers.forEach(([action, handler]) => {
-      try { navigator.mediaSession.setActionHandler(action, handler) } catch { /* unsupported action */ }
-    })
-
-    return () => {
-      handlers.forEach(([action]) => {
-        try { navigator.mediaSession.setActionHandler(action, null) } catch { /* unsupported action */ }
-      })
-    }
+    handlers.forEach(([action, handler]) => { try { navigator.mediaSession.setActionHandler(action, handler) } catch { /* unsupported */ } })
+    return () => handlers.forEach(([action]) => { try { navigator.mediaSession.setActionHandler(action, null) } catch { /* unsupported */ } })
   }, [currentSong?.id, isPlaying, queue, shuffle, repeatQueue])
 
-  const importFiles = async (files: FileList | null) => {
+  const importFiles = async (files: FileList | null, source: 'files' | 'folder' = 'files') => {
     if (!files?.length) return
     const audioFiles = Array.from(files).filter((file) => file.type.startsWith('audio/') || /\.(mp3|m4a|aac|wav|ogg|flac)$/i.test(file.name))
     if (!audioFiles.length) return setMessage('Keine unterstützten Audiodateien ausgewählt.')
     try {
-      const imported = await saveSongs(audioFiles)
-      setSongs((existing) => [...existing, ...imported])
-      setMessage(`${imported.length} ${imported.length === 1 ? 'Song wurde' : 'Songs wurden'} importiert.`)
+      const normalized = songs.map((song) => song.isNew ? { ...song, isNew: false } : song)
+      if (normalized.some((song, index) => song !== songs[index])) await saveSongOrder(normalized)
+      const imported = await saveSongs(audioFiles, crypto.randomUUID())
+      setSongs([...normalized, ...imported])
+      setMessage(`${imported.length} ${imported.length === 1 ? 'Song wurde' : 'Songs wurden'} aus ${source === 'folder' ? 'dem Ordner' : 'der Auswahl'} importiert.`)
     } catch {
       setMessage('Import fehlgeschlagen. Möglicherweise ist der lokale Speicher voll.')
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = ''
+      if (folderInputRef.current) folderInputRef.current.value = ''
     }
+  }
+
+  const markSongSeen = async (songId: string) => {
+    const updated = songs.map((song) => song.id === songId ? { ...song, isNew: false } : song)
+    setSongs(updated)
+    setSongPrompt(null)
+    await saveSongOrder(updated)
+  }
+
+  const markAllSeen = async () => {
+    const updated = songs.map((song) => song.isNew ? { ...song, isNew: false } : song)
+    setSongs(updated)
+    setSongPrompt(null)
+    await saveSongOrder(updated)
+  }
+
+  const startSongLongPress = (songId: string, event: React.PointerEvent) => {
+    if (songLongPressTimerRef.current !== null) window.clearTimeout(songLongPressTimerRef.current)
+    songLongPressTriggeredRef.current = false
+    const { clientX, clientY } = event
+    songLongPressTimerRef.current = window.setTimeout(() => {
+      songLongPressTriggeredRef.current = true
+      setSongPrompt({ songId, x: clientX, y: clientY })
+      songLongPressTimerRef.current = null
+    }, 1000)
+  }
+
+  const cancelSongLongPress = () => {
+    if (songLongPressTimerRef.current !== null) {
+      window.clearTimeout(songLongPressTimerRef.current)
+      songLongPressTimerRef.current = null
+    }
+  }
+
+  const handleSongClick = (songId: string) => {
+    if (songLongPressTriggeredRef.current) {
+      songLongPressTriggeredRef.current = false
+      return
+    }
+    playSong(songId)
   }
 
   const createPlaylist = async (event: React.FormEvent) => {
@@ -306,12 +356,12 @@ function App() {
     await savePlaylist(playlist)
     setPlaylists((existing) => [playlist, ...existing])
     setPlaylistName('')
-    navigateTo({ playlistId: playlist.id, detailOpen: false, playlistOverviewOpen: false })
+    navigateTo({ playlistId: playlist.id, detailOpen: false, playlistOverviewOpen: false, historyOpen: false })
   }
 
   const openPlaylist = async (id: string | null) => {
     if (reorderScope === 'sidebar') return
-    navigateTo({ playlistId: id, detailOpen: false, playlistOverviewOpen: false })
+    navigateTo({ playlistId: id, detailOpen: false, playlistOverviewOpen: false, historyOpen: false })
     if (!id) return
     const playlist = playlists.find((item) => item.id === id)
     if (playlist) await updatePlaylist({ ...playlist, lastUsedAt: Date.now() })
@@ -320,11 +370,7 @@ function App() {
   const togglePlaylistSong = async (playlist: Playlist) => {
     if (!currentSong) return
     const contains = playlist.songIds.includes(currentSong.id)
-    await updatePlaylist({
-      ...playlist,
-      songIds: contains ? playlist.songIds.filter((id) => id !== currentSong.id) : [...playlist.songIds, currentSong.id],
-      lastUsedAt: Date.now(),
-    }, true)
+    await updatePlaylist({ ...playlist, songIds: contains ? playlist.songIds.filter((id) => id !== currentSong.id) : [...playlist.songIds, currentSong.id], lastUsedAt: Date.now() }, true)
   }
 
   const removeSongFromActivePlaylist = async (songId: string) => {
@@ -352,12 +398,7 @@ function App() {
     setMoveCandidate(null)
     setEditPrompt(null)
   }
-
-  const finishReorder = () => {
-    setMoveCandidate(null)
-    setReorderScope(null)
-  }
-
+  const finishReorder = () => { setMoveCandidate(null); setReorderScope(null) }
   const chooseMoveItem = (kind: 'song' | 'playlist', id: string) => setMoveCandidate({ kind, id, targetIndex: null })
   const chooseTarget = (targetIndex: number) => setMoveCandidate((candidate) => candidate ? { ...candidate, targetIndex } : candidate)
   const cancelPendingMove = () => setMoveCandidate(null)
@@ -375,31 +416,24 @@ function App() {
   const confirmPendingMove = async () => {
     if (!moveCandidate || moveCandidate.targetIndex === null) return
     recordHistory()
-
     if (moveCandidate.kind === 'playlist') {
       const ids = reorderIds(sidebarPlaylists.map((playlist) => playlist.id), moveCandidate.id, moveCandidate.targetIndex)
       const order = new Map(ids.map((id, index) => [id, index]))
       const updated = playlists.map((playlist) => ({ ...playlist, sortOrder: order.get(playlist.id) ?? playlist.sortOrder }))
       setPlaylists(updated)
       await Promise.all(updated.map((playlist) => savePlaylist(playlist)))
-      setMoveCandidate(null)
-      return
-    }
-
-    if (reorderScope === 'playlist' && activePlaylist) {
+    } else if (reorderScope === 'playlist' && activePlaylist) {
       const songIds = reorderIds(activePlaylist.songIds, moveCandidate.id, moveCandidate.targetIndex)
       const updated = { ...activePlaylist, songIds, lastUsedAt: Date.now() }
       setPlaylists((items) => items.map((item) => item.id === updated.id ? updated : item))
       await savePlaylist(updated)
-      setMoveCandidate(null)
-      return
+    } else {
+      const ids = reorderIds(songs.map((song) => song.id), moveCandidate.id, moveCandidate.targetIndex)
+      const byId = new Map(songs.map((song) => [song.id, song]))
+      const ordered = ids.map((id, index) => ({ ...byId.get(id)!, libraryOrder: index }))
+      setSongs(ordered)
+      await saveSongOrder(ordered)
     }
-
-    const ids = reorderIds(songs.map((song) => song.id), moveCandidate.id, moveCandidate.targetIndex)
-    const byId = new Map(songs.map((song) => [song.id, song]))
-    const ordered = ids.map((id, index) => ({ ...byId.get(id)!, libraryOrder: index }))
-    setSongs(ordered)
-    await saveSongOrder(ordered)
     setMoveCandidate(null)
   }
 
@@ -429,7 +463,7 @@ function App() {
     recordHistory()
     await deletePlaylist(playlistToDelete.id)
     setPlaylists((items) => items.filter((item) => item.id !== playlistToDelete.id))
-    if (activePlaylistId === playlistToDelete.id) navigateTo({ playlistId: null, detailOpen: false, playlistOverviewOpen: false })
+    if (activePlaylistId === playlistToDelete.id) navigateTo({ playlistId: null, detailOpen: false, playlistOverviewOpen: false, historyOpen: false })
     setPlaylistToDelete(null)
   }
 
@@ -439,151 +473,115 @@ function App() {
   }
 
   const songEditMode = reorderScope === (activePlaylist ? 'playlist' : 'library')
-
   const renderDropZone = (index: number, kind: 'song' | 'playlist') => {
     if (!moveCandidate || moveCandidate.kind !== kind) return null
     return <button className={`drop-zone${moveCandidate.targetIndex === index ? ' selected' : ''}`} type="button" onClick={() => chooseTarget(index)} aria-label={`An Position ${index + 1} verschieben`}><span /></button>
   }
 
+  const renderSongRow = (song: Song, index: number, history = false) => (
+    <div key={song.id} className={`song-row${song.isNew ? ' new-import' : ''}${moveCandidate?.kind === 'song' && moveCandidate.id === song.id ? ' move-source' : ''}`}>
+      {!history && songEditMode && <button className="move-selector" type="button" onClick={() => chooseMoveItem('song', song.id)} aria-label={`${song.name} zum Verschieben auswählen`}>↕</button>}
+      <button
+        className="song-main"
+        type="button"
+        onPointerDown={(event) => startSongLongPress(song.id, event)}
+        onPointerUp={cancelSongLongPress}
+        onPointerCancel={cancelSongLongPress}
+        onPointerLeave={cancelSongLongPress}
+        onContextMenu={(event) => event.preventDefault()}
+        onClick={() => handleSongClick(song.id)}
+        disabled={!history && songEditMode}
+      >
+        <span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span>
+        <span className="song-copy"><strong>{song.name}</strong><small>{history ? `${formatImportDate(song.addedAt)}${song.sourcePath ? ` · ${song.sourcePath}` : ''}` : membershipText(song.id)}</small></span>
+        <span className="song-action">▶</span>
+      </button>
+      {!history && activePlaylist && !songEditMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActivePlaylist(song.id)}>Entfernen</button>}
+      {!history && renderDropZone(index + 1, 'song')}
+    </div>
+  )
+
   return (
     <div className="app-shell">
       <header className="site-header">
-        <div className="history-controls" aria-label="Navigation">
+        <div className="history-controls" aria-label="Navigation und Verlauf">
           <button type="button" onClick={navigateBack} disabled={navigationIndex === 0} aria-label="Zurück">‹</button>
           <button type="button" onClick={navigateForward} disabled={navigationIndex >= navigation.length - 1} aria-label="Vor">›</button>
+          <button type="button" onClick={() => void undo()} disabled={!undoStack.length || Boolean(moveCandidate)} aria-label="Rückgängig">↶</button>
+          <button type="button" onClick={() => void redo()} disabled={!redoStack.length || Boolean(moveCandidate)} aria-label="Wiederholen">↷</button>
           {moveCandidate && <>
             <button className="confirm-move" type="button" onClick={() => void confirmPendingMove()} disabled={moveCandidate.targetIndex === null} aria-label="Verschieben bestätigen">✓</button>
             <button className="cancel-move" type="button" onClick={cancelPendingMove} aria-label="Verschieben abbrechen">×</button>
           </>}
         </div>
-        <button className="import-button" type="button" onClick={() => fileInputRef.current?.click()}>+ Musik importieren</button>
-        <input ref={fileInputRef} className="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac" multiple onChange={(event) => importFiles(event.target.files)} />
+        <div className="import-actions">
+          <button className="folder-import-button" type="button" onClick={() => folderInputRef.current?.click()}>Ordner importieren</button>
+          <button className="import-button" type="button" onClick={() => fileInputRef.current?.click()}>+ Musik importieren</button>
+        </div>
+        <input ref={fileInputRef} className="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac" multiple onChange={(event) => void importFiles(event.target.files, 'files')} />
+        <input ref={folderInputRef} className="file-input" type="file" multiple onChange={(event) => void importFiles(event.target.files, 'folder')} />
       </header>
 
-      {!playlistOverviewOpen && <main className="music-layout">
+      {!playlistOverviewOpen && !historyOpen && <main className="music-layout">
         <aside className="sidebar">
-          <button className={`nav-item${activePlaylistId === null ? ' active' : ''}`} type="button" onClick={() => void openPlaylist(null)} disabled={reorderScope === 'sidebar'}>
-            <span>Bibliothek</span><strong>{songs.length}</strong>
-          </button>
+          <button className={`nav-item${activePlaylistId === null ? ' active' : ''}`} type="button" onClick={() => void openPlaylist(null)} disabled={reorderScope === 'sidebar'}><span>Bibliothek</span><strong>{songs.length}</strong></button>
+          <button className="nav-item history-nav" type="button" onClick={() => navigateTo({ playlistId: null, detailOpen: false, playlistOverviewOpen: false, historyOpen: true })} disabled={reorderScope === 'sidebar'}><span>Verlauf</span><strong>{songs.filter((song) => song.isNew).length}</strong></button>
 
           <div className="sidebar-heading heading-with-popover">
             <button className="heading-longpress" type="button" onPointerDown={startLongPress} onPointerUp={cancelLongPress} onPointerCancel={cancelLongPress} onPointerLeave={cancelLongPress} onContextMenu={(event) => event.preventDefault()}>Playlists</button>
             {reorderScope === 'sidebar' && <button className="finish-inline" type="button" onClick={finishReorder}>Fertig</button>}
-            {editPrompt === 'playlists' && <div className="edit-popover playlist-menu"><button type="button" onClick={() => beginReorder('sidebar')}>Bearbeiten</button><button type="button" onClick={() => navigateTo({ playlistId: activePlaylistId, detailOpen: false, playlistOverviewOpen: true })}>Übersicht</button></div>}
+            {editPrompt === 'playlists' && <div className="edit-popover playlist-menu"><button type="button" onClick={() => beginReorder('sidebar')}>Bearbeiten</button><button type="button" onClick={() => navigateTo({ playlistId: activePlaylistId, detailOpen: false, playlistOverviewOpen: true, historyOpen: false })}>Übersicht</button></div>}
           </div>
 
           <div className="playlist-nav">
             {renderDropZone(0, 'playlist')}
-            {sidebarPlaylists.map((playlist, index) => (
-              <div key={playlist.id} className={`playlist-nav-row${moveCandidate?.kind === 'playlist' && moveCandidate.id === playlist.id ? ' move-source' : ''}`}>
-                {reorderScope === 'sidebar' && <button className="move-selector" type="button" onClick={() => chooseMoveItem('playlist', playlist.id)} aria-label={`${playlist.name} zum Verschieben auswählen`}>↕</button>}
-                <button className={`nav-item${activePlaylistId === playlist.id ? ' active' : ''}`} type="button" onClick={() => void openPlaylist(playlist.id)} disabled={reorderScope === 'sidebar'}>
-                  <span className="playlist-nav-name">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span className="playlist-mini-cover">♫</span>}<span>{playlist.name}</span></span>
-                  <strong>{playlist.songIds.length}</strong>
-                </button>
-                {renderDropZone(index + 1, 'playlist')}
-              </div>
-            ))}
+            {sidebarPlaylists.map((playlist, index) => <div key={playlist.id} className={`playlist-nav-row${moveCandidate?.kind === 'playlist' && moveCandidate.id === playlist.id ? ' move-source' : ''}`}>
+              {reorderScope === 'sidebar' && <button className="move-selector" type="button" onClick={() => chooseMoveItem('playlist', playlist.id)}>↕</button>}
+              <button className={`nav-item${activePlaylistId === playlist.id ? ' active' : ''}`} type="button" onClick={() => void openPlaylist(playlist.id)} disabled={reorderScope === 'sidebar'}>
+                <span className="playlist-nav-name">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span className="playlist-mini-cover">♫</span>}<span>{playlist.name}</span></span><strong>{playlist.songIds.length}</strong>
+              </button>
+              {renderDropZone(index + 1, 'playlist')}
+            </div>)}
           </div>
 
-          <form className="new-playlist" onSubmit={createPlaylist}>
-            <input value={playlistName} onChange={(event) => setPlaylistName(event.target.value)} placeholder="Neue Playlist" aria-label="Name der neuen Playlist" disabled={reorderScope === 'sidebar'} />
-            <button type="submit" disabled={!playlistName.trim() || reorderScope === 'sidebar'} aria-label="Playlist erstellen">+</button>
-          </form>
+          <form className="new-playlist" onSubmit={createPlaylist}><input value={playlistName} onChange={(event) => setPlaylistName(event.target.value)} placeholder="Neue Playlist" disabled={reorderScope === 'sidebar'} /><button type="submit" disabled={!playlistName.trim() || reorderScope === 'sidebar'}>+</button></form>
         </aside>
 
         <section className="library-panel">
           <div className={`library-heading${activePlaylist ? ' playlist-heading' : ''}`}>
-            {activePlaylist && <button className="playlist-cover" type="button" onClick={() => coverInputRef.current?.click()} aria-label="Playlist-Bild ändern">{coverUrls[activePlaylist.id] ? <img src={coverUrls[activePlaylist.id]} alt="" /> : <span>+ Bild</span>}</button>}
-            <div className="library-title">
-              <p className="eyebrow">{activePlaylist ? 'PLAYLIST' : 'DEINE MUSIK'}</p>
-              {activePlaylist && isEditingPlaylist ? (
-                <form className="rename-playlist" onSubmit={savePlaylistName}>
-                  <input value={editingName} onChange={(event) => setEditingName(event.target.value)} autoFocus aria-label="Playlist-Name" />
-                  <button type="submit" disabled={!editingName.trim()}>Speichern</button>
-                  <button type="button" onClick={() => setIsEditingPlaylist(false)}>Abbrechen</button>
-                </form>
-              ) : <h1>{activePlaylist?.name ?? 'Bibliothek'}</h1>}
+            {activePlaylist && <button className="playlist-cover" type="button" onClick={() => coverInputRef.current?.click()}>{coverUrls[activePlaylist.id] ? <img src={coverUrls[activePlaylist.id]} alt="" /> : <span>+ Bild</span>}</button>}
+            <div className="library-title"><p className="eyebrow">{activePlaylist ? 'PLAYLIST' : 'DEINE MUSIK'}</p>
+              {activePlaylist && isEditingPlaylist ? <form className="rename-playlist" onSubmit={savePlaylistName}><input value={editingName} onChange={(event) => setEditingName(event.target.value)} autoFocus /><button type="submit" disabled={!editingName.trim()}>Speichern</button><button type="button" onClick={() => setIsEditingPlaylist(false)}>Abbrechen</button></form> : <h1>{activePlaylist?.name ?? 'Bibliothek'}</h1>}
               <p>{queue.length} {queue.length === 1 ? 'Song' : 'Songs'}</p>
             </div>
             <div className="playlist-actions">
-              {activePlaylist && <>
-                <button type="button" onClick={startEditingPlaylist}>Name ändern</button>
-                <button type="button" onClick={() => coverInputRef.current?.click()}>Bild ändern</button>
-                <button className={reorderScope === 'playlist' ? 'active-action' : ''} type="button" onClick={() => reorderScope === 'playlist' ? finishReorder() : beginReorder('playlist')}>{reorderScope === 'playlist' ? 'Fertig' : 'Reihenfolge ändern'}</button>
-                <button className="danger-button" type="button" onClick={() => setPlaylistToDelete(activePlaylist)}>Playlist löschen</button>
-                <input ref={coverInputRef} className="file-input" type="file" accept="image/*" onChange={(event) => changePlaylistCover(event.target.files)} />
-              </>}
+              {activePlaylist && <><button type="button" onClick={startEditingPlaylist}>Name ändern</button><button type="button" onClick={() => coverInputRef.current?.click()}>Bild ändern</button><button className={reorderScope === 'playlist' ? 'active-action' : ''} type="button" onClick={() => reorderScope === 'playlist' ? finishReorder() : beginReorder('playlist')}>{reorderScope === 'playlist' ? 'Fertig' : 'Reihenfolge ändern'}</button><button className="danger-button" type="button" onClick={() => setPlaylistToDelete(activePlaylist)}>Playlist löschen</button><input ref={coverInputRef} className="file-input" type="file" accept="image/*" onChange={(event) => void changePlaylistCover(event.target.files)} /></>}
               {!activePlaylist && <button className={reorderScope === 'library' ? 'active-action' : ''} type="button" onClick={() => reorderScope === 'library' ? finishReorder() : beginReorder('library')}>{reorderScope === 'library' ? 'Fertig' : 'Reihenfolge ändern'}</button>}
             </div>
           </div>
-
           {message && <div className="message" role="status">{message}</div>}
-          {songEditMode && <div className="reorder-hint">Wähle links einen Song aus, scrolle zur Zielstelle und tippe zwischen zwei Songs. Der rote Strich markiert die neue Position. Bestätige oben mit ✓ oder brich mit × ab.</div>}
-
-          {queue.length ? (
-            <div className="song-list">
-              {renderDropZone(0, 'song')}
-              {queue.map((song, index) => (
-                <div key={song.id} className={`song-row${moveCandidate?.kind === 'song' && moveCandidate.id === song.id ? ' move-source' : ''}`}>
-                  {songEditMode && <button className="move-selector" type="button" onClick={() => chooseMoveItem('song', song.id)} aria-label={`${song.name} zum Verschieben auswählen`}>↕</button>}
-                  <button className="song-main" type="button" onClick={() => playSong(song.id)} disabled={songEditMode}>
-                    <span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span>
-                    <span className="song-copy"><strong>{song.name}</strong><small>{membershipText(song.id)}</small></span>
-                    <span className="song-action">▶</span>
-                  </button>
-                  {activePlaylist && !songEditMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActivePlaylist(song.id)}>Entfernen</button>}
-                  {renderDropZone(index + 1, 'song')}
-                </div>
-              ))}
-            </div>
-          ) : <div className="empty-state"><div className="empty-icon">♫</div><h2>{activePlaylist ? 'Noch keine Songs in dieser Playlist.' : 'Noch keine Musik importiert.'}</h2></div>}
+          {songEditMode && <div className="reorder-hint">Wähle einen Song aus, scrolle zur Zielstelle und tippe zwischen zwei Songs. Bestätige oben mit ✓ oder brich mit × ab.</div>}
+          {queue.length ? <div className="song-list">{renderDropZone(0, 'song')}{queue.map((song, index) => renderSongRow(song, index))}</div> : <div className="empty-state"><div className="empty-icon">♫</div><h2>{activePlaylist ? 'Noch keine Songs in dieser Playlist.' : 'Noch keine Musik importiert.'}</h2></div>}
         </section>
       </main>}
 
-      {playlistOverviewOpen && <section className="playlist-overview" aria-label="Playlist-Übersicht">
-        <div className="playlist-overview-heading"><p className="eyebrow">DEINE MUSIK</p><h1>Playlists</h1><p>{sidebarPlaylists.length} {sidebarPlaylists.length === 1 ? 'Playlist' : 'Playlists'}</p></div>
-        <div className="playlist-grid">
-          {sidebarPlaylists.map((playlist) => <button key={playlist.id} className="playlist-card" type="button" onClick={() => void openPlaylist(playlist.id)}>
-            <span className="playlist-card-cover">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span>♫</span>}</span>
-            <strong>{playlist.name}</strong>
-            <small>{playlist.songIds.length} {playlist.songIds.length === 1 ? 'Lied' : 'Lieder'}</small>
-          </button>)}
-        </div>
+      {historyOpen && <section className="import-history-view" aria-label="Import-Verlauf">
+        <div className="history-view-heading"><p className="eyebrow">BIBLIOTHEK</p><h1>Verlauf</h1><p>Zuletzt importierte Dateien, neueste zuerst.</p></div>
+        {importHistory.length ? <div className="song-list history-song-list">{importHistory.map((song, index) => renderSongRow(song, index, true))}</div> : <div className="empty-state"><div className="empty-icon">↧</div><h2>Noch keine Importe.</h2></div>}
       </section>}
+
+      {playlistOverviewOpen && <section className="playlist-overview" aria-label="Playlist-Übersicht"><div className="playlist-overview-heading"><p className="eyebrow">DEINE MUSIK</p><h1>Playlists</h1><p>{sidebarPlaylists.length} {sidebarPlaylists.length === 1 ? 'Playlist' : 'Playlists'}</p></div><div className="playlist-grid">{sidebarPlaylists.map((playlist) => <button key={playlist.id} className="playlist-card" type="button" onClick={() => void openPlaylist(playlist.id)}><span className="playlist-card-cover">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span>♫</span>}</span><strong>{playlist.name}</strong><small>{playlist.songIds.length} {playlist.songIds.length === 1 ? 'Lied' : 'Lieder'}</small></button>)}</div></section>}
 
       <section className={`player${currentSong ? ' visible' : ''}`} aria-label="Player">
         <audio ref={audioRef} src={currentUrl ?? undefined} playsInline onTimeUpdate={(event) => setCurrentTime(event.currentTarget.currentTime)} onLoadedMetadata={(event) => setDuration(event.currentTarget.duration)} onPlay={() => setIsPlaying(true)} onPause={() => setIsPlaying(false)} onEnded={() => moveSong(1)} />
-        <button className="now-playing" type="button" onClick={() => currentSong && navigateTo({ playlistId: activePlaylistId, detailOpen: true, playlistOverviewOpen: false })} disabled={!currentSong}>
-          <span className="cover-placeholder">♫</span><span className="now-playing-copy"><small>JETZT</small><span className="marquee"><strong>{currentSong?.name ?? 'Kein Song ausgewählt'}</strong></span></span>
-        </button>
-        <div className="transport">
-          <div className="transport-buttons">
-            <button className={shuffle ? 'active-control' : ''} type="button" onClick={() => setShuffle((value) => !value)}>⇄</button>
-            <button type="button" onClick={() => moveSong(-1)}>⏮</button>
-            <button className="play-button" type="button" onClick={togglePlayback}>{isPlaying ? '❚❚' : '▶'}</button>
-            <button type="button" onClick={() => moveSong(1)}>⏭</button>
-            <button className={repeatQueue ? 'active-control' : ''} type="button" onClick={() => setRepeatQueue((value) => !value)}>↻</button>
-          </div>
-          <div className="progress-row"><span>{formatTime(currentTime)}</span><input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} /><span>{formatTime(duration)}</span></div>
-        </div>
-        <div className="quick-playlists"><div className="quick-heading"><strong>Playlists</strong></div><div className="quick-list">
-          {playerPlaylists.length ? playerPlaylists.map((playlist) => {
-            const contains = currentSong ? playlist.songIds.includes(currentSong.id) : false
-            return <button key={playlist.id} type="button" className={contains ? 'included' : ''} onClick={() => void togglePlaylistSong(playlist)} disabled={!currentSong}><span>{playlist.name}</span><strong>{contains ? '−' : '+'}</strong></button>
-          }) : <span className="no-playlists">Noch keine Playlist</span>}
-        </div></div>
+        <button className="now-playing" type="button" onClick={() => currentSong && navigateTo({ playlistId: activePlaylistId, detailOpen: true, playlistOverviewOpen: false, historyOpen: false })} disabled={!currentSong}><span className="cover-placeholder">♫</span><span className="now-playing-copy"><small>JETZT</small><span className="marquee"><strong>{currentSong?.name ?? 'Kein Song ausgewählt'}</strong></span></span></button>
+        <div className="transport"><div className="transport-buttons"><button className={shuffle ? 'active-control' : ''} type="button" onClick={() => setShuffle((value) => !value)}>⇄</button><button type="button" onClick={() => moveSong(-1)}>⏮</button><button className="play-button" type="button" onClick={togglePlayback}>{isPlaying ? '❚❚' : '▶'}</button><button type="button" onClick={() => moveSong(1)}>⏭</button><button className={repeatQueue ? 'active-control' : ''} type="button" onClick={() => setRepeatQueue((value) => !value)}>↻</button></div><div className="progress-row"><span>{formatTime(currentTime)}</span><input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} /><span>{formatTime(duration)}</span></div></div>
+        <div className="quick-playlists"><div className="quick-heading"><strong>Playlists</strong></div><div className="quick-list">{playerPlaylists.length ? playerPlaylists.map((playlist) => { const contains = currentSong ? playlist.songIds.includes(currentSong.id) : false; return <button key={playlist.id} type="button" className={contains ? 'included' : ''} onClick={() => void togglePlaylistSong(playlist)} disabled={!currentSong}><span>{playlist.name}</span><strong>{contains ? '−' : '+'}</strong></button> }) : <span className="no-playlists">Noch keine Playlist</span>}</div></div>
       </section>
 
-      {detailOpen && currentSong && <section className="song-detail" aria-label="Songdetails">
-        <div className="detail-topbar"><button type="button" onClick={navigateBack}>‹ Zurück</button></div>
-        <div className="detail-content"><p className="detail-label">JETZT</p><h2>{currentSong.name}</h2>
-          <div className="playlist-membership"><span>IN PLAYLISTS</span><strong>{currentSongPlaylists.length ? currentSongPlaylists.map((playlist) => playlist.name).join(' · ') : 'In keiner Playlist'}</strong></div>
-          <div className="detail-progress"><input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} /><div><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div></div>
-          <div className="detail-controls"><button type="button" onClick={playPreviousFromHistory} disabled={!playHistory.length}>⏮</button><button type="button" onClick={() => skipSeconds(-10)}>↶<small>10</small></button><button className="detail-play" type="button" onClick={togglePlayback}>{isPlaying ? '❚❚' : '▶'}</button><button type="button" onClick={() => skipSeconds(10)}>↷<small>10</small></button><button type="button" onClick={() => moveSong(1)}>⏭</button></div>
-        </div>
-      </section>}
+      {detailOpen && currentSong && <section className="song-detail" aria-label="Songdetails"><div className="detail-topbar"><button type="button" onClick={navigateBack}>‹ Zurück</button></div><div className="detail-content"><p className="detail-label">JETZT</p><h2>{currentSong.name}</h2><div className="playlist-membership"><span>IN PLAYLISTS</span><strong>{currentSongPlaylists.length ? currentSongPlaylists.map((playlist) => playlist.name).join(' · ') : 'In keiner Playlist'}</strong></div><div className="detail-progress"><input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} /><div><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div></div><div className="detail-controls"><button type="button" onClick={playPreviousFromHistory} disabled={!playHistory.length}>⏮</button><button type="button" onClick={() => skipSeconds(-10)}>↶<small>10</small></button><button className="detail-play" type="button" onClick={togglePlayback}>{isPlaying ? '❚❚' : '▶'}</button><button type="button" onClick={() => skipSeconds(10)}>↷<small>10</small></button><button type="button" onClick={() => moveSong(1)}>⏭</button></div></div></section>}
 
+      {songPrompt && <><button className="song-menu-shield" type="button" aria-label="Menü schließen" onClick={() => setSongPrompt(null)} /><div className="song-context-menu" style={{ left: Math.min(songPrompt.x, window.innerWidth - 230), top: Math.min(songPrompt.y, window.innerHeight - 150) }}>{songs.find((song) => song.id === songPrompt.songId)?.isNew && <button type="button" onClick={() => void markSongSeen(songPrompt.songId)}>Als gesehen markieren</button>}<button type="button" onClick={() => void markAllSeen()}>Alle als gesehen markieren</button></div></>}
       {editPrompt && <button className="edit-popover-shield" type="button" aria-label="Menü schließen" onClick={() => setEditPrompt(null)} />}
       {playlistToDelete && <div className="modal-backdrop" onMouseDown={() => setPlaylistToDelete(null)}><div className="confirm-dialog" role="dialog" aria-modal="true" onMouseDown={(event) => event.stopPropagation()}><h2>Playlist löschen?</h2><p>„{playlistToDelete.name}“ wird gelöscht. Die Musikdateien bleiben erhalten.</p><div className="dialog-actions"><button type="button" onClick={() => setPlaylistToDelete(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void confirmDeletePlaylist()}>Playlist löschen</button></div></div></div>}
     </div>
