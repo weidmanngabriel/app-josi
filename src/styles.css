@@ -47,19 +47,25 @@ h1 { margin: 0 0 6px; font-size: clamp(34px,5vw,64px); line-height: 1; letter-sp
 .playlist-cover { display: grid; flex: 0 0 clamp(92px, 12vw, 150px); place-items: center; width: clamp(92px, 12vw, 150px); height: clamp(92px, 12vw, 150px); padding: 0; overflow: hidden; border: 1px solid #303645; border-radius: 18px; background: #171b24; color: #a78bfa; cursor: pointer; }
 .playlist-cover img { width: 100%; height: 100%; object-fit: cover; }
 .playlist-cover span { font-weight: 800; font-size: 13px; }
-.playlist-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: 260px; }
+.playlist-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px; max-width: 300px; }
 .playlist-actions button, .rename-playlist button, .dialog-actions button { min-height: 40px; padding: 0 12px; border: 1px solid #303645; border-radius: 10px; background: #1a1f2a; cursor: pointer; }
+.playlist-actions .active-action { border-color: #7657d7; background: #2b2148; }
 .danger-button { border-color: #6e3037 !important; background: #31171c !important; color: #fecaca; }
 .rename-playlist { display: flex; flex-wrap: wrap; gap: 8px; margin: 4px 0 8px; }
 .rename-playlist input { min-width: min(360px, 100%); min-height: 48px; padding: 0 12px; border: 1px solid #4b5568; border-radius: 10px; background: #11141b; color: white; font-size: clamp(24px,4vw,42px); font-weight: 800; }
-.message { margin-bottom: 18px; padding: 12px 14px; border: 1px solid #313747; border-radius: 12px; background: #171b24; color: #cbd5e1; font-size: 13px; }
+.message, .reorder-hint { margin-bottom: 18px; padding: 12px 14px; border: 1px solid #313747; border-radius: 12px; background: #171b24; color: #cbd5e1; font-size: 13px; }
+.reorder-hint { border-color: #4a3c73; background: #1d1830; color: #ddd6fe; }
 .song-list { overflow: hidden; border: 1px solid #252a36; border-radius: 16px; background: #11141b; }
-.song-row { display: grid; grid-template-columns: 28px minmax(0,1fr) auto; align-items: center; min-height: 64px; border-bottom: 1px solid #202530; background: transparent; }
+.song-list.reordering { overflow: visible; }
+.song-row { display: grid; grid-template-columns: minmax(0,1fr) auto; align-items: center; min-height: 64px; border-bottom: 1px solid #202530; background: #11141b; }
+.song-row.reorder-mode { grid-template-columns: 48px minmax(0,1fr); }
 .song-row:last-child { border-bottom: 0; }
 .song-row:hover, .song-row.current { background: #1a1f2a; }
-.song-row.dragging { opacity: .45; }
-.drag-handle { color: #626d7f; text-align: center; cursor: grab; user-select: none; }
+.song-row.dragging { position: relative; z-index: 5; opacity: .72; box-shadow: 0 8px 24px rgba(0,0,0,.35); }
+.drag-handle { display: grid; place-items: center; align-self: stretch; width: 48px; padding: 0; border: 0; border-right: 1px solid #262c38; background: #171b24; color: #9da7b8; font-size: 20px; cursor: grab; user-select: none; -webkit-user-select: none; touch-action: none; }
+.drag-handle:active { cursor: grabbing; background: #282139; color: #ddd6fe; }
 .song-main { display: grid; grid-template-columns: 34px minmax(0,1fr) 36px; align-items: center; gap: 10px; width: 100%; min-height: 63px; padding: 8px 10px; border: 0; background: transparent; text-align: left; cursor: pointer; }
+.song-main:disabled { color: inherit; opacity: 1; cursor: default; }
 .song-number, .song-action { color: #768092; font-size: 13px; text-align: center; }
 .song-copy { display: grid; min-width: 0; }
 .song-copy strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -136,7 +142,7 @@ h1 { margin: 0 0 6px; font-size: clamp(34px,5vw,64px); line-height: 1; letter-sp
   .playlist-cover { width: 104px; height: 104px; flex-basis: 104px; }
   .playlist-actions { width: 100%; }
   .playlist-actions button { flex: 1 1 auto; }
-  .song-row { grid-template-columns: 24px minmax(0,1fr) auto; }
+  .song-row.reorder-mode { grid-template-columns: 48px minmax(0,1fr); }
   .remove-song { padding: 8px; }
   .player { grid-template-columns: 1fr; gap: 14px; min-height: 310px; padding: 14px 16px 18px; }
   .quick-playlists { grid-column: auto; }
