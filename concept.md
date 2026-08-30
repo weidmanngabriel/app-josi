@@ -78,11 +78,15 @@ Der Pfeil kehrt die Sortierung um. Die manuelle Reihenfolge bleibt separat gespe
 Der Editor enthält:
 
 - einen **roten Loop-Kasten** mit verschiebbarem Gesamtbereich,
-- getrennte rote Start- und Endkanten,
+- getrennte rote Start- und Endkanten mit größeren Touch-Flächen,
 - **Zoom von 1× bis 16×** und horizontales Scrollen,
 - eine klassische **Audio-Wellenform** als Amplitude über Zeit,
-- einen **blauen Abspielstrich**, der unabhängig vom roten Bereich bewegt werden kann,
+- einen **blauen Abspielstrich**, der nur über seinen blauen Punkt bewegt werden kann,
 - einen Schalter, der den roten Loop-Bereich transparent und unbeweglich macht,
+- einen Schalter **„Cursor-Loop“**, der bestimmt, ob die Wiedergabe im Editor am roten Endpunkt wieder zum roten Startpunkt springt,
+- eine zweite **grüne Fokus-Leiste unter der Zeitachse**,
+- einen grünen Fokusstrich, der den Mittelpunkt für den nächsten Zoom bestimmt,
+- einen Schalter **„Fokus folgt Cursor“**: eingeschaltet folgt der grüne Fokus dem blauen Cursor und die sichtbare Zeitleiste bewegt sich beim Abspielen mit; ausgeschaltet kann der Fokus unabhängig gesetzt werden,
 - **−5 s**, **Play/Pause** und **+5 s**,
 - **orange Markierungen**, die an der Position des blauen Cursors gesetzt werden,
 - anklickbare orange Markierungen, die den blauen Cursor direkt dorthin bringen,
@@ -94,7 +98,9 @@ Der Editor enthält:
 
 Die Wellenform entspricht dem, was man aus Schnittprogrammen kennt: Sie zeigt nicht die Frequenz in Hertz, sondern die Stärke des Audios über die Zeit. Das macht Einsätze, Pausen und Übergänge leichter sichtbar. Kann die Datei lokal nicht für die Wellenform dekodiert werden, bleibt der Song trotzdem normal abspielbar.
 
-Beim Abspielen innerhalb des Editors springt die Wiedergabe am Loop-Ende wieder zum Loop-Start. **Loop speichern** übernimmt Start, Ende, Marker und aktiviert den Loop. Gespeicherte Loops werden weiterhin mit einer roten Schleife markiert und im Tab **Loops** gesammelt.
+Das Bedienprinzip priorisiert große, eindeutige Touch-Flächen. Unsichtbare Trefferbereiche dürfen größer als die sichtbaren Striche sein, solange sie sich nicht gegenseitig blockieren. Besonders der blaue Cursor nimmt deshalb entlang seines Strichs keine Eingaben an; nur der blaue Punkt ist greifbar.
+
+Beim Abspielen innerhalb des Editors springt die Wiedergabe nur dann am Loop-Ende wieder zum Loop-Start, wenn **Cursor-Loop** eingeschaltet ist. **Loop speichern** übernimmt Start, Ende, Marker und aktiviert den gespeicherten Song-Loop. Gespeicherte Loops werden weiterhin mit einer roten Schleife markiert und im Tab **Loops** gesammelt.
 
 ## Wiedergabe nach Loop-Bearbeitung
 
@@ -133,5 +139,6 @@ Der experimentelle Ordnerimport bleibt entfernt.
 - Die lokale Browser-Speicherkapazität reicht für einen realistischen Test.
 - Systemfreigabe von Audiodateien funktioniert auf den tatsächlich verwendeten iPadOS-/Safari-Versionen ausreichend zuverlässig.
 - Die klassische Amplituden-Wellenform ist auf realen Musikdateien schnell genug berechenbar und hilft bei der Loop-Auswahl.
+- Die vergrößerten Trefferflächen und die getrennte Fokus-Leiste machen den Editor auf Touch-Geräten zuverlässiger bedienbar.
 - Die Audioquelle bleibt bei reinen Loop-Metadatenänderungen stabil.
 - Für eine spätere Produktversion müssen Backup, Speichergrenzen, Wiederherstellung verlorener Audiodaten und eventuell eine native App-Hülle geprüft werden.
