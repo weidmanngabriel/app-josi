@@ -120,6 +120,9 @@ function App() {
   const [loopMarkers, setLoopMarkers] = useState<number[]>([])
   const [activeLoopEdge, setActiveLoopEdge] = useState<'start' | 'end'>('start')
   const [previewLead, setPreviewLead] = useState('1')
+  const [edgeStep, setEdgeStep] = useState('0,01')
+  const [waveform, setWaveform] = useState<number[]>([])
+  const [waveformStatus, setWaveformStatus] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle')
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
@@ -183,11 +186,12 @@ function App() {
   }, [playlists])
 
   useEffect(() => {
-    if (!currentSong?.file || currentSong.file.size === 0) { setCurrentUrl(null); return }
-    const url = URL.createObjectURL(currentSong.file)
+    const file = currentSong?.file
+    if (!file || file.size === 0) { setCurrentUrl(null); return }
+    const url = URL.createObjectURL(file)
     setCurrentUrl(url)
     return () => URL.revokeObjectURL(url)
-  }, [currentSong])
+  }, [currentSong?.id, currentSong?.file])
 
   useEffect(() => {
     const audio = audioRef.current
@@ -217,6 +221,44 @@ function App() {
     setMarkersEnabled(true)
     setActiveLoopEdge('start')
   }, [loopEditorSongId, editorDuration])
+
+  useEffect(() => {
+    if (!loopEditorSongId || !editorSong?.file || editorSong.file.size === 0) {
+      setWaveform([])
+      setWaveformStatus('idle')
+      return
+    }
+    let cancelled = false
+    setWaveform([])
+    setWaveformStatus('loading')
+    const buildWaveform = async () => {
+      const AudioContextClass = window.AudioContext
+      if (!AudioContextClass) throw new Error('no-audio-context')
+      const context = new AudioContextClass()
+      try {
+        const buffer = await context.decodeAudioData((await editorSong.file.arrayBuffer()).slice(0))
+        const channel = buffer.getChannelData(0)
+        const buckets = 720
+        const block = Math.max(1, Math.floor(channel.length / buckets))
+        const peaks = Array.from({ length: buckets }, (_, bucket) => {
+          const start = bucket * block
+          const end = Math.min(channel.length, start + block)
+          let peak = 0
+          for (let index = start; index < end; index += Math.max(1, Math.floor(block / 120))) peak = Math.max(peak, Math.abs(channel[index]))
+          return peak
+        })
+        const max = Math.max(...peaks, .001)
+        if (!cancelled) {
+          setWaveform(peaks.map((value) => Math.max(.04, value / max)))
+          setWaveformStatus('ready')
+        }
+      } finally {
+        void context.close()
+      }
+    }
+    void buildWaveform().catch(() => { if (!cancelled) setWaveformStatus('unavailable') })
+    return () => { cancelled = true }
+  }, [loopEditorSongId, editorSong?.id, editorSong?.file])
 
   const snapshot = (): Snapshot => ({ songs: songs.map((song) => ({ ...song, loopMarkers: song.loopMarkers ? [...song.loopMarkers] : undefined })), playlists: playlists.map((playlist) => ({ ...playlist, songIds: [...playlist.songIds] })) })
   const recordHistory = () => { setUndoStack((items) => [...items, snapshot()].slice(-50)); setRedoStack([]) }
@@ -255,7 +297,7 @@ function App() {
     if (selectionMode) return toggleSelected(id)
     const song = songs.find((item) => item.id === id)
     if (!song?.file || song.file.size === 0) { setMessage('Diese Audiodatei ist lokal nicht mehr verfügbar. Bitte importiere sie erneut.'); return }
-    if (id === currentSongId && audioRef.current) return void audioRef.current.play()
+    if (id === currentSongId && audioRef.current) return void audioRef.current.play().catch(() => setMessage(`„${song.name}“ konnte nicht gestartet werden.`))
     if (remember && currentSongId) setPlayHistory((items) => [...items, currentSongId].slice(-50))
     shouldAutoPlayRef.current = true; setCurrentSongId(id); setCurrentTime(0)
   }
@@ -271,7 +313,13 @@ function App() {
     if (repeatQueue) return playSong(playerQueue[direction === 1 ? 0 : playerQueue.length - 1].id)
     shouldAutoPlayRef.current = false; setIsPlaying(false)
   }
-  const togglePlayback = () => { const audio = audioRef.current; if (!currentSong) return playerQueue[0] && playSong(playerQueue[0].id); if (!audio) return; if (audio.paused) void audio.play(); else audio.pause() }
+  const togglePlayback = () => {
+    const audio = audioRef.current
+    if (!currentSong) return playerQueue[0] && playSong(playerQueue[0].id)
+    if (!audio) return
+    if (audio.paused) void audio.play().catch(() => setMessage(`„${currentSong.name}“ konnte nicht gestartet werden.`))
+    else audio.pause()
+  }
   const seek = (value: number) => { if (!audioRef.current) return; const next = Math.max(0, Math.min(duration || 0, value)); audioRef.current.currentTime = next; setCurrentTime(next); if (loopEditorSongId) setLoopCursor(next) }
   const skipSeconds = (seconds: number) => seek(currentTime + seconds)
   const playPreviousFromHistory = () => { const previous = playHistory.at(-1); if (!previous) return; setPlayHistory((items) => items.slice(0, -1)); playSong(previous, false) }
@@ -432,11 +480,12 @@ function App() {
   const moveCursorTo = (value: number, play = false) => {
     const next = Math.max(0, Math.min(editorDuration || 0, value))
     setLoopCursor(next); seek(next)
-    if (play) void audioRef.current?.play()
+    if (play) void audioRef.current?.play().catch(() => setMessage('Die Vorschau konnte nicht gestartet werden.'))
   }
+  const parsedEdgeStep = () => Math.max(.001, Math.min(60, Number.parseFloat(edgeStep.replace(',', '.')) || .01))
   const nudgeActiveEdge = (delta: number) => {
     if (loopSelectionLocked || !editorDuration) return
-    const minLength = .01
+    const minLength = .001
     if (activeLoopEdge === 'start') setLoopDraftStart((value) => Math.max(0, Math.min(value + delta, loopDraftEnd - minLength)))
     else setLoopDraftEnd((value) => Math.min(editorDuration, Math.max(value + delta, loopDraftStart + minLength)))
   }
@@ -450,8 +499,10 @@ function App() {
   }
   const saveLoopDraft = async () => {
     if (!editorSong || !editorDuration || loopDraftEnd <= loopDraftStart) return
+    const wasPlaying = Boolean(audioRef.current && !audioRef.current.paused)
     await updateSong({ ...editorSong, loopStart: loopDraftStart, loopEnd: loopDraftEnd, loopEnabled: true, loopConfidence: undefined, loopMarkers: [...loopMarkers] }, true)
     setLoopEditorSongId(null)
+    if (wasPlaying) void audioRef.current?.play().catch(() => undefined)
     setMessage(`Loop für „${editorSong.name}“ gespeichert.`)
   }
 
@@ -495,6 +546,7 @@ function App() {
   const loopLeft = editorDuration ? (loopDraftStart / editorDuration) * 100 : 0
   const loopWidth = editorDuration ? Math.max(0, ((loopDraftEnd - loopDraftStart) / editorDuration) * 100) : 0
   const cursorLeft = editorDuration ? (loopCursor / editorDuration) * 100 : 0
+  const edgeStepSeconds = parsedEdgeStep()
 
   return <div className="app-shell">
     <header className="site-header">
@@ -531,9 +583,10 @@ function App() {
 
     {detailOpen && currentSong && <section className="song-detail"><div className="detail-topbar"><button type="button" onClick={navigateBack}>‹ Zurück</button></div><div className="detail-content"><p className="detail-label">JETZT</p><h2>{currentSong.name}</h2><div className="playlist-membership"><span>IN PLAYLISTS</span><strong>{currentSongPlaylists.length ? currentSongPlaylists.map((playlist) => playlist.name).join(' · ') : 'In keiner Playlist'}</strong></div><div className="detail-progress"><input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} /><div><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div></div><div className="detail-controls"><button onClick={playPreviousFromHistory} disabled={!playHistory.length}>⏮</button><button onClick={() => skipSeconds(-10)}>↶<small>10</small></button><button className="detail-play" onClick={togglePlayback}>{isPlaying ? '❚❚' : '▶'}</button><button onClick={() => skipSeconds(10)}>↷<small>10</small></button><button onClick={() => moveSong(1)}>⏭</button></div><div className="loop-panel"><div><span className="loop-panel-label">LOOP</span><h3>{currentSong.loopStart !== undefined && currentSong.loopEnd !== undefined ? `${formatTime(currentSong.loopStart)} – ${formatTime(currentSong.loopEnd)}` : 'Noch kein Loop'}</h3><p>Den Bereich legst du präzise im Loop-Editor fest.</p></div><div className="loop-actions"><button type="button" onClick={() => openLoopEditor(currentSong.id)}>{currentSong.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{currentSong.loopStart !== undefined && currentSong.loopEnd !== undefined && <><button className={currentSong.loopEnabled ? 'loop-active' : ''} type="button" onClick={() => void toggleCurrentLoop()}>{currentSong.loopEnabled ? 'Loop aktiv' : 'Loop aktivieren'}</button><button className="danger-button" type="button" onClick={() => void removeCurrentLoop()}>Loop entfernen</button></>}</div></div></div></section>}
 
-    {loopEditorSongId && editorSong && <section className="loop-editor" aria-label="Loop bearbeiten"><div className="loop-editor-inner"><div className="loop-editor-top"><button type="button" onClick={() => setLoopEditorSongId(null)}>‹ Zurück</button><h1>{editorSong.name}</h1></div><p className="loop-editor-copy">Der rote Bereich ist der Loop. Der blaue Strich ist dein unabhängiger Abspielcursor. Zoome hinein, sperre bei Bedarf den roten Bereich und setze orange Markierungen für wichtige Stellen.</p>
+    {loopEditorSongId && editorSong && <section className="loop-editor" aria-label="Loop bearbeiten"><div className="loop-editor-inner"><div className="loop-editor-top"><button type="button" onClick={() => setLoopEditorSongId(null)}>‹ Zurück</button><h1>{editorSong.name}</h1></div><p className="loop-editor-copy">Der rote Bereich ist der Loop. Der blaue Strich ist dein unabhängiger Abspielcursor. Die Wellenform zeigt die Lautstärke des Audios über die Zeit und hilft beim präzisen Finden von Übergängen.</p>
       <div className="loop-toolbar"><label>Zoom <input type="range" min="1" max="16" step="1" value={loopZoom} onChange={(event) => setLoopZoom(Number(event.target.value))} /><strong>{loopZoom}×</strong></label><button className={loopSelectionLocked ? 'toggle-on' : ''} type="button" onClick={() => setLoopSelectionLocked((value) => !value)}>Loop-Kasten {loopSelectionLocked ? 'gesperrt' : 'beweglich'}</button><button className={markersEnabled ? 'toggle-on marker-toggle' : ''} type="button" onClick={() => setMarkersEnabled((value) => !value)}>Markierungen {markersEnabled ? 'an' : 'aus'}</button></div>
-      <div className="loop-timeline-wrap"><div className="loop-timeline-scroll"><div ref={loopTimelineRef} className="loop-timeline precision" style={{ width: `${loopZoom * 100}%` }} onPointerDown={(event) => beginLoopDrag(event, 'cursor')} onPointerMove={moveLoopDrag} onPointerUp={endLoopDrag} onPointerCancel={endLoopDrag}>
+      <div className="loop-timeline-wrap"><div className="waveform-status">{waveformStatus === 'loading' ? 'Wellenform wird berechnet…' : waveformStatus === 'unavailable' ? 'Wellenform für diese Datei nicht verfügbar – Wiedergabe bleibt unverändert.' : 'Wellenform: Amplitude über Zeit'}</div><div className="loop-timeline-scroll"><div ref={loopTimelineRef} className="loop-timeline precision" style={{ width: `${loopZoom * 100}%` }} onPointerDown={(event) => beginLoopDrag(event, 'cursor')} onPointerMove={moveLoopDrag} onPointerUp={endLoopDrag} onPointerCancel={endLoopDrag}>
+        {waveform.length > 0 && <div className="loop-waveform" aria-hidden="true">{waveform.map((height, index) => <i key={index} style={{ height: `${Math.max(4, height * 92)}%` }} />)}</div>}
         {markersEnabled && loopMarkers.map((marker, index) => <button key={`${marker}-${index}`} className="loop-marker" type="button" style={{ left: `${editorDuration ? marker / editorDuration * 100 : 0}%` }} title={formatPrecise(marker)} onPointerDown={(event) => event.stopPropagation()} onClick={() => moveCursorTo(marker)}><span /></button>)}
         <div className={`loop-selection${loopSelectionLocked ? ' locked' : ''}`} style={{ left: `${loopLeft}%`, width: `${loopWidth}%` }} onPointerDown={(event) => beginLoopDrag(event, 'move')}><button className={`loop-handle start${activeLoopEdge === 'start' ? ' active-edge' : ''}`} type="button" aria-label="Loop-Start verschieben" onPointerDown={(event) => beginLoopDrag(event, 'start')} /><span className="loop-window-label">LOOP</span><button className={`loop-handle end${activeLoopEdge === 'end' ? ' active-edge' : ''}`} type="button" aria-label="Loop-Ende verschieben" onPointerDown={(event) => beginLoopDrag(event, 'end')} /></div>
         <button className="loop-cursor" type="button" style={{ left: `${cursorLeft}%` }} aria-label="Abspielposition verschieben" onPointerDown={(event) => beginLoopDrag(event, 'cursor')}><span /></button>
@@ -541,7 +594,7 @@ function App() {
       <div className="loop-editor-range"><div><span>Start</span><strong>{formatPrecise(loopDraftStart)}</strong></div><div><span>Cursor</span><strong className="cursor-time">{formatPrecise(loopCursor)}</strong></div><div><span>Ende</span><strong>{formatPrecise(loopDraftEnd)}</strong></div></div>
       <div className="loop-transport"><button type="button" onClick={() => moveCursorTo(loopCursor - 5)}>−5 s</button><button className="play-loop" type="button" onClick={togglePlayback}>{isPlaying ? '❚❚ Pause' : '▶ Start'}</button><button type="button" onClick={() => moveCursorTo(loopCursor + 5)}>+5 s</button></div>
       <div className="marker-controls"><button type="button" onClick={setMarker} disabled={!markersEnabled}>Markierung setzen</button><span>{loopMarkers.length} Markierungen</span>{loopMarkers.length > 0 && <button type="button" onClick={() => setLoopMarkers((items) => items.slice(0, -1))} disabled={!markersEnabled}>Letzte entfernen</button>}</div>
-      <div className="precision-controls"><div className="precision-block"><span>Zuletzt berührte rote Kante: <strong>{activeLoopEdge === 'start' ? 'Start' : 'Ende'}</strong></span><div><button type="button" onClick={() => nudgeActiveEdge(-.01)} disabled={loopSelectionLocked}>−10 ms</button><button type="button" onClick={() => nudgeActiveEdge(.01)} disabled={loopSelectionLocked}>+10 ms</button></div></div><div className="preview-block"><span>Vor einer Kante abspielen</span><div className="preview-row"><button type="button" onClick={() => previewBoundary('start')}>▶ vor Start</button><input aria-label="Sekunden vor Start oder Ende" value={previewLead} onChange={(event) => setPreviewLead(event.target.value)} inputMode="decimal" /><b>s</b></div><div className="preview-row"><button type="button" onClick={() => previewBoundary('end')}>▶ vor Ende</button><input value={previewLead} onChange={(event) => setPreviewLead(event.target.value)} inputMode="decimal" /><b>s</b></div></div></div>
+      <div className="precision-controls"><div className="precision-block"><span>Zuletzt berührte rote Kante: <strong>{activeLoopEdge === 'start' ? 'Start' : 'Ende'}</strong></span><label className="step-input"><span>Sprungweite</span><input aria-label="Sprungweite der roten Kante in Sekunden" value={edgeStep} onChange={(event) => setEdgeStep(event.target.value)} inputMode="decimal" /><b>s</b></label><div><button type="button" onClick={() => nudgeActiveEdge(-edgeStepSeconds)} disabled={loopSelectionLocked}>− Schritt</button><button type="button" onClick={() => nudgeActiveEdge(edgeStepSeconds)} disabled={loopSelectionLocked}>+ Schritt</button></div><small>Beispiele: 0,01 = 10 ms · 0,1 = 100 ms · 1 = 1 Sekunde</small></div><div className="preview-block"><span>Vor einer Kante abspielen</span><div className="preview-row"><button type="button" onClick={() => previewBoundary('start')}>▶ vor Start</button><input aria-label="Sekunden vor Start oder Ende" value={previewLead} onChange={(event) => setPreviewLead(event.target.value)} inputMode="decimal" /><b>s</b></div><div className="preview-row"><button type="button" onClick={() => previewBoundary('end')}>▶ vor Ende</button><input value={previewLead} onChange={(event) => setPreviewLead(event.target.value)} inputMode="decimal" /><b>s</b></div></div></div>
       <div className="loop-editor-actions"><button className="save-loop" type="button" onClick={() => void saveLoopDraft()} disabled={!editorDuration || loopDraftEnd <= loopDraftStart}>Loop speichern</button><button type="button" onClick={() => setLoopEditorSongId(null)}>Abbrechen</button></div></div></div></section>}
 
     {playlistChooserMode && <div className="playlist-chooser-backdrop" onMouseDown={() => setPlaylistChooserMode(null)}><section className="playlist-chooser" onMouseDown={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">PLAYLISTS</p><h2>{playlistChooserMode === 'bulk' ? `${selectedSongIds.size} Lieder zuordnen` : 'Alle Playlists'}</h2></div><button type="button" onClick={() => setPlaylistChooserMode(null)}>×</button></div><div className="playlist-groups">{groupedPlaylists.map(([group, items]) => <div className="playlist-group" key={group}><strong>{group}</strong><div>{items.map((playlist) => { const contains = currentSong ? playlist.songIds.includes(currentSong.id) : false; return <button key={playlist.id} type="button" onClick={() => playlistChooserMode === 'bulk' ? void assignSelectedToPlaylist(playlist) : void toggleCurrentInPlaylist(playlist)}><span>{playlist.name}</span>{playlistChooserMode === 'current' && <b>{contains ? '−' : '+'}</b>}</button> })}</div></div>)}</div></section></div>}
