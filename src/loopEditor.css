@@ -1,0 +1,36 @@
+.loop-editor {
+  position: fixed;
+  inset: 0;
+  z-index: 125;
+  overflow-y: auto;
+  background: radial-gradient(circle at 70% 10%, rgba(239,68,68,.12), transparent 32%), #0b0d12;
+  padding: 92px clamp(20px,6vw,72px) 48px;
+}
+.loop-editor-inner { width: min(980px,100%); margin: 0 auto; }
+.loop-editor-top { display:flex; align-items:center; justify-content:space-between; gap:16px; margin-bottom:42px; }
+.loop-editor-top button, .loop-editor-actions button { min-height:42px; padding:0 14px; border:1px solid #353c4b; border-radius:11px; background:#171b24; cursor:pointer; }
+.loop-editor-top h1 { margin:0; font-size:clamp(30px,5vw,58px); overflow-wrap:anywhere; }
+.loop-editor-copy { color:#9aa4b5; line-height:1.5; max-width:720px; }
+.loop-timeline-wrap { margin-top:34px; padding:28px 22px 20px; border:1px solid #303645; border-radius:20px; background:#11151d; }
+.loop-timeline { position:relative; height:84px; border-radius:14px; background:linear-gradient(180deg,#252b37,#171b24); overflow:hidden; touch-action:none; user-select:none; -webkit-user-select:none; }
+.loop-timeline::before { content:''; position:absolute; inset:50% 0 auto; height:1px; background:#3c4555; }
+.loop-selection { position:absolute; top:8px; bottom:8px; border:2px solid #ef4444; border-radius:12px; background:rgba(239,68,68,.18); box-shadow:0 0 0 1px rgba(239,68,68,.12) inset; cursor:grab; }
+.loop-selection:active { cursor:grabbing; }
+.loop-handle { position:absolute; top:0; bottom:0; width:18px; border:0; padding:0; background:rgba(239,68,68,.92); cursor:ew-resize; touch-action:none; }
+.loop-handle.start { left:-2px; border-radius:10px 0 0 10px; }
+.loop-handle.end { right:-2px; border-radius:0 10px 10px 0; }
+.loop-window-label { position:absolute; inset:0 22px; display:grid; place-items:center; color:#fecaca; font-size:13px; font-weight:800; pointer-events:none; }
+.loop-time-labels { display:flex; justify-content:space-between; margin-top:10px; color:#7f8999; font-size:11px; }
+.loop-editor-range { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:18px; }
+.loop-editor-range div { padding:13px 14px; border:1px solid #2f3644; border-radius:12px; background:#151a23; }
+.loop-editor-range span { display:block; color:#8d96a6; font-size:10px; letter-spacing:.09em; text-transform:uppercase; }
+.loop-editor-range strong { display:block; margin-top:4px; font-size:20px; }
+.loop-editor-actions { display:flex; flex-wrap:wrap; gap:10px; margin-top:24px; }
+.loop-editor-actions .save-loop { border-color:#7f1d1d; background:#451a1a; color:#fecaca; font-weight:800; }
+.loop-editor-actions .play-loop { background:#f8fafc; color:#111827; font-weight:800; }
+.loop-editor-warning { margin-top:18px; padding:12px 14px; border:1px solid #6b3035; border-radius:12px; background:#2a171b; color:#fecaca; font-size:12px; }
+@media (max-width:620px) {
+  .loop-editor { padding:82px 14px 32px; }
+  .loop-editor-top { align-items:flex-start; flex-direction:column; }
+  .loop-editor-range { grid-template-columns:1fr; }
+}
