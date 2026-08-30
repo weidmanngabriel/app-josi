@@ -14,6 +14,7 @@ export type Song = {
   loopEnd?: number
   loopEnabled?: boolean
   loopConfidence?: number
+  loopMarkers?: number[]
 }
 
 export type Playlist = {
@@ -98,6 +99,18 @@ export async function saveSong(song: Song): Promise<void> {
 
 export async function saveSongOrder(songs: Song[]): Promise<void> {
   await putSongs(songs.map((song, index) => ({ ...song, libraryOrder: index })))
+}
+
+export async function deleteSong(id: string): Promise<void> {
+  const db = await openDb()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(SONGS, 'readwrite')
+    tx.objectStore(SONGS).delete(id)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+    tx.onabort = () => reject(tx.error)
+  })
+  db.close()
 }
 
 export async function getPlaylists(): Promise<Playlist[]> {
