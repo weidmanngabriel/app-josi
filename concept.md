@@ -23,7 +23,7 @@ Erste Zielgruppe sind Nutzer, die bereits eigene Musikdateien lokal auf ihrem iP
 - Für jede Playlist optional ein eigenes Bild hinterlegen.
 - Songs Playlists zuordnen, ohne die Audiodatei zu duplizieren.
 - Songs direkt in einer Playlist entfernen.
-- Die Reihenfolge einer Playlist per Drag-and-Drop ändern.
+- Die Reihenfolge einer Playlist in einem eigenen Bearbeitungsmodus per Finger-Drag ändern.
 - Im Player Playlists schnell per Plus/Minus verwalten: Playlists, in denen der aktuelle Song bereits enthalten ist, stehen zuerst; danach folgen zuletzt verwendete Playlists.
 - Die Anwendung bleibt als PWA installierbar und funktioniert ohne Backend.
 
@@ -49,9 +49,11 @@ Erste Zielgruppe sind Nutzer, die bereits eigene Musikdateien lokal auf ihrem iP
 
 1. Nutzer öffnet eine Playlist.
 2. Name und Playlist-Bild können direkt geändert werden.
-3. Songs können aus der Playlist entfernt und per Drag-and-Drop neu sortiert werden.
-4. Beim Löschen der Playlist fragt Josi vor dem endgültigen Löschen nach.
-5. Gelöschte Playlists entfernen keine Audiodateien aus der Bibliothek.
+3. Songs können aus der Playlist entfernt werden.
+4. Für die Reihenfolge tippt der Nutzer auf „Reihenfolge ändern“ und zieht Songs am Griff mit dem Finger an die gewünschte Position.
+5. Mit „Fertig“ verlässt der Nutzer den Sortiermodus wieder.
+6. Beim Löschen der Playlist fragt Josi vor dem endgültigen Löschen nach.
+7. Gelöschte Playlists entfernen keine Audiodateien aus der Bibliothek.
 
 ### Song schnell einer Playlist zuordnen
 
@@ -78,5 +80,5 @@ Crossfade ist als mögliche nächste Erweiterung vorgesehen, sobald Import, Play
 
 - Die vom Browser bereitgestellte lokale Speicherkapazität reicht für einen realistischen ersten Test mit der persönlichen Musiksammlung aus.
 - Die relevanten Audioformate werden von Safari/iPadOS zuverlässig abgespielt.
-- Drag-and-Drop funktioniert auf den für den Test verwendeten iPadOS-/Safari-Versionen ausreichend zuverlässig.
+- Der eigene Touch-Sortiermodus funktioniert auf den für den Test verwendeten iPadOS-/Safari-Versionen zuverlässig genug, auch bei längeren Playlists.
 - Für eine spätere Produktversion muss geprüft werden, wie Backups, Speichergrenzen und Datenverlust bei Browser-/Gerätebereinigung behandelt werden.
