@@ -63,7 +63,7 @@ Dateien, die bereits vor dieser Änderung beschädigt oder leer geworden sind, k
 
 ## Mehrfachauswahl
 
-„Auswählen“ funktioniert in Bibliothek, Playlist, Verlauf und Loops. Rechts neben **„Alle Playlists“** erscheint ein runder `•••`-Knopf mit **Gruppieren** (später), **Bewegen**, **Tags** (später) und **Alle löschen**. Bewegen ist nur in Bibliothek bzw. geöffneter Playlist verfügbar und verschiebt die Auswahl als zusammenhängenden Block. Bei einer nicht-manuellen Sortierung fragt Josi, ob auf Manuell umgeschaltet werden soll; Nein bricht die Aktion ab. Alle löschen verlangt eine Sicherheitsabfrage.
+„Auswählen“ funktioniert in Bibliothek, Playlist, Importverlauf und Loops. Rechts neben **„Alle Playlists“** erscheint ein runder `•••`-Knopf mit **Gruppieren** (später), **Bewegen**, **Tags** (später) und **Alle löschen**. Bewegen ist nur in Bibliothek bzw. geöffneter Playlist verfügbar und verschiebt die Auswahl als zusammenhängenden Block. Bei einer nicht-manuellen Sortierung fragt Josi, ob auf Manuell umgeschaltet werden soll; Nein bricht die Aktion ab. Alle löschen verlangt eine Sicherheitsabfrage.
 
 ## Suche
 
