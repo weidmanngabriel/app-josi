@@ -27,9 +27,10 @@ Die Aktionen stehen in dieser Reihenfolge:
 2. **Kopieren**
 3. **Teilen**
 4. **Loop erstellen** bzw. **Loop bearbeiten**
-5. Nur bei blau markierten Songs in blauer Schrift: **Als gelesen markieren**
-6. Nur bei blau markierten Songs in blauer Schrift: **Alle als gelesen markieren**
-7. In roter Schrift: **Löschen**
+5. Bei vorhandenem Loop: **Loop aktivieren** bzw. **Loop deaktivieren**
+6. Nur bei blau markierten Songs in blauer Schrift: **Als gelesen markieren**
+7. Nur bei blau markierten Songs in blauer Schrift: **Alle als gelesen markieren**
+8. In roter Schrift: **Löschen**
 
 „Kopieren“ erstellt einen zweiten Bibliothekseintrag mit eigener ID. „Teilen“ öffnet nach Möglichkeit die iPad-Systemfreigabe mit der Audiodatei. „Löschen“ fragt vorher nach und entfernt den Song anschließend auch aus Playlists, ohne die Playlists selbst zu löschen.
 
@@ -92,6 +93,7 @@ Der Editor enthält:
 - einen grünen Fokusstrich, der den Mittelpunkt für den nächsten Zoom bestimmt,
 - einen Schalter **„Fokus folgt Cursor“**: eingeschaltet folgt der grüne Fokus dem blauen Cursor und die sichtbare Zeitleiste bewegt sich beim Abspielen mit; ausgeschaltet kann der Fokus unabhängig gesetzt werden,
 - **−5 s**, **Play/Pause** und **+5 s**,
+- eine leicht bläuliche Geschwindigkeitsbox mit **10%, 25%, 33%, 50%, 66%, 75%, 100%, 150% und 200%**, wobei 100% Normalgeschwindigkeit ist,
 - **orange Markierungen**, die an der Position des blauen Cursors gesetzt werden,
 - anklickbare orange Markierungen, die den blauen Cursor direkt dorthin bringen,
 - einen Schalter zum Aktivieren/Deaktivieren der Markierungsbedienung,
@@ -105,6 +107,10 @@ Die Wellenform entspricht dem, was man aus Schnittprogrammen kennt: Sie zeigt ni
 Das Bedienprinzip priorisiert große, eindeutige Touch-Flächen. Unsichtbare Trefferbereiche dürfen größer als die sichtbaren Striche sein, solange sie sich nicht gegenseitig blockieren. Besonders der blaue Cursor nimmt deshalb entlang seines Strichs keine Eingaben an; nur der blaue Punkt ist greifbar.
 
 Beim Abspielen innerhalb des Editors springt die Wiedergabe nur dann am Loop-Ende wieder zum Loop-Start, wenn **Cursor-Loop** eingeschaltet ist. **Loop speichern** übernimmt Start, Ende, Marker und aktiviert den gespeicherten Song-Loop. Diese Werte werden nur als Metadaten gespeichert; die Audiodatei selbst bleibt unangetastet. Gespeicherte Loops werden weiterhin mit einer roten Schleife markiert und im Tab **Loops** gesammelt.
+
+## Wiederholen: Liste oder ausgewählte Songs
+
+Kurzer Druck auf den Wiederholen-Knopf schaltet die normale Listenwiederholung. **Langdruck ist hier bewusst die einzige Ausnahme zur sonst abgeschafften Langdruck-Bedienung:** Er aktiviert `↻1`. Ohne Mehrfachauswahl wiederholt Josi den aktuell gewählten Song. Werden vorher mehrere Songs mit „Auswählen“ markiert, übernimmt der Langdruck genau diese Songs als Wiederholgruppe, beendet den Auswahlmodus und markiert die Gruppe dauerhaft grün, solange der Modus aktiv ist. Die Songs laufen in Listenreihenfolge und beginnen nach dem letzten wieder beim ersten. Das Symbol bleibt `↻1`, auch wenn mehrere Songs dazugehören.
 
 ## Wiedergabe nach Loop-Bearbeitung
 

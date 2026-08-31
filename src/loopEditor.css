@@ -90,3 +90,13 @@
   .step-input { grid-template-columns:1fr 86px 18px; }
   .preview-row { grid-template-columns:minmax(120px,1fr) 86px 18px; }
 }
+
+
+.loop-speed-box { margin:16px auto 0; padding:14px 16px; border:1px solid #365a7b; border-radius:16px; background:linear-gradient(135deg,rgba(37,99,235,.15),rgba(30,64,175,.07)); }
+.loop-speed-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+.loop-speed-heading span { color:#93c5fd; font-size:10px; font-weight:900; letter-spacing:.1em; }
+.loop-speed-heading strong { color:#bfdbfe; font-size:17px; font-variant-numeric:tabular-nums; }
+.loop-speed-options { display:flex; flex-wrap:wrap; gap:7px; }
+.loop-speed-options button { min-height:42px; min-width:58px; padding:0 11px; border:1px solid #3b5f82; border-radius:10px; background:#101b2b; color:#bfdbfe; cursor:pointer; }
+.loop-speed-options button.active-speed { border-color:#60a5fa; background:#1d4ed8; color:#eff6ff; box-shadow:0 0 0 2px rgba(96,165,250,.15); }
+.loop-speed-box small { display:block; margin-top:9px; color:#7fa1c5; font-size:10px; line-height:1.4; }
