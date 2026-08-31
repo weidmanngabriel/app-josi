@@ -30,11 +30,11 @@ Die Aktionen stehen in dieser Reihenfolge:
 3. **Einfügen**
 4. **Tags**
 5. **Teilen**
-4. **Loop erstellen** bzw. **Loop bearbeiten**
-5. Bei vorhandenem Loop: **Loop aktivieren** bzw. **Loop deaktivieren**
-6. Nur bei blau markierten Songs in blauer Schrift: **Als gelesen markieren**
-7. Nur bei blau markierten Songs in blauer Schrift: **Alle als gelesen markieren**
-8. In roter Schrift: **Löschen**
+6. **Loop erstellen** bzw. **Loop bearbeiten**
+7. Bei vorhandenem Loop: **Loop aktivieren** bzw. **Loop deaktivieren**
+8. Nur bei blau markierten Songs in blauer Schrift: **Als gelesen markieren**
+9. Nur bei blau markierten Songs in blauer Schrift: **Alle als gelesen markieren**
+10. In roter Schrift: **Löschen**
 
 „Kopieren“ legt das Objekt in die Josi-Zwischenablage; erst „Einfügen“ erstellt den zweiten Eintrag mit eigener ID. „Teilen“ öffnet nach Möglichkeit die iPad-Systemfreigabe mit der Audiodatei. „Löschen“ fragt vorher nach und entfernt den Song anschließend auch aus Playlists, ohne die Playlists selbst zu löschen.
 
@@ -93,7 +93,7 @@ Der Pfeil kehrt die Sortierung um. Die manuelle Reihenfolge bleibt separat gespe
 
 ## Papierkorb
 
-Unter Loops gibt es einen Papierkorb. Gelöschte Songs, Playlists und Loops landen zunächst dort und können einzeln wiederhergestellt werden. Bei Songs bleibt die lokale Audiodatei bis zum endgültigen Leeren erhalten. „Papierkorb leeren“ verlangt eine erneute Sicherheitsabfrage und entfernt die dortigen Einträge endgültig.
+Unter Loops gibt es einen Papierkorb. Gelöschte Songs, Playlists, Tags und Loops landen zunächst dort und können einzeln wiederhergestellt werden. Bei Songs bleibt die lokale Audiodatei bis zum endgültigen Leeren erhalten. „Papierkorb leeren“ verlangt eine erneute Sicherheitsabfrage und entfernt die dortigen Einträge endgültig.
 
 ## Präziser Loop-Editor
 

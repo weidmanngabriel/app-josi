@@ -54,11 +54,11 @@ In dieser Reihenfolge:
 3. Einfügen
 4. Tags
 5. Teilen
-4. Loop erstellen bzw. Loop bearbeiten
-5. Bei vorhandenem Loop: Loop aktivieren bzw. Loop deaktivieren
-6. Nur bei blau markierten Songs: „Als gelesen markieren“ in Blau
-7. Nur bei blau markierten Songs: „Alle als gelesen markieren“ in Blau
-8. Löschen in Rot
+6. Loop erstellen bzw. Loop bearbeiten
+7. Bei vorhandenem Loop: Loop aktivieren bzw. Loop deaktivieren
+8. Nur bei blau markierten Songs: „Als gelesen markieren“ in Blau
+9. Nur bei blau markierten Songs: „Alle als gelesen markieren“ in Blau
+10. Löschen in Rot
 
 Beim Teilen wird aus dem gespeicherten Blob eine `File` erzeugt und über die Web Share API an die Systemfreigabe übergeben, sofern Browser/iPadOS Dateifreigabe unterstützt. Bei fehlender Unterstützung zeigt Josi eine Meldung.
 

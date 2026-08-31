@@ -736,8 +736,12 @@ function App() {
       if (!tag) return []
       const pool = action.targetKind === 'song' ? songs : playlists
       const memberIds = action.targetKind === 'song' ? tag.songIds : tag.playlistIds
-      const newNames = new Set(action.ids.map((id) => normalizeName(pool.find((item) => item.id === id)?.name ?? '')).filter(Boolean))
-      return [...new Set(memberIds.filter((id) => !action.ids.includes(id)).map((id) => pool.find((item) => item.id === id)?.name).filter((name): name is string => Boolean(name)).filter((name) => newNames.has(normalizeName(name))))]
+      const actionNames = action.ids.map((id) => pool.find((item) => item.id === id)?.name).filter((name): name is string => Boolean(name))
+      const newNames = new Set(actionNames.map(normalizeName).filter(Boolean))
+      const existingConflicts = memberIds.filter((id) => !action.ids.includes(id)).map((id) => pool.find((item) => item.id === id)?.name).filter((name): name is string => Boolean(name)).filter((name) => newNames.has(normalizeName(name)))
+      const counts = new Map<string, number>(); actionNames.forEach((name) => counts.set(normalizeName(name), (counts.get(normalizeName(name)) ?? 0) + 1))
+      const internalConflicts = actionNames.filter((name, index) => (counts.get(normalizeName(name)) ?? 0) > 1 && actionNames.findIndex((item) => normalizeName(item) === normalizeName(name)) === index)
+      return [...new Set([...existingConflicts, ...internalConflicts])]
     }
     if (action.kind === 'paste-song') {
       const destination = action.targetPlaylistId ? playlists.find((playlist) => playlist.id === action.targetPlaylistId)?.songIds.map((id) => songs.find((song) => song.id === id)).filter((song): song is Song => Boolean(song)) ?? [] : songs
@@ -760,6 +764,7 @@ function App() {
     setPlaylists((items) => items.map((playlist) => affected.find((changed) => changed.id === playlist.id) ?? playlist))
     setSongs((items) => items.filter((song) => !idSet.has(song.id)))
     setTrashedSongs((items) => [...moving, ...items.filter((song) => !idSet.has(song.id))])
+    if (currentSongId && idSet.has(currentSongId)) { audioRef.current?.pause(); overlapAudioRef.current?.pause(); setCurrentSongId(null); setCurrentUrl(null); setCurrentTime(0); setDuration(0) }
   }
   const applyDuplicateAction = async (action: DuplicateAction, resolution: 'replace' | 'both') => {
     setDuplicateConflict(null); setCancelledDuplicateAction(null)
@@ -768,12 +773,13 @@ function App() {
       if (!tag) return
       const pool = action.targetKind === 'song' ? songs : playlists
       const newNames = new Set(action.ids.map((id) => normalizeName(pool.find((item) => item.id === id)?.name ?? '')).filter(Boolean))
+      const insertIds = resolution === 'replace' ? [...action.ids].reverse().filter((id, index, reversed) => reversed.findIndex((other) => normalizeName(pool.find((item) => item.id === other)?.name ?? '') === normalizeName(pool.find((item) => item.id === id)?.name ?? '')) === index).reverse() : action.ids
       if (action.targetKind === 'song') {
         const kept = resolution === 'replace' ? tag.songIds.filter((id) => action.ids.includes(id) || !newNames.has(normalizeName(songs.find((song) => song.id === id)?.name ?? ''))) : tag.songIds
-        await updateTag({ ...tag, songIds: [...new Set([...kept, ...action.ids])], lastUsedAt: Date.now() }, true)
+        await updateTag({ ...tag, songIds: [...new Set([...kept.filter((id) => !action.ids.includes(id)), ...insertIds])], lastUsedAt: Date.now() }, true)
       } else {
         const kept = resolution === 'replace' ? tag.playlistIds.filter((id) => action.ids.includes(id) || !newNames.has(normalizeName(playlists.find((playlist) => playlist.id === id)?.name ?? ''))) : tag.playlistIds
-        await updateTag({ ...tag, playlistIds: [...new Set([...kept, ...action.ids])], lastUsedAt: Date.now() }, true)
+        await updateTag({ ...tag, playlistIds: [...new Set([...kept.filter((id) => !action.ids.includes(id)), ...insertIds])], lastUsedAt: Date.now() }, true)
       }
       return
     }
@@ -1038,7 +1044,7 @@ function App() {
   const changePlaylistCover = async (files: FileList | null) => { const playlist = playlists.find((item) => item.id === playlistCoverTargetId); if (!playlist || !files?.[0] || !files[0].type.startsWith('image/')) return; await updatePlaylist({ ...playlist, cover: files[0], lastUsedAt: Date.now() }, true); setPlaylistCoverTargetId(null); if (coverInputRef.current) coverInputRef.current.value = '' }
   const confirmDeletePlaylist = async () => { if (!playlistToDelete) return; const trashed = { ...playlistToDelete, trashedAt: Date.now() }; await savePlaylist(trashed); setPlaylists((items) => items.filter((playlist) => playlist.id !== playlistToDelete.id)); setTrashedPlaylists((items) => [trashed, ...items.filter((playlist) => playlist.id !== trashed.id)]); if (activePlaylistId === playlistToDelete.id) navigateTo({ view: 'library', playlistId: null, detailOpen: false }); setPlaylistToDelete(null) }
 
-  const beginReorder = (scope: Exclude<ReorderScope, null>) => { if (scope === 'library' || scope === 'playlist') setSearchQuery(''); setReorderScope(scope); setMoveCandidate(null); setOverflowMenu(null); if (scope === 'tags') setTagSortMode('manual'); else setSortMode('manual') }
+  const beginReorder = (scope: Exclude<ReorderScope, null>) => { if (scope === 'library' || scope === 'playlist') setSearchQuery(''); if (scope === 'sidebar') setPlaylistsCollapsed(false); if (scope === 'tags') setTagsCollapsed(false); setReorderScope(scope); setMoveCandidate(null); setOverflowMenu(null); if (scope === 'tags') setTagSortMode('manual'); else setSortMode('manual') }
   const finishReorder = () => { setReorderScope(null); setMoveCandidate(null) }
   const reorderIds = (ids: string[], sourceId: string, targetIndex: number) => { const sourceIndex = ids.indexOf(sourceId); if (sourceIndex < 0) return ids; const next = [...ids]; const [moved] = next.splice(sourceIndex, 1); next.splice(Math.max(0, Math.min(targetIndex > sourceIndex ? targetIndex - 1 : targetIndex, next.length)), 0, moved); return next }
   const confirmPendingMove = async () => {
