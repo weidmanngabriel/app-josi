@@ -166,3 +166,10 @@ Die endliche Wiederholung verwendet zusätzlich einen synchronen Restzähler in 
 
 
 Beim Dialog `Objekte hinzufügen` wird eine Auswahl zunächst nur vorgemerkt: `+` wechselt zu `−`, ohne die Gruppe sofort zu verändern. `−` nimmt die vorgemerkte Auswahl wieder zurück. Erst `Fertig` übernimmt alle vorgemerkten Objekte gemeinsam; `Abbrechen` verwirft sie.
+
+
+## Globale Loop-Aktivierung
+
+In den Einstellungen gibt es eine gespeicherte globale Loop-Regel mit drei Zuständen: `Aktiviert`, `Deaktiviert` und `Manuell`. Ohne bestehende Einstellung startet Josi mit `Deaktiviert`. Die automatischen Zustände verändern keine Song-Metadaten: `Aktiviert` behandelt jeden Song mit gesetztem Loop bei Wiedergabe und Anzeige als aktiv, `Deaktiviert` behandelt jeden vorhandenen Loop als inaktiv. Nur `Manuell` verwendet `song.loopEnabled`.
+
+Wenn eine einzelne Loop-Aktivierung in Song-Menü oder Detailansicht bzw. eine Mehrfachaktion auf ausgewählten Loop-Songs in einem automatischen Modus angefordert wird, fragt Josi vorab nach dem Wechsel zu `Manuell`. Bei Ablehnung wird die Aktion vollständig verworfen. Bei Zustimmung wechselt die globale Regel auf `Manuell` und schreibt erst danach die individuellen `loopEnabled`-Werte als Metadaten. Im Song-Auswahlmenü erscheinen `Alle Loops aktivieren` und `Alle Loops deaktivieren` nur dann, wenn sämtliche ausgewählten Songs einen gespeicherten Loop besitzen.
