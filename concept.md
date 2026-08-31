@@ -71,7 +71,7 @@ In Bibliothek und geöffneter Playlist gibt es ein Suchfeld. Es sucht nur nach d
 
 ## Importverlauf
 
-Der frühere „Verlauf“-Tab heißt **Importverlauf**. Er zeigt die aktuell blau markierten neuen Importe. In der Navigation steht **x/y**: x ist die Zahl der blauen Importe, y die Gesamtzahl aller importierten Songs.
+Der frühere „Verlauf“-Tab heißt **Importverlauf** und zeigt alle aktiven Songs. In der Navigation steht **x/y**: x ist die blau dargestellte Zahl der noch blau markierten neuen Importe, y die Gesamtzahl aller aktiven Songs. Blau markierte Songs bilden in allen Songlisten vorübergehend eine eigene obere Gruppe; normale Songs stehen darunter. Beide Gruppen werden mit derselben gewählten Sortierung sortiert. Nach „Als gelesen markieren“ verlässt ein Song die blaue Gruppe.
 
 ## Sortierung
 
@@ -84,7 +84,11 @@ Alle Songlisten bieten:
 - **Dauer**
 - **Chronik**
 
-Der Pfeil kehrt die Sortierung um. Die manuelle Reihenfolge bleibt separat gespeichert und wird durch andere Sortierungen nicht verändert.
+Der Pfeil kehrt die Sortierung um. Die manuelle Reihenfolge bleibt separat gespeichert und wird durch andere Sortierungen nicht verändert. Über `•••` neben der Sortierung kann eine aktuelle nicht-manuelle Reihenfolge inklusive Pfeilrichtung nach Bestätigung **einmalig** als neue manuelle Reihenfolge übernommen werden. Danach bleibt sie statisch.
+
+## Papierkorb
+
+Unter Loops gibt es einen Papierkorb. Gelöschte Songs, Playlists und Loops landen zunächst dort und können einzeln wiederhergestellt werden. Bei Songs bleibt die lokale Audiodatei bis zum endgültigen Leeren erhalten. „Papierkorb leeren“ verlangt eine erneute Sicherheitsabfrage und entfernt die dortigen Einträge endgültig.
 
 ## Präziser Loop-Editor
 
@@ -96,7 +100,7 @@ Die Zeitachse verwendet die bestehende Amplituden-Wellenform und vier klare Farb
 
 Unter der Zeitachse stehen **Fokus**, **Cursor** und **Loop** in einer kompakten Reihe; der Loop-Block liegt rechts neben Fokus und Cursor. Die Markierungen liegen darunter. Direkt hinter jedem Wort „Standort“ steht die aktuelle Position bis auf Millisekunden. Die bisherigen freien Zahleneingaben sind durch kleine Schritt-Auswahllisten ersetzt. Beim Cursor sind zusätzlich 30 s und 60 s auswählbar. Auch die Vorlaufwerte werden ausgewählt und bedeuten immer nur „x Sekunden vor Start“ bzw. „x Sekunden vor Ende“.
 
-Markierungen heißen A, B, C usw. Oberhalb von „Alle Markierungen löschen“ steht ein eigener **Markierung setzen**-Knopf. Das `•••` enthält weiterhin „Zoom hinbewegen“, „Loop-Anfang hinbewegen“, „Loop-Ende hinbewegen“ und „Markierung löschen“.
+Markierungen heißen A, B, C usw. Oberhalb von „Alle Markierungen löschen“ steht ein eigener **Markierung setzen**-Knopf. Das `•••` enthält „Cursor hinbewegen“, „Zoom hinbewegen“, „Loop-Anfang hinbewegen“, „Loop-Ende hinbewegen“ und „Markierung löschen“.
 
 Loop-Kasten sperren, Cursor-Loop, Marker an/aus, Fokus-Modus, Zoom und Geschwindigkeit verändern nur den Editorzustand. **Loop speichern** schreibt weiterhin nur Metadaten und niemals den Audio-Blob. Vor **Loop speichern**, **Loop löschen** und **Alle Markierungen löschen** erscheint jeweils eine Sicherheitsabfrage.
 

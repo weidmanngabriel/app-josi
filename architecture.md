@@ -66,7 +66,9 @@ Einzelne Playlists bieten Bild ändern, Umbenennen, Kopieren, Teilen und Lösche
 
 Das `•••` neben der Überschrift „Playlists“ bleibt für „Bearbeiten“ und „Übersicht“ zuständig.
 
-## Löschen und Undo/Redo
+## Papierkorb, Löschen und Undo/Redo
+
+Unter Loops liegt ein Papierkorb. Song- und Playlist-Löschen verwenden Bestätigungsdialoge und verschieben die Objekte zunächst nur in diesen lokalen Papierkorb. Der Song-Blob bleibt dabei im bestehenden Song-Store; Playlists werden per `trashedAt` ausgeblendet. Gelöschte Loops bleiben als kleine `trashedLoop`-Metadaten am Song erhalten. Alle drei Typen können einzeln wiederhergestellt werden. Erst „Papierkorb leeren“ entfernt nach erneuter Bestätigung Songs/Blobs und Playlists endgültig bzw. verwirft gelöschte Loop-Metadaten. Normale Löschaktionen werden deshalb nicht zusätzlich in den Undo-Verlauf geschrieben.
 
 Song- und Playlist-Löschen verwenden Bestätigungsdialoge. Der Snapshot-Verlauf berücksichtigt fehlende Song-IDs und kann bei Undo/Redo deshalb auch kopierte oder gelöschte Songs wiederherstellen bzw. entfernen. Frisch importierte Dateien werden weiterhin nicht automatisch durch Undo gelöscht.
 
@@ -82,11 +84,11 @@ Bibliothek und geöffnete Playlists besitzen eine lokale Textsuche. Sie arbeitet
 
 ## Importverlauf
 
-Der frühere Tab „Verlauf“ heißt „Importverlauf“. Er zeigt nur blau markierte, noch nicht als gelesen markierte Importe. Die Navigation zeigt `x/y`: x sind aktuell blaue Importe, y ist die Gesamtzahl aller importierten Songs.
+Der frühere Tab „Verlauf“ heißt „Importverlauf“. Er zeigt alle aktiven Songs. Die Navigation zeigt `x/y`: x sind aktuell blau markierte neue Importe, y ist die Gesamtzahl aller aktiven Songs. Die Zahl x ist blau. In allen Songlisten werden blau markierte Songs als temporäre obere Gruppe von normalen Songs getrennt; innerhalb beider Gruppen gilt dieselbe gewählte Sortierung. Nach „Als gelesen markieren“ fällt der Song zurück in die normale Gruppe.
 
 ## Sortierung
 
-Alle Songlisten unterstützen `Manuell`, `A–Z Anfang`, `A–Z Ende`, `Anzahl des Hörens`, `Dauer` und `Chronik`. Die Sortieransicht verändert die manuelle Reihenfolge nicht. Die gewählte Ansicht und Richtung werden in `localStorage` gespeichert.
+Alle Songlisten unterstützen `Manuell`, `A–Z Anfang`, `A–Z Ende`, `Anzahl des Hörens`, `Dauer` und `Chronik`. Die Sortieransicht verändert die manuelle Reihenfolge nicht. Die gewählte Ansicht und Richtung werden in `localStorage` gespeichert. Neben Sortierbox und Richtungspfeil liegt ein `•••`. In Bibliothek bzw. geöffneter Playlist kann die aktuelle nicht-manuelle Sortierung inklusive Pfeilrichtung nach Bestätigung einmalig als neue manuelle Reihenfolge gespeichert werden; danach wird auf Manuell gewechselt und es gibt keine automatische Nachsortierung.
 
 ## Präziser Loop-Editor
 
@@ -105,7 +107,7 @@ Cursor, Loop-Start, Loop-Ende, Fokus und Markierungen zeigen direkt an ihren Str
 
 Unter der Zeitachse liegen kompakte Präzisionsbereiche. Fokus und Cursor stehen links, der Loop-Block direkt rechts daneben; Markierungen liegen darunter über die ganze Breite. Direkt hinter jedem Standort steht die Position bis auf Millisekunden. Freie Zahleneingaben wurden durch kompakte Auswahllisten für Schrittweiten ersetzt. Beim Cursor stehen zusätzlich 30 und 60 Sekunden zur Verfügung. Auch Vorlaufwerte sind positive Auswahlen und bedeuten ausschließlich eine Position **vor** Start bzw. Ende.
 
-Markierungen werden als A, B, C usw. angezeigt. Über den globalen Löschknopf steht ein eigener **Markierung setzen**-Knopf. Eine ausgewählte Markierung kann über `•••` zum Zoom-Fokus, zum Loop-Anfang oder zum Loop-Ende übertragen oder einzeln gelöscht werden. Das Löschen aller Markierungen verlangt eine Bestätigung.
+Markierungen werden als A, B, C usw. angezeigt. Über den globalen Löschknopf steht ein eigener **Markierung setzen**-Knopf. Eine ausgewählte Markierung kann über `•••` direkt zum Cursor, zum Zoom-Fokus, zum Loop-Anfang oder zum Loop-Ende übertragen oder einzeln gelöscht werden. Das Löschen aller Markierungen verlangt eine Bestätigung.
 
 Die Audiodatei bleibt beim gesamten Bearbeiten unverändert. `Loop speichern` persistiert weiterhin ausschließlich Start, Ende, Aktivstatus und Marker als Metadaten. Sowohl **Loop speichern** als auch **Loop löschen** verlangen vor der Änderung eine Bestätigung.
 
