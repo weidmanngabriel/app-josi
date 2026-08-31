@@ -9,11 +9,12 @@ Der Proof of Concept validiert vor allem **Importieren → organisieren → zuve
 ## Kernfunktionen
 
 - Mehrere lokale Audiodateien über den normalen Dateidialog importieren.
-- Bibliothek, Verlauf und eigener Loops-Tab.
+- Bibliothek, Importverlauf und eigener Loops-Tab.
 - Neu importierte Songs blau markieren.
 - Songs und Playlists über sichtbare Drei-Punkte-Menüs verwalten.
 - Mehrere Songs auswählen und über „Alle Playlists“ einer Playlist zuordnen.
 - Songlisten nach Manuell, A–Z Anfang, A–Z Ende, Höranzahl, Dauer oder Chronik sortieren.
+- Bibliothek und Playlists per einfacher Zeichenfolgen-Suche durchsuchen.
 - Lieddauer anzeigen, sobald sie vom Player ermittelt wurde.
 - Vollständig gehörte Wiedergaben zählen.
 - Manueller, präziser Loop-Editor statt automatischer Loop-Erkennung.
@@ -38,10 +39,11 @@ Die Aktionen stehen in dieser Reihenfolge:
 
 Einzelne Playlists bieten:
 
-1. **Umbenennen**
-2. **Kopieren**
-3. **Teilen**
-4. **Löschen** in Rot
+1. **Bild ändern**
+2. **Umbenennen**
+3. **Kopieren**
+4. **Teilen**
+5. **Löschen** in Rot
 
 Eine kopierte Playlist verweist auf dieselben Songs; Audiodateien werden nicht verdoppelt. Beim Teilen wird eine Textübersicht der Playlist mit ihren Liedern an die Systemfreigabe übergeben.
 
@@ -62,6 +64,14 @@ Dateien, die bereits vor dieser Änderung beschädigt oder leer geworden sind, k
 ## Mehrfachauswahl
 
 „Auswählen“ funktioniert in Bibliothek, Playlist, Verlauf und Loops. Rechts neben **„Alle Playlists“** erscheint ein runder `•••`-Knopf mit **Gruppieren** (später), **Bewegen**, **Tags** (später) und **Alle löschen**. Bewegen ist nur in Bibliothek bzw. geöffneter Playlist verfügbar und verschiebt die Auswahl als zusammenhängenden Block. Bei einer nicht-manuellen Sortierung fragt Josi, ob auf Manuell umgeschaltet werden soll; Nein bricht die Aktion ab. Alle löschen verlangt eine Sicherheitsabfrage.
+
+## Suche
+
+In Bibliothek und geöffneter Playlist gibt es ein Suchfeld. Es sucht nur nach der tatsächlich vorhandenen Zeichenfolge im Liednamen und ignoriert lediglich Groß-/Kleinschreibung. Es gibt bewusst keine semantischen oder unscharfen Treffer.
+
+## Importverlauf
+
+Der frühere „Verlauf“-Tab heißt **Importverlauf**. Er zeigt die aktuell blau markierten neuen Importe. In der Navigation steht **x/y**: x ist die Zahl der blauen Importe, y die Gesamtzahl aller importierten Songs.
 
 ## Sortierung
 
@@ -84,7 +94,7 @@ Oben stehen Zurück/Vor und Editor-Undo/Redo. Zoom ist eine Auswahlliste von **1
 
 Die Zeitachse verwendet die bestehende Amplituden-Wellenform und vier klare Farbfamilien: Loop leicht rot, Cursor leicht blau, Fokus leicht grün und Markierungen leicht orange. Direkt an den jeweiligen Strichen werden ihre aktuellen Zeiten angezeigt; diese Zahlen sind reine Anzeigen und nicht bedienbar. Der Cursor wird weiterhin nur am blauen Punkt verschoben.
 
-Unter der Zeitachse stehen **Fokus**, **Cursor** und **Loop** in einer kompakten Reihe; der Loop-Block liegt rechts neben Fokus und Cursor. Die Markierungen liegen darunter. Direkt hinter jedem Wort „Standort“ steht die aktuelle Position bis auf Millisekunden. Die bisherigen freien Zahleneingaben sind durch kleine Schritt-Auswahllisten ersetzt. Auch die Vorlaufwerte werden ausgewählt und bedeuten immer nur „x Sekunden vor Start“ bzw. „x Sekunden vor Ende“.
+Unter der Zeitachse stehen **Fokus**, **Cursor** und **Loop** in einer kompakten Reihe; der Loop-Block liegt rechts neben Fokus und Cursor. Die Markierungen liegen darunter. Direkt hinter jedem Wort „Standort“ steht die aktuelle Position bis auf Millisekunden. Die bisherigen freien Zahleneingaben sind durch kleine Schritt-Auswahllisten ersetzt. Beim Cursor sind zusätzlich 30 s und 60 s auswählbar. Auch die Vorlaufwerte werden ausgewählt und bedeuten immer nur „x Sekunden vor Start“ bzw. „x Sekunden vor Ende“.
 
 Markierungen heißen A, B, C usw. Oberhalb von „Alle Markierungen löschen“ steht ein eigener **Markierung setzen**-Knopf. Das `•••` enthält weiterhin „Zoom hinbewegen“, „Loop-Anfang hinbewegen“, „Loop-Ende hinbewegen“ und „Markierung löschen“.
 
@@ -100,7 +110,7 @@ Kurzer Druck auf den Wiederholen-Knopf schaltet die normale Listenwiederholung. 
 
 Das Speichern oder Umschalten eines Loops darf die zugrunde liegende Audiodatei weder neu laden noch neu in IndexedDB schreiben. Die Audioquelle wird nur dann neu erzeugt, wenn sich der ausgewählte Song oder dessen tatsächlicher Datei-Blob ändert.
 
-Änderungen wie Loop speichern, Loop an/aus, Marker, Dauer oder Umbenennen verändern nur Metadaten. Dadurch bleibt die Wiedergabequelle stabil und die importierte Datei geschützt. Für die Loop-Grenze nutzt der Player während der Wiedergabe eine häufige Frame-Prüfung statt ausschließlich `timeupdate`, um die hörbare Pause beim Rücksprung zu verkleinern. Da echtes sample-genaues Gapless-Segment-Looping in Safari-PWAs nicht garantiert ist, gibt es zusätzlich **Loop-Auslauf +1 s**: ein globaler Master-Schalter in den Einstellungen und eine pro Song ein-/ausschaltbare Ausnahme in Detailansicht und `•••`.
+Änderungen wie Loop speichern, Loop an/aus, Marker, Dauer oder Umbenennen verändern nur Metadaten. Dadurch bleibt die importierte Datei geschützt. Für den eigentlichen Übergang versucht Josi eine kurze Doppelwiedergabe: Kurz vor dem Loop-Ende beginnt ein zweiter unsichtbarer Wiedergabekanal bereits am Loop-Anfang, sodass Ende und Anfang ungefähr 0,18 Sekunden überlappen. Wenn Lautstärkesteuerung unterstützt wird, werden beide Kanäle gegeneinander überblendet. Scheitert der zweite Kanal technisch, sucht Josi lokal in einem kleinen Bereich um die gesetzten Grenzen nach einem möglichst ähnlichen Signal-Verbindungspunkt. Dieser Fallback verändert die gespeicherten Loop-Punkte nicht und kann musikalisch falsch liegen.
 
 ## Teilen
 
@@ -110,7 +120,7 @@ Playlists sind keine einzelne Datei. Deshalb teilt Josi bei Playlists eine Text�
 
 ## Navigation und Bearbeitungsverlauf
 
-Ganz links stehen **Home** und **Einstellungen**, danach Zurück/Vor sowie Undo/Redo. Home öffnet von jedem Tab direkt die Bibliothek. Die Einstellungen sind zunächst ein Prototyp für die Spulweite (5/10/15/30/60 Sekunden) und den globalen Loop-Auslauf. Der Hauptplayer zeigt zwischen Shuffle und Wiederholen **⏪ / Play-Pause / ⏩** mit der gewählten Spulweite. In der näheren Song-Ansicht sitzen Shuffle und Wiederholen außen um die bisherigen Transportknöpfe; Langdruck auf Wiederholen nutzt dort ebenfalls `↻1`.
+Ganz links stehen **Home** und **Einstellungen**, danach Zurück/Vor sowie Undo/Redo. Home öffnet von jedem Tab direkt die Bibliothek. Die Einstellungen sind zunächst ein Prototyp für die Spulweite (5/10/15/30/60 Sekunden) und erklären den automatischen Loop-Übergang. Im Hauptplayer liegt Play/Pause ganz innen; daneben stehen Spulen, dann Liedwechsel und ganz außen Shuffle bzw. Wiederholen. In der näheren Song-Ansicht sitzen Shuffle und Wiederholen außen um die bisherigen Transportknöpfe; Langdruck auf Wiederholen nutzt dort ebenfalls `↻1`.
 
 ## Abgrenzung
 
@@ -119,11 +129,10 @@ Noch nicht Teil der aktuellen Version:
 - Cloud-Synchronisierung oder Backend,
 - Nutzerkonten im Produktablauf,
 - automatische Metadaten-/Cover-Erkennung,
-- Suche,
 - Musik-Streaming,
 - automatische Loop-Erkennung,
 - Frequenz-Spektrogramm,
-- Crossfade/Fading,
+- Crossfade/Fading zwischen unterschiedlichen Liedern,
 - native iOS-Hintergrund-Audio-Berechtigungen außerhalb der Möglichkeiten einer PWA.
 
 Der experimentelle Ordnerimport bleibt entfernt.
