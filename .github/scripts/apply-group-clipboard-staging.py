@@ -80,22 +80,27 @@ if count != 1:
 
 app_path.write_text(app)
 
-for path_name in ['architecture.md', 'concept.md']:
-    path = Path(path_name)
-    text = path.read_text()
-    if path_name == 'architecture.md':
-        old = "Ein Objekt kann innerhalb seines Typs höchstens einer Gruppe angehören; beim Hinzufügen zu einer anderen Gruppe wird es aus der vorherigen entfernt. Gruppen stehen in der jeweiligen Liste immer vor ungruppierten Objekten und werden untereinander nach der Sortierung der Gesamtliste angeordnet. Innerhalb der Gruppe kann `Allgemeine Sortierung` verwendet werden oder eine eigene Sortierung inklusive manueller Reihenfolge."
-        new = "Ein Objekt darf in mehreren Gruppen desselben Typs referenziert werden; Lieder, Playlists und Tags werden dabei niemals typübergreifend gemischt. Gruppen stehen in der jeweiligen Liste immer vor ungruppierten Objekten und werden untereinander nach der Sortierung der Gesamtliste angeordnet. Innerhalb der Gruppe kann `Allgemeine Sortierung` verwendet werden oder eine eigene Sortierung inklusive manueller Reihenfolge. Das Gruppenmenü besitzt zusätzlich Kopieren und Einfügen direkt vor `Gruppe bewegen`: Kopieren merkt sich ausschließlich die Objekt-IDs der Gruppe, Einfügen ergänzt sie nur in einer Gruppe desselben Typs und dupliziert keine Audiodateien oder Playlist-/Tag-Daten."
-    else:
-        old = "Gruppen sind reine lokale Organisationsdaten und verändern weder Songdateien noch Playlist-/Tag-Zuordnungen. Ein Objekt kann pro Typ nur in einer Gruppe liegen; beim Verschieben in eine andere Gruppe wird es aus der bisherigen entfernt."
-        new = "Gruppen sind reine lokale Organisationsdaten und verändern weder Songdateien noch Playlist-/Tag-Zuordnungen. Ein Objekt darf in mehreren Gruppen desselben Typs vorkommen; typübergreifendes Mischen bleibt ausgeschlossen. `Kopieren` und `Einfügen` im Gruppenmenü übertragen nur Gruppeninhalte zwischen Gruppen desselben Typs und erzeugen keine zweite Audiodatei."
-    if old not in text:
-        raise SystemExit(f'Missing docs replacement in {path_name}')
-    text = text.replace(old, new, 1)
-    anchor = "Objekte hinzufügen"
-    if anchor in text and "vorläufig" not in text:
-        if path_name == 'architecture.md':
-            text += "\n\nBeim Dialog `Objekte hinzufügen` wird eine Auswahl zunächst nur vorgemerkt: `+` wechselt zu `−`, ohne die Gruppe sofort zu verändern. `−` nimmt die vorgemerkte Auswahl wieder zurück. Erst `Fertig` übernimmt alle vorgemerkten Objekte gemeinsam; `Abbrechen` verwirft sie.\n"
-        else:
-            text += "\n\nBei **Objekte hinzufügen** ist die Auswahl vorläufig: Ein `+` wird nach dem Antippen zu `−`, sodass die Wahl vor dem Speichern zurückgenommen werden kann. Erst **Fertig** fügt die vorgemerkten Objekte hinzu; **Abbrechen** lässt die Gruppe unverändert.\n"
-    path.write_text(text)
+architecture = Path('architecture.md')
+text = architecture.read_text()
+old = "Ein Objekt kann innerhalb seines Typs höchstens einer Gruppe angehören; beim Hinzufügen zu einer anderen Gruppe wird es aus der vorherigen entfernt. Gruppen stehen in der jeweiligen Liste immer vor ungruppierten Objekten und werden untereinander nach der Sortierung der Gesamtliste angeordnet. Innerhalb der Gruppe kann `Allgemeine Sortierung` verwendet werden oder eine eigene Sortierung inklusive manueller Reihenfolge."
+new = "Ein Objekt darf in mehreren Gruppen desselben Typs referenziert werden; Lieder, Playlists und Tags werden dabei niemals typübergreifend gemischt. Gruppen stehen in der jeweiligen Liste immer vor ungruppierten Objekten und werden untereinander nach der Sortierung der Gesamtliste angeordnet. Innerhalb der Gruppe kann `Allgemeine Sortierung` verwendet werden oder eine eigene Sortierung inklusive manueller Reihenfolge. Das Gruppenmenü besitzt zusätzlich Kopieren und Einfügen direkt vor `Gruppe bewegen`: Kopieren merkt sich ausschließlich die Objekt-IDs der Gruppe, Einfügen ergänzt sie nur in einer Gruppe desselben Typs und dupliziert keine Audiodateien oder Playlist-/Tag-Daten."
+if old not in text:
+    raise SystemExit('Missing docs replacement in architecture.md')
+text = text.replace(old, new, 1)
+text += "\n\nBeim Dialog `Objekte hinzufügen` wird eine Auswahl zunächst nur vorgemerkt: `+` wechselt zu `−`, ohne die Gruppe sofort zu verändern. `−` nimmt die vorgemerkte Auswahl wieder zurück. Erst `Fertig` übernimmt alle vorgemerkten Objekte gemeinsam; `Abbrechen` verwirft sie.\n"
+architecture.write_text(text)
+
+concept = Path('concept.md')
+text = concept.read_text()
+old = "Mehrere ausgewählte Lieder, Playlists oder Tags können über `••• → Gruppieren` zu einer eigenen Gruppe zusammengefasst werden. Die drei Typen werden nie vermischt, und ein Objekt liegt immer nur in einer Gruppe seines Typs. Neue Gruppen heißen zunächst **Unbenannt**. Gruppen stehen vor allen ungruppierten Objekten; untereinander folgen sie der Sortierung der Gesamtliste."
+new = "Mehrere ausgewählte Lieder, Playlists oder Tags können über `••• → Gruppieren` zu einer eigenen Gruppe zusammengefasst werden. Die drei Typen werden nie vermischt. Ein Objekt darf in mehreren Gruppen desselben Typs vorkommen; Gruppen speichern dabei nur Verweise und duplizieren keine Audiodateien. Neue Gruppen heißen zunächst **Unbenannt**. Gruppen stehen vor allen ungruppierten Objekten; untereinander folgen sie der Sortierung der Gesamtliste."
+if old not in text:
+    raise SystemExit('Missing docs replacement in concept.md')
+text = text.replace(old, new, 1)
+old = "Das `•••` der Gruppe bietet bei Liedern **Gruppe abspielen** sowie für alle Typen **Gruppe umbenennen**, **Sortieren**, **Reihenfolge ändern**, **Gruppe bewegen**, **Objekte hinzufügen**, **Objekte entfernen** und **Gruppe auflösen**. Die interne Sortierung besitzt zusätzlich **Allgemeine Sortierung**, wodurch die Gruppe automatisch die Sortierung der gesamten Liste übernimmt."
+new = "Das `•••` der Gruppe bietet bei Liedern **Gruppe abspielen** sowie für alle Typen **Gruppe umbenennen**, **Sortieren**, **Reihenfolge ändern**, **Kopieren**, **Einfügen**, **Gruppe bewegen**, **Objekte hinzufügen**, **Objekte entfernen** und **Gruppe auflösen**. Kopieren/Einfügen überträgt ausschließlich Gruppeninhalte zwischen Gruppen desselben Typs; Lied-, Playlist- und Taggruppen können nicht ineinander eingefügt werden. Die interne Sortierung besitzt zusätzlich **Allgemeine Sortierung**, wodurch die Gruppe automatisch die Sortierung der gesamten Liste übernimmt."
+if old not in text:
+    raise SystemExit('Missing group menu docs replacement in concept.md')
+text = text.replace(old, new, 1)
+text += "\n\nBei **Objekte hinzufügen** ist die Auswahl vorläufig: Ein `+` wird nach dem Antippen zu `−`, sodass die Wahl vor dem Speichern zurückgenommen werden kann. Erst **Fertig** fügt die vorgemerkten Objekte hinzu; **Abbrechen** lässt die Gruppe unverändert.\n"
+concept.write_text(text)
