@@ -31,7 +31,7 @@ Diese Trennung ist eine Datenintegritätsmaßnahme für Safari/iPadOS. Sie verhi
 
 ### Playlists und Tags
 
-Playlists enthalten ID, Name, geordnete Song-IDs, optionales Bild, Erstellungs-/Nutzungszeit und manuelle Sortierposition. Tags liegen ab IndexedDB-Version 3 in einem eigenen `tags`-Store und enthalten Name, frei wählbare Farbe, Song-IDs, Playlist-IDs und eine manuelle Sortierposition. Beim Erstellen und Umbenennen steht eine kompakte Palette mit ungefähr 100 Farbtönen bereit. Tags referenzieren ausschließlich vorhandene Objekte und duplizieren niemals Audiodateien. Ein Song oder eine Playlist kann mehrere Tags besitzen; Tags selbst können nicht Mitglied einer Playlist sein.
+Playlists enthalten ID, Name, geordnete Song-IDs, optionales Bild, Erstellungs-/Nutzungszeit und manuelle Sortierposition. Tags liegen ab IndexedDB-Version 3 in einem eigenen `tags`-Store und enthalten Name, frei wählbare Farbe, Song-IDs, Playlist-IDs und eine manuelle Sortierposition. Beim Erstellen und Umbenennen öffnet der Farbring ein frei antippbares Farbspektrum; erst „Fertig“ übernimmt die gewählte Farbe. Tags referenzieren ausschließlich vorhandene Objekte und duplizieren niemals Audiodateien. Ein Song oder eine Playlist kann mehrere Tags besitzen; Tags selbst können nicht Mitglied einer Playlist sein.
 
 ## Import und Speicherstabilität
 
@@ -66,7 +66,7 @@ Beim Teilen wird aus dem gespeicherten Blob eine `File` erzeugt und über die We
 
 Einzelne Playlists bieten Bild ändern, Umbenennen, Kopieren, Einfügen, Tags, Teilen und Löschen. „Teilen“ übergibt eine Textübersicht mit Playlistname und Liedliste an die Systemfreigabe. Der separate Löschknopf in der geöffneten Playlist wurde entfernt; die Bestätigungsabfrage bleibt erhalten.
 
-Das `•••` neben der Überschrift „Playlists“ bleibt für „Bearbeiten“ und „Übersicht“ zuständig.
+Das `•••` neben der Überschrift „Playlists“ bietet „Auswählen“, „Bearbeiten“ und „Übersicht“. Im Auswahlmodus erscheint zusätzlich der schwebende Drei-Punkte-Knopf unten rechts.
 
 ## Papierkorb, Löschen und Undo/Redo
 
@@ -78,7 +78,7 @@ Die sichere Metadaten-Speicherung prüft bei Undo, ob der Basis-Song noch existi
 
 ## Mehrfachauswahl und Playlist-Zuordnung
 
-Bibliothek, Playlists, Importverlauf und Loops verwenden denselben Auswahlmodus. Rechts neben „Alle Playlists“ liegt im Auswahlmodus ein runder `•••`-Knopf. Er zeigt die reservierten Aktionen Gruppieren und Tags sowie Bewegen und Alle löschen. Gruppieren/Tags bleiben im Prototyp deaktiviert. Bewegen arbeitet nur in Bibliothek bzw. geöffneter Playlist und verschiebt die Auswahl als Block innerhalb der manuellen Reihenfolge. Ist eine andere Sortierung aktiv, fragt Josi vorab nach dem Wechsel auf Manuell; bei Nein wird abgebrochen. Alle löschen verlangt eine Sicherheitsabfrage und entfernt die ausgewählten lokalen Dateien aus allen Playlists.
+Bibliothek, Playlists, Importverlauf und Loops verwenden denselben Song-Auswahlmodus. Rechts neben „Alle Playlists“ liegt im Auswahlmodus ein runder `•••`-Knopf. Er bietet unter anderem Gruppieren, Bewegen, Tags und Alle löschen. Playlists und Tags besitzen einen entsprechenden eigenen Auswahlmodus mit einem schwebenden `•••` unten rechts; dort kann die Auswahl gruppiert werden. Bewegen arbeitet nur in Bibliothek bzw. geöffneter Playlist und verschiebt die Auswahl als Block innerhalb der manuellen Reihenfolge. Ist eine andere Sortierung aktiv, fragt Josi vorab nach dem Wechsel auf Manuell; bei Nein wird abgebrochen. Alle löschen verlangt eine Sicherheitsabfrage und entfernt die ausgewählten lokalen Dateien aus allen Playlists.
 
 ## Suche
 
@@ -127,7 +127,7 @@ Für normale Wiedergabe bleibt ein HTML-Audio-Element der aktive Player. Bei ein
 
 Falls iPadOS/Safari den zweiten Wiedergabekanal technisch nicht starten lässt, wechselt Josi für diesen Song auf einen lokalen Fallback: Die Audiodatei wird im AudioContext dekodiert und in einem kleinen Bereich um die vom Nutzer gesetzten Loop-Grenzen nach zwei möglichst ähnlich verlaufenden Signalabschnitten durchsucht. Dieser automatisch gefundene Verbindungspunkt wird nur für die Wiedergabe verwendet und überschreibt die gespeicherten manuellen Loop-Punkte nicht. Die Heuristik kann musikalisch falsch liegen. Vollständig gehörte Songs werden nur beim natürlichen `ended`-Ereignis gezählt. Media Session wird genutzt, soweit Safari/iPadOS sie bereitstellt.
 
-Im Kopfbereich stehen Home und Einstellungen links vor Zurück/Vor. Home öffnet immer die Bibliothek. Die Einstellungen enthalten zunächst die globale Spulweite (5/10/15/30/60 Sekunden) und eine kurze Erklärung des automatischen Loop-Übergangs. Der Hauptplayer ordnet die Steuerung symmetrisch von innen nach außen: Play/Pause, Spulen, Liedwechsel und außen Shuffle bzw. Wiederholen. Die Song-Detailansicht zeigt Shuffle und Wiederholen außen um ihre bisherigen Transportknöpfe; derselbe Langdruck auf Wiederholen aktiviert dort ebenfalls `↻1`.
+Im Kopfbereich stehen Home und Einstellungen links vor Zurück/Vor. Home öffnet immer die Bibliothek. Die Einstellungen enthalten zunächst die globale Spulweite (5/10/15/30/60 Sekunden) und eine kurze Erklärung des automatischen Loop-Übergangs. Der Hauptplayer ordnet die Steuerung symmetrisch von innen nach außen: Play/Pause, Spulen, Liedwechsel und außen Shuffle bzw. Wiederholen. Die Song-Detailansicht zeigt Shuffle und Wiederholen außen um ihre bisherigen Transportknöpfe; derselbe Langdruck auf Wiederholen öffnet dort ebenfalls die Auswahl zwischen `∞` und einer endlichen Wiederholungszahl.
 
 ## PWA und Deployment
 
@@ -152,3 +152,14 @@ Songzeilen zeigen Tags platzsparend nur als farbige Punkte vor der Playlist-Zuor
 ## Seitenleisten-Sortierung, Detailmenü und Navigation
 
 Die Sortierfelder für Tags und Playlists stehen nicht dauerhaft in der Seitenleiste. Bei einem einzelnen Tag bzw. einer Playlist liegt direkt unter `Umbenennen` die Aktion `Sortieren`; sie öffnet einen kompakten Dialog für Sortiermodus und Richtung. Beide Listen speichern ihre Auswahl separat. Die Song-Detailansicht besitzt ein eigenes `•••` mit nur songbezogenen Aktionen inklusive Tags; globale Listen-Sortierung erscheint dort nicht. `Home` schließt den Loop-Editor explizit, bevor zur Bibliothek navigiert wird, damit ein bereits aktiver Bibliotheks-Navigationseintrag den Editor nicht offen hält.
+
+
+## Objektgruppen und Farbfeld
+
+Lieder, Playlists und Tags können jeweils innerhalb ihres eigenen Typs zu persistenten Objektgruppen zusammengefasst werden. Gruppen sind reine lokale Metadaten in `localStorage` und enthalten ID, Typ, Namen, Objekt-IDs, manuelle Gruppenposition sowie eine interne Sortierung. Audiodateien, Playlist-Inhalte und Tag-Zuordnungen werden dadurch nicht dupliziert. Ein Objekt kann innerhalb seines Typs höchstens einer Gruppe angehören; beim Hinzufügen zu einer anderen Gruppe wird es aus der vorherigen entfernt. Gruppen stehen in der jeweiligen Liste immer vor ungruppierten Objekten und werden untereinander nach der Sortierung der Gesamtliste angeordnet. Innerhalb der Gruppe kann `Allgemeine Sortierung` verwendet werden oder eine eigene Sortierung inklusive manueller Reihenfolge.
+
+Die Gruppenzeile zeigt Name, Anzahl der aktuell dargestellten Objekte und deren Gesamtdauer. Gruppen für Songs können als temporäre Player-Queue abgespielt werden. Weitere Gruppenaktionen sind Umbenennen, Sortieren, Reihenfolge ändern, Gruppe bewegen, Objekte hinzufügen/entfernen und Auflösen. Playlists und Tags besitzen dafür einen eigenen Mehrfachauswahlmodus mit einem schwebenden `•••` unten rechts.
+
+Die Tag-Farbauswahl verwendet keine feste Palette mehr. Ein zweidimensionales Spektrum wird rein im Frontend dargestellt; ein Tippen setzt einen nicht interaktiven Zielpunkt. Erst `Fertig` übernimmt die Farbe unter diesem Punkt, `Abbrechen` verwirft sie.
+
+Die endliche Wiederholung verwendet zusätzlich einen synchronen Restzähler in einem Ref. Dadurch liest insbesondere das native `ended`-Ereignis bei normalen, nicht geloopten Songs immer den aktuellen Wert und startet das Audio zuverlässig neu, bevor nach Erreichen von 0 zum nächsten Song gewechselt wird.

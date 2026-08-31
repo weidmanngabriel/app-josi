@@ -54,7 +54,7 @@ Eine kopierte Playlist verweist auf dieselben Songs; Audiodateien werden nicht v
 
 Der bisherige separate Löschknopf in einer geöffneten Playlist entfällt. Die Nachfrage „wirklich löschen?“ bleibt erhalten.
 
-Das `•••` neben der Überschrift „Playlists“ bleibt für **Bearbeiten** und **Übersicht** zuständig.
+Das `•••` neben der Überschrift „Playlists“ bietet **Auswählen**, **Bearbeiten** und **Übersicht**. Während der Auswahl erscheint der zusätzliche Drei-Punkte-Knopf unten rechts.
 
 ## Import und lokale Dateien
 
@@ -68,7 +68,7 @@ Dateien, die bereits vor dieser Änderung beschädigt oder leer geworden sind, k
 
 ## Mehrfachauswahl
 
-„Auswählen“ funktioniert in Bibliothek, Playlist, Importverlauf und Loops. Rechts neben **„Alle Playlists“** erscheint ein runder `•••`-Knopf mit **Gruppieren** (später), **Bewegen**, **Tags** und **Alle löschen**. Tags öffnet die Tag-Auswahl für alle markierten Songs. Bewegen ist nur in Bibliothek bzw. geöffneter Playlist verfügbar und verschiebt die Auswahl als zusammenhängenden Block. Bei einer nicht-manuellen Sortierung fragt Josi, ob auf Manuell umgeschaltet werden soll; Nein bricht die Aktion ab. Alle löschen verlangt eine Sicherheitsabfrage.
+„Auswählen“ funktioniert in Bibliothek, Playlist, Importverlauf und Loops. Rechts neben **„Alle Playlists“** erscheint ein runder `•••`-Knopf mit **Gruppieren**, **Bewegen**, **Tags** und **Alle löschen**. Playlists und Tags erhalten einen eigenen Auswahlmodus über ihre Überschrift und ebenfalls einen Drei-Punkte-Knopf unten rechts zum Gruppieren. Tags öffnet die Tag-Auswahl für alle markierten Songs. Bewegen ist nur in Bibliothek bzw. geöffneter Playlist verfügbar und verschiebt die Auswahl als zusammenhängenden Block. Bei einer nicht-manuellen Sortierung fragt Josi, ob auf Manuell umgeschaltet werden soll; Nein bricht die Aktion ab. Alle löschen verlangt eine Sicherheitsabfrage.
 
 ## Suche
 
@@ -129,7 +129,7 @@ Playlists sind keine einzelne Datei. Deshalb teilt Josi bei Playlists eine Text�
 
 ## Navigation und Bearbeitungsverlauf
 
-Ganz links stehen **Home** und **Einstellungen**, danach Zurück/Vor sowie Undo/Redo. Home öffnet von jedem Tab direkt die Bibliothek. Die Einstellungen sind zunächst ein Prototyp für die Spulweite (5/10/15/30/60 Sekunden) und erklären den automatischen Loop-Übergang. Im Hauptplayer liegt Play/Pause ganz innen; daneben stehen Spulen, dann Liedwechsel und ganz außen Shuffle bzw. Wiederholen. In der näheren Song-Ansicht sitzen Shuffle und Wiederholen außen um die bisherigen Transportknöpfe; Langdruck auf Wiederholen nutzt dort ebenfalls `↻1`.
+Ganz links stehen **Home** und **Einstellungen**, danach Zurück/Vor sowie Undo/Redo. Home öffnet von jedem Tab direkt die Bibliothek. Die Einstellungen sind zunächst ein Prototyp für die Spulweite (5/10/15/30/60 Sekunden) und erklären den automatischen Loop-Übergang. Im Hauptplayer liegt Play/Pause ganz innen; daneben stehen Spulen, dann Liedwechsel und ganz außen Shuffle bzw. Wiederholen. In der näheren Song-Ansicht sitzen Shuffle und Wiederholen außen um die bisherigen Transportknöpfe; Langdruck auf Wiederholen öffnet dort ebenfalls `∞` oder eine frei wählbare Wiederholungszahl.
 
 ## Abgrenzung
 
@@ -158,7 +158,7 @@ Der experimentelle Ordnerimport bleibt entfernt.
 
 ## Tags und Einfügen
 
-Tags sind eine zweite Organisationsschicht neben Playlists. Jeder Tag hat einen farbigen Punkt und kann beliebig viele Songs und Playlists enthalten; Tags selbst gehören nie zu Playlists. Beim Erstellen und Umbenennen kann die Farbe aus einer kompakten Palette mit ungefähr 100 Farben gewählt werden. In normalen Songzeilen werden aus Platzgründen nur die Punkte angezeigt. In der näheren Songansicht stehen Punkt und Tagname zusammen.
+Tags sind eine zweite Organisationsschicht neben Playlists. Jeder Tag hat einen farbigen Punkt und kann beliebig viele Songs und Playlists enthalten; Tags selbst gehören nie zu Playlists. Beim Erstellen und Umbenennen wird die Farbe über ein frei antippbares Farbspektrum gewählt. Ein nicht greifbarer Punkt zeigt die Auswahl; erst **Fertig** übernimmt sie. In normalen Songzeilen werden aus Platzgründen nur die Punkte angezeigt. In der näheren Songansicht stehen Punkt und Tagname zusammen.
 
 Der Tags-Bereich und der Playlists-Bereich lassen sich durch Antippen ihrer freien Überschrift ein- und ausklappen. Die Sortiersteuerung steht nicht dauerhaft unter der Überschrift, sondern im `•••` des jeweiligen Tags bzw. der Playlist als **Sortieren** direkt unter **Umbenennen**. Tags und Playlists speichern ihren Sortiermodus und die Richtung getrennt. Für Tags stehen Manuell, A–Z Anfang, A–Z Ende, summierte Höranzahl, Anzahl der Lieder und Chronik bereit; Playlists verwenden dieselben passenden Kriterien.
 
@@ -168,3 +168,20 @@ Beim Taggen oder Einfügen eines Objekts mit einem Namen, der am Ziel bereits vo
 ## Detailansicht und kleine Bedienkorrekturen
 
 Die nähere Songansicht besitzt ein eigenes `•••` mit songbezogenen Aktionen wie Umbenennen, Kopieren/Einfügen, Tags, Teilen und Loop-Funktionen. Listenweite Aktionen wie das Sortieren von Tags oder Playlists werden dort bewusst nicht gezeigt. In der Tag-Zuordnung bedeutet `+` hinzufügen und `−` entfernen; eine teilweise Mehrfachzuordnung bleibt als `±` sichtbar. Home schließt auch aus dem Loop-Editor zuverlässig den Editor und öffnet die Bibliothek.
+
+
+## Gruppen
+
+Mehrere ausgewählte Lieder, Playlists oder Tags können über `••• → Gruppieren` zu einer eigenen Gruppe zusammengefasst werden. Die drei Typen werden nie vermischt, und ein Objekt liegt immer nur in einer Gruppe seines Typs. Neue Gruppen heißen zunächst **Unbenannt**. Gruppen stehen vor allen ungruppierten Objekten; untereinander folgen sie der Sortierung der Gesamtliste.
+
+Die fast weiße Gruppenzeile zeigt Gruppenname, Objektanzahl und Gesamtdauer. Die enthaltenen Objekte liegen auf einem hellgrauen Hintergrund. Das `•••` der Gruppe bietet bei Liedern **Gruppe abspielen** sowie für alle Typen **Gruppe umbenennen**, **Sortieren**, **Reihenfolge ändern**, **Gruppe bewegen**, **Objekte hinzufügen**, **Objekte entfernen** und **Gruppe auflösen**. Die interne Sortierung besitzt zusätzlich **Allgemeine Sortierung**, wodurch die Gruppe automatisch die Sortierung der gesamten Liste übernimmt.
+
+Playlists und Tags erhalten über das `•••` ihrer Überschrift einen Auswahlmodus. Während dieser Auswahl erscheint wie bei Liedern ein eigener Drei-Punkte-Knopf unten rechts, über den gruppiert werden kann.
+
+## Freie Tag-Farbe
+
+Die frühere Palette entfällt. Der Farbkreis öffnet ein großes Spektrum mit praktisch allen Farbtönen von hell bis dunkel. Ein Tippen setzt einen rein visuellen, nicht greifbaren Punkt. **Fertig** übernimmt die Farbe unter dem Punkt in den Kreis; **Abbrechen** verwirft die Auswahl.
+
+## Endliche Wiederholung ohne Loop
+
+Die eingegebene Wiederholungszahl zählt auch bei unbearbeiteten Liedern zuverlässig pro vollständigem Durchlauf herunter. Solange der Restwert größer als 0 ist, startet dasselbe Lied erneut. Erst bei 0 wird zum nächsten Lied gewechselt. Für gespeicherte Loops bleibt dasselbe Prinzip pro Loop-Durchlauf bestehen.

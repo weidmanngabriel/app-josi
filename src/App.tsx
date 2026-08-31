@@ -18,6 +18,7 @@ import {
   type Song,
   type Tag,
 } from './musicDb'
+import { ColorSpectrumPicker } from './ColorSpectrumPicker'
 import './enhancements.css'
 import './loopEditor.css'
 
@@ -64,9 +65,14 @@ type Snapshot = { songs: Song[]; playlists: Playlist[]; tags: Tag[] }
 type PlaylistChooserMode = 'current' | 'bulk' | null
 type SortMode = 'manual' | 'azStart' | 'azEnd' | 'plays' | 'duration' | 'chronology'
 type SortDirection = 'down' | 'up'
-type OverflowMenu = { kind: 'song' | 'songDetail' | 'playlist' | 'playlists' | 'tag' | 'tags'; id?: string } | null
+type OverflowMenu = { kind: 'song' | 'songDetail' | 'playlist' | 'playlists' | 'tag' | 'tags' | 'group'; id?: string } | null
 type SidebarSortTarget = 'tags' | 'playlists' | null
 type RepeatSetting = { kind: 'infinite' } | { kind: 'count'; count: number } | null
+type GroupKind = 'song' | 'playlist' | 'tag'
+type GroupSortMode = 'general' | SortMode
+type ObjectGroup = { id: string; kind: GroupKind; name: string; itemIds: string[]; createdAt: number; sortOrder: number; sortMode: GroupSortMode; sortDirection: SortDirection }
+type SidebarSelectionKind = 'playlist' | 'tag' | null
+type GroupMembershipTarget = { groupId: string; mode: 'add' | 'remove' } | null
 type ClipboardItem = { kind: 'song'; song: Song } | { kind: 'playlist'; playlist: Playlist }
 type TagChooserTarget = { kind: 'song' | 'playlist'; ids: string[] } | null
 type DuplicateAction =
@@ -102,13 +108,6 @@ const LOOP_PREVIEW_OPTIONS = [0.05, 0.1, 0.25, 0.5, 1, 2, 3, 5, 10] as const
 const SEEK_SECOND_OPTIONS = [5, 10, 15, 30, 60] as const
 const LOOP_OVERLAP_SECONDS = .18
 const AUTO_LOOP_SEARCH_RADIUS_SECONDS = .6
-const TAG_COLOR_PALETTE = Array.from({ length: 100 }, (_, index) => {
-  const hue = (index % 20) * 18
-  const row = Math.floor(index / 20)
-  const saturation = [72, 82, 68, 88, 76][row]
-  const lightness = [38, 46, 54, 62, 70][row]
-  return `hsl(${hue} ${saturation}% ${lightness}%)`
-})
 
 function App() {
   const [songs, setSongs] = useState<Song[]>([])
@@ -130,20 +129,32 @@ function App() {
   const [repeatRemaining, setRepeatRemaining] = useState<number | null>(null)
   const [repeatMenuOpen, setRepeatMenuOpen] = useState(false)
   const [repeatCountInput, setRepeatCountInput] = useState('3')
+  const [objectGroups, setObjectGroups] = useState<ObjectGroup[]>(() => { try { const parsed = JSON.parse(localStorage.getItem('josi-object-groups') ?? '[]'); return Array.isArray(parsed) ? parsed : [] } catch { return [] } })
+  const [groupPlaybackIds, setGroupPlaybackIds] = useState<string[] | null>(null)
+  const [sidebarSelectionKind, setSidebarSelectionKind] = useState<SidebarSelectionKind>(null)
+  const [selectedPlaylistIds, setSelectedPlaylistIds] = useState<Set<string>>(new Set())
+  const [selectedTagIds, setSelectedTagIds] = useState<Set<string>>(new Set())
+  const [sidebarSelectionMenuOpen, setSidebarSelectionMenuOpen] = useState(false)
+  const [groupRenameId, setGroupRenameId] = useState<string | null>(null)
+  const [groupRenameValue, setGroupRenameValue] = useState('')
+  const [groupSortId, setGroupSortId] = useState<string | null>(null)
+  const [groupMembershipTarget, setGroupMembershipTarget] = useState<GroupMembershipTarget>(null)
+  const [groupReorderId, setGroupReorderId] = useState<string | null>(null)
+  const [groupMoveId, setGroupMoveId] = useState<string | null>(null)
+  const [colorPickerTarget, setColorPickerTarget] = useState<'create' | 'rename' | null>(null)
   const [shuffle, setShuffle] = useState(false)
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [playlistName, setPlaylistName] = useState('')
   const [tagName, setTagName] = useState('')
-  const [tagColor, setTagColor] = useState(TAG_COLOR_PALETTE[0])
-  const [tagColorPickerOpen, setTagColorPickerOpen] = useState(false)
+  const [tagColor, setTagColor] = useState('#60a5fa')
   const [editingName, setEditingName] = useState('')
   const [isEditingPlaylist, setIsEditingPlaylist] = useState(false)
   const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(null)
   const [songToDelete, setSongToDelete] = useState<Song | null>(null)
   const [renameTarget, setRenameTarget] = useState<RenameTarget>(null)
   const [renameValue, setRenameValue] = useState('')
-  const [renameTagColor, setRenameTagColor] = useState(TAG_COLOR_PALETTE[0])
+  const [renameTagColor, setRenameTagColor] = useState('#60a5fa')
   const [message, setMessage] = useState('')
   const [playHistory, setPlayHistory] = useState<string[]>([])
   const [reorderScope, setReorderScope] = useState<ReorderScope>(null)
@@ -225,6 +236,7 @@ function App() {
   const loopDragRef = useRef<LoopDrag>(null)
   const repeatHoldTimerRef = useRef<number | null>(null)
   const repeatHoldTriggeredRef = useRef(false)
+  const repeatRemainingRef = useRef<number | null>(null)
 
   const currentPlaybackAudio = () => playbackAudioRef.current ?? audioRef.current
   const otherPlaybackAudio = (audio: HTMLAudioElement) => audio === audioRef.current ? overlapAudioRef.current : audioRef.current
@@ -313,6 +325,7 @@ function App() {
   useEffect(() => { localStorage.setItem('josi-playlist-sort-direction', playlistSortDirection) }, [playlistSortDirection])
   useEffect(() => { localStorage.setItem('josi-playlists-collapsed', playlistsCollapsed ? '1' : '0') }, [playlistsCollapsed])
   useEffect(() => { localStorage.setItem('josi-tags-collapsed', tagsCollapsed ? '1' : '0') }, [tagsCollapsed])
+  useEffect(() => { localStorage.setItem('josi-object-groups', JSON.stringify(objectGroups)) }, [objectGroups])
 
   const currentSong = songs.find((song) => song.id === currentSongId) ?? null
   const activePlaylist = playlists.find((playlist) => playlist.id === activePlaylistId) ?? null
@@ -391,7 +404,9 @@ function App() {
     return [...fresh, ...normal]
   }, [searchedVisibleSongs, sortMode, sortDirection])
 
-  const playerQueue = view === 'tag' && activeTag ? tagSongQueue : activePlaylist ? manualQueue : [...songs].sort((a, b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt))
+  const normalPlayerQueue = view === 'tag' && activeTag ? tagSongQueue : activePlaylist ? manualQueue : [...songs].sort((a, b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt))
+  const groupPlayerQueue = groupPlaybackIds ? groupPlaybackIds.map((id) => songs.find((song) => song.id === id)).filter((song): song is Song => Boolean(song)) : []
+  const playerQueue = groupPlayerQueue.length ? groupPlayerQueue : normalPlayerQueue
   const currentSongPlaylists = useMemo(() => currentSong ? playlists.filter((playlist) => playlist.songIds.includes(currentSong.id)) : [], [currentSong, playlists])
   const currentSongTags = useMemo(() => currentSong ? tags.filter((tag) => tag.songIds.includes(currentSong.id)) : [], [currentSong, tags])
   const taggedPlaylists = useMemo(() => activeTag ? activeTag.playlistIds.map((id) => playlists.find((playlist) => playlist.id === id)).filter((playlist): playlist is Playlist => Boolean(playlist)) : [], [activeTag, playlists])
@@ -405,8 +420,9 @@ function App() {
   }, [playlists])
 
   useEffect(() => {
-    if (repeatSetting?.kind === 'count') setRepeatRemaining(repeatSetting.count)
-    else setRepeatRemaining(null)
+    const next = repeatSetting?.kind === 'count' ? repeatSetting.count : null
+    repeatRemainingRef.current = next
+    setRepeatRemaining(next)
   }, [currentSongId, repeatSetting])
 
   useEffect(() => {
@@ -444,12 +460,12 @@ function App() {
       if (audio && song && !audio.paused) {
         if (loopEditorSongId === song.id && cursorLoopEnabled && loopDraftEnd > loopDraftStart && audio.currentTime >= loopDraftEnd) {
           audio.currentTime = loopDraftStart; setCurrentTime(loopDraftStart); setLoopCursor(loopDraftStart)
-        } else if (!loopEditorSongId && song.loopEnabled && song.loopStart !== undefined && song.loopEnd !== undefined && (repeatSetting?.kind !== 'count' || (repeatRemaining ?? 0) > 0)) {
+        } else if (!loopEditorSongId && song.loopEnabled && song.loopStart !== undefined && song.loopEnd !== undefined && (repeatSetting?.kind !== 'count' || (repeatRemainingRef.current ?? 0) > 0)) {
           const automatic = loopOverlapBlockedRef.current ? automaticLoopSeamsRef.current.get(song.id) : undefined
           const start = automatic?.start ?? song.loopStart
           const end = automatic?.end ?? song.loopEnd
           if (loopOverlapBlockedRef.current) {
-            if (audio.currentTime >= end) { audio.currentTime = start; setCurrentTime(start); if (repeatSetting?.kind === 'count') setRepeatRemaining((value) => Math.max(0, (value ?? 0) - 1)) }
+            if (audio.currentTime >= end) { audio.currentTime = start; setCurrentTime(start); if (repeatSetting?.kind === 'count') consumeRepeat() }
           } else {
             const transition = loopTransitionRef.current
             if (transition) {
@@ -458,7 +474,7 @@ function App() {
               if (progress >= 1) {
                 transition.outgoing.pause(); transition.outgoing.currentTime = start
                 try { transition.outgoing.volume = 1; transition.incoming.volume = 1 } catch { /* ignored */ }
-                playbackAudioRef.current = transition.incoming; loopTransitionRef.current = null; setCurrentTime(transition.incoming.currentTime); if (repeatSetting?.kind === 'count') setRepeatRemaining((value) => Math.max(0, (value ?? 0) - 1))
+                playbackAudioRef.current = transition.incoming; loopTransitionRef.current = null; setCurrentTime(transition.incoming.currentTime); if (repeatSetting?.kind === 'count') consumeRepeat()
               }
             } else {
               const overlap = Math.min(LOOP_OVERLAP_SECONDS, Math.max(.04, (end - start) / 3))
@@ -476,7 +492,7 @@ function App() {
                     loopStartPendingRef.current = false; incoming.pause()
                     try { audio.volume = 1; incoming.volume = 1 } catch { /* ignored */ }
                     loopOverlapBlockedRef.current = true
-                    if (audio.currentTime >= end) { audio.currentTime = start; setCurrentTime(start); if (repeatSetting?.kind === 'count') setRepeatRemaining((value) => Math.max(0, (value ?? 0) - 1)) }
+                    if (audio.currentTime >= end) { audio.currentTime = start; setCurrentTime(start); if (repeatSetting?.kind === 'count') consumeRepeat() }
                     void prepareAutomaticLoopSeam(song)
                   })
                 }
@@ -644,8 +660,9 @@ function App() {
   const updateTag = async (updated: Tag, addHistory = false) => { if (addHistory) recordHistory(); setTags((items) => items.map((tag) => tag.id === updated.id ? updated : tag)); await saveTag(updated) }
 
   const toggleSelected = (id: string) => setSelectedSongIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next })
-  const playSong = (id: string, remember = true) => {
+  const playSong = (id: string, remember = true, preserveGroupQueue = false) => {
     if (selectionMode) return toggleSelected(id)
+    if (!preserveGroupQueue) setGroupPlaybackIds(null)
     const song = songs.find((item) => item.id === id)
     if (!song?.file || song.file.size === 0) { setMessage('Diese Audiodatei ist lokal nicht mehr verfügbar. Bitte importiere sie erneut.'); return }
     if (id === currentSongId && currentPlaybackAudio()) return void currentPlaybackAudio()?.play().catch(() => setMessage(`„${song.name}“ konnte nicht gestartet werden.`))
@@ -659,7 +676,7 @@ function App() {
       void activeAudio.play().catch(() => setMessage(`„${song.name}“ konnte nicht erneut gestartet werden.`))
       return
     }
-    playSong(song.id)
+    playSong(song.id, true, true)
   }
   const moveSong = (direction: 1 | -1) => {
     if (!playerQueue.length) return
@@ -667,11 +684,11 @@ function App() {
     const currentIndex = queue.findIndex((song) => song.id === currentSongId)
     if (shuffle && direction === 1 && playerQueue.length > 1) {
       const options = playerQueue.filter((song) => song.id !== currentSongId && song.file?.size)
-      if (options.length) return playSong(options[Math.floor(Math.random() * options.length)].id)
+      if (options.length) return playSong(options[Math.floor(Math.random() * options.length)].id, true, true)
     }
     const nextIndex = currentIndex < 0 ? (direction === 1 ? 0 : queue.length - 1) : currentIndex + direction
     if (nextIndex >= 0 && nextIndex < queue.length) return playQueueSong(queue[nextIndex])
-    if (repeatQueue) return playSong(playerQueue[direction === 1 ? 0 : playerQueue.length - 1].id)
+    if (repeatQueue) return playSong(playerQueue[direction === 1 ? 0 : playerQueue.length - 1].id, true, true)
     shouldAutoPlayRef.current = false; setIsPlaying(false)
   }
   const togglePlayback = () => {
@@ -732,7 +749,7 @@ function App() {
   const beginRename = (kind: 'song' | 'playlist' | 'tag', id: string) => {
     const name = kind === 'song' ? songs.find((song) => song.id === id)?.name : kind === 'playlist' ? playlists.find((playlist) => playlist.id === id)?.name : tags.find((tag) => tag.id === id)?.name
     if (!name) return
-    if (kind === 'tag') setRenameTagColor(tags.find((tag) => tag.id === id)?.color ?? TAG_COLOR_PALETTE[0])
+    if (kind === 'tag') setRenameTagColor(tags.find((tag) => tag.id === id)?.color ?? '#60a5fa')
     setRenameTarget({ kind, id }); setRenameValue(name); setOverflowMenu(null)
   }
   const confirmRename = async (event: React.FormEvent) => {
@@ -1056,7 +1073,7 @@ function App() {
     event.preventDefault(); const name = tagName.trim(); if (!name) return
     if (tags.some((tag) => normalizeName(tag.name) === normalizeName(name))) { setMessage('Ein Tag mit diesem Namen existiert bereits.'); return }
     recordHistory(); const now = Date.now(); const tag: Tag = { id: crypto.randomUUID(), name, color: tagColor, songIds: [], playlistIds: [], createdAt: now, lastUsedAt: now, sortOrder: tags.length }
-    await saveTag(tag); setTags((items) => [...items, tag]); setTagName(''); setTagColorPickerOpen(false); setTagColor(TAG_COLOR_PALETTE[(tags.length + 1) % TAG_COLOR_PALETTE.length])
+    await saveTag(tag); setTags((items) => [...items, tag]); setTagName(''); setTagColor('#60a5fa')
   }
   const openTag = async (id: string) => {
     if (reorderScope === 'tags') return
@@ -1157,6 +1174,9 @@ function App() {
     setSelectionConfirmation(null)
     stopSelection()
   }
+  const setRepeatRemainingNow = (value: number | null) => { repeatRemainingRef.current = value; setRepeatRemaining(value) }
+  const consumeRepeat = () => { const current = Math.max(0, repeatRemainingRef.current ?? 0); const next = Math.max(0, current - 1); setRepeatRemainingNow(next); return next }
+  const restartFinishedAudio = (audio: HTMLAudioElement) => { cancelLoopTransition(); const other = otherPlaybackAudio(audio); other?.pause(); playbackAudioRef.current = audio; audio.currentTime = 0; setCurrentTime(0); requestAnimationFrame(() => void audio.play().catch(() => setMessage('Die Wiederholung konnte nicht gestartet werden.'))) }
   const clearRepeatHold = () => {
     if (repeatHoldTimerRef.current !== null) window.clearTimeout(repeatHoldTimerRef.current)
     repeatHoldTimerRef.current = null
@@ -1175,13 +1195,13 @@ function App() {
   const handleRepeatClick = () => {
     if (repeatHoldTriggeredRef.current) { repeatHoldTriggeredRef.current = false; return }
     clearRepeatHold()
-    if (repeatSetting) { setRepeatSetting(null); setRepeatRemaining(null); setRepeatQueue(false); return }
+    if (repeatSetting) { setRepeatSetting(null); setRepeatRemainingNow(null); setRepeatQueue(false); return }
     setRepeatQueue((value) => !value)
   }
-  const chooseInfiniteRepeat = () => { setRepeatSetting({ kind: 'infinite' }); setRepeatRemaining(null); setRepeatQueue(false); setRepeatMenuOpen(false) }
+  const chooseInfiniteRepeat = () => { setRepeatSetting({ kind: 'infinite' }); setRepeatRemainingNow(null); setRepeatQueue(false); setRepeatMenuOpen(false) }
   const chooseCountRepeat = () => {
     const count = Math.max(1, Math.min(9999, Math.floor(Number(repeatCountInput) || 1)))
-    setRepeatCountInput(String(count)); setRepeatSetting({ kind: 'count', count }); setRepeatRemaining(count); setRepeatQueue(false); setRepeatMenuOpen(false)
+    setRepeatCountInput(String(count)); setRepeatSetting({ kind: 'count', count }); setRepeatRemainingNow(count); setRepeatQueue(false); setRepeatMenuOpen(false)
   }
   const selectAllVisible = () => setSelectedSongIds(new Set(visibleSongs.map((song) => song.id)))
   const assignSelectedToPlaylist = async (playlist: Playlist) => { const ids = [...selectedSongIds]; if (!ids.length) return; recordHistory(); const merged = [...playlist.songIds]; ids.forEach((id) => { if (!merged.includes(id)) merged.push(id) }); await updatePlaylist({ ...playlist, songIds: merged, lastUsedAt: Date.now() }); setPlaylistChooserMode(null); stopSelection() }
@@ -1244,7 +1264,132 @@ function App() {
     setSortMode('manual'); setSortConfirmation(false); setSortMenuOpen(false)
   }
 
-  const renderTagColorPalette = (selected: string, onSelect: (color: string) => void) => <div className="tag-color-palette" role="group" aria-label="Tag-Farbe wählen">{TAG_COLOR_PALETTE.map((color) => <button key={color} className={selected === color ? 'selected' : ''} type="button" style={{ background: color }} onClick={() => onSelect(color)} aria-label={`Farbe ${color}`} />)}</div>
+  const globalSortForKind = (kind: GroupKind) => kind === 'song' ? { mode: sortMode, direction: sortDirection } : kind === 'playlist' ? { mode: playlistSortMode, direction: playlistSortDirection } : { mode: tagSortMode, direction: tagSortDirection }
+  const itemDuration = (kind: GroupKind, id: string) => {
+    if (kind === 'song') return songs.find((song) => song.id === id)?.duration ?? 0
+    if (kind === 'playlist') return (playlists.find((playlist) => playlist.id === id)?.songIds ?? []).reduce((sum, songId) => sum + (songs.find((song) => song.id === songId)?.duration ?? 0), 0)
+    return (tags.find((tag) => tag.id === id)?.songIds ?? []).reduce((sum, songId) => sum + (songs.find((song) => song.id === songId)?.duration ?? 0), 0)
+  }
+  const itemPlays = (kind: GroupKind, id: string) => {
+    if (kind === 'song') return songs.find((song) => song.id === id)?.completedPlays ?? 0
+    if (kind === 'playlist') return (playlists.find((playlist) => playlist.id === id)?.songIds ?? []).reduce((sum, songId) => sum + (songs.find((song) => song.id === songId)?.completedPlays ?? 0), 0)
+    return (tags.find((tag) => tag.id === id)?.songIds ?? []).reduce((sum, songId) => sum + (songs.find((song) => song.id === songId)?.completedPlays ?? 0), 0)
+  }
+  const itemSongCount = (kind: GroupKind, id: string) => kind === 'song' ? 1 : kind === 'playlist' ? (playlists.find((playlist) => playlist.id === id)?.songIds.length ?? 0) : (tags.find((tag) => tag.id === id)?.songIds.filter((songId) => songs.some((song) => song.id === songId)).length ?? 0)
+  const objectFor = (kind: GroupKind, id: string): Song | Playlist | Tag | null => kind === 'song' ? songs.find((song) => song.id === id) ?? null : kind === 'playlist' ? playlists.find((playlist) => playlist.id === id) ?? null : tags.find((tag) => tag.id === id) ?? null
+  const compareObjects = (kind: GroupKind, a: Song | Playlist | Tag, b: Song | Playlist | Tag, mode: SortMode) => {
+    if (mode === 'azStart') return a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' })
+    if (mode === 'azEnd') return reverseText(a.name).localeCompare(reverseText(b.name), 'de', { numeric: true, sensitivity: 'base' })
+    if (mode === 'plays') return itemPlays(kind, a.id) - itemPlays(kind, b.id) || a.name.localeCompare(b.name, 'de')
+    if (mode === 'duration') return (kind === 'song' ? itemDuration(kind, a.id) - itemDuration(kind, b.id) : itemSongCount(kind, a.id) - itemSongCount(kind, b.id)) || a.name.localeCompare(b.name, 'de')
+    const aTime = kind === 'song' ? (a as Song).addedAt : (a as Playlist | Tag).createdAt
+    const bTime = kind === 'song' ? (b as Song).addedAt : (b as Playlist | Tag).createdAt
+    return aTime - bTime
+  }
+  const orderedGroupItems = (group: ObjectGroup, allowed: Array<Song | Playlist | Tag>) => {
+    const allowedMap = new Map(allowed.map((item) => [item.id, item]))
+    if (group.sortMode === 'general') return allowed.filter((item) => group.itemIds.includes(item.id))
+    if (group.sortMode === 'manual') return group.itemIds.map((id) => allowedMap.get(id)).filter((item): item is Song | Playlist | Tag => Boolean(item))
+    const direction = group.sortDirection === 'down' ? 1 : -1
+    return group.itemIds.map((id) => allowedMap.get(id)).filter((item): item is Song | Playlist | Tag => Boolean(item)).sort((a, b) => compareObjects(group.kind, a, b, group.sortMode as SortMode) * direction)
+  }
+  const groupDuration = (group: ObjectGroup, allowed: Array<Song | Playlist | Tag>) => orderedGroupItems(group, allowed).reduce((sum, item) => sum + itemDuration(group.kind, item.id), 0)
+  const sortedGroupsFor = (kind: GroupKind, allowed: Array<Song | Playlist | Tag>) => {
+    const allowedIds = new Set(allowed.map((item) => item.id))
+    const candidates = objectGroups.filter((group) => group.kind === kind && group.itemIds.some((id) => allowedIds.has(id)))
+    const { mode, direction } = globalSortForKind(kind)
+    if (mode === 'manual') return [...candidates].sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt - b.createdAt)
+    const sign = direction === 'down' ? 1 : -1
+    const metric = (group: ObjectGroup) => {
+      const ids = group.itemIds.filter((id) => allowedIds.has(id))
+      if (mode === 'plays') return ids.reduce((sum, id) => sum + itemPlays(kind, id), 0)
+      if (mode === 'duration') return kind === 'song' ? ids.reduce((sum, id) => sum + itemDuration(kind, id), 0) : ids.reduce((sum, id) => sum + itemSongCount(kind, id), 0)
+      return group.createdAt
+    }
+    return [...candidates].sort((a, b) => {
+      if (mode === 'azStart') return a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' }) * sign
+      if (mode === 'azEnd') return reverseText(a.name).localeCompare(reverseText(b.name), 'de', { numeric: true, sensitivity: 'base' }) * sign
+      return (metric(a) - metric(b) || a.name.localeCompare(b.name, 'de')) * sign
+    })
+  }
+  const createObjectGroup = (kind: GroupKind, sourceIds: string[]) => {
+    const valid = [...new Set(sourceIds)].filter((id) => Boolean(objectFor(kind, id)))
+    if (valid.length < 2) { setMessage('Wähle mindestens zwei Objekte zum Gruppieren aus.'); return }
+    setObjectGroups((current) => {
+      const next = current.map((group) => group.kind === kind ? { ...group, itemIds: group.itemIds.filter((id) => !valid.includes(id)) } : group).filter((group) => group.kind !== kind || group.itemIds.length >= 2)
+      const minOrder = Math.min(0, ...next.filter((group) => group.kind === kind).map((group) => group.sortOrder))
+      return [{ id: crypto.randomUUID(), kind, name: 'Unbenannt', itemIds: valid, createdAt: Date.now(), sortOrder: minOrder - 1, sortMode: 'general', sortDirection: 'down' }, ...next]
+    })
+    if (kind === 'song') stopSelection()
+    else { setSidebarSelectionKind(null); setSelectedPlaylistIds(new Set()); setSelectedTagIds(new Set()); setSidebarSelectionMenuOpen(false) }
+  }
+  const startSidebarSelection = (kind: 'playlist' | 'tag') => { setSidebarSelectionKind(kind); setSelectedPlaylistIds(new Set()); setSelectedTagIds(new Set()); setSidebarSelectionMenuOpen(false); setOverflowMenu(null) }
+  const stopSidebarSelection = () => { setSidebarSelectionKind(null); setSelectedPlaylistIds(new Set()); setSelectedTagIds(new Set()); setSidebarSelectionMenuOpen(false) }
+  const toggleSidebarSelected = (kind: 'playlist' | 'tag', id: string) => {
+    const setter = kind === 'playlist' ? setSelectedPlaylistIds : setSelectedTagIds
+    setter((current) => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next })
+  }
+  const updateObjectGroup = (id: string, change: (group: ObjectGroup) => ObjectGroup) => setObjectGroups((current) => current.map((group) => group.id === id ? change(group) : group))
+  const dissolveGroup = (id: string) => { setObjectGroups((current) => current.filter((group) => group.id !== id)); setOverflowMenu(null); setGroupReorderId((value) => value === id ? null : value); setGroupMoveId((value) => value === id ? null : value) }
+  const openGroupRename = (group: ObjectGroup) => { setGroupRenameId(group.id); setGroupRenameValue(group.name); setOverflowMenu(null) }
+  const saveGroupRename = (event: React.FormEvent) => { event.preventDefault(); const value = groupRenameValue.trim(); if (!groupRenameId || !value) return; updateObjectGroup(groupRenameId, (group) => ({ ...group, name: value })); setGroupRenameId(null) }
+  const moveGroup = (id: string, delta: -1 | 1) => {
+    const target = objectGroups.find((group) => group.id === id); if (!target) return
+    if (target.kind === 'song') setSortMode('manual'); else if (target.kind === 'playlist') setPlaylistSortMode('manual'); else setTagSortMode('manual')
+    setObjectGroups((current) => {
+      const same = current.filter((group) => group.kind === target.kind).sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt - b.createdAt)
+      const index = same.findIndex((group) => group.id === id); const other = same[index + delta]; if (!other) return current
+      const aOrder = same[index].sortOrder; const bOrder = other.sortOrder
+      return current.map((group) => group.id === id ? { ...group, sortOrder: bOrder } : group.id === other.id ? { ...group, sortOrder: aOrder } : group)
+    })
+  }
+  const moveGroupItem = (groupId: string, itemId: string, delta: -1 | 1) => updateObjectGroup(groupId, (group) => { const ids = [...group.itemIds]; const index = ids.indexOf(itemId); const other = index + delta; if (index < 0 || other < 0 || other >= ids.length) return group; [ids[index], ids[other]] = [ids[other], ids[index]]; return { ...group, itemIds: ids, sortMode: 'manual' } })
+  const addItemToGroup = (groupId: string, itemId: string) => {
+    const target = objectGroups.find((group) => group.id === groupId); if (!target || !objectFor(target.kind, itemId)) return
+    setObjectGroups((current) => current.map((group) => {
+      if (group.kind !== target.kind) return group
+      if (group.id === groupId) return group.itemIds.includes(itemId) ? group : { ...group, itemIds: [...group.itemIds, itemId] }
+      return { ...group, itemIds: group.itemIds.filter((id) => id !== itemId) }
+    }).filter((group) => group.kind !== target.kind || group.id === groupId || group.itemIds.length >= 2))
+  }
+  const removeItemFromGroup = (groupId: string, itemId: string) => setObjectGroups((current) => current.map((group) => group.id === groupId ? { ...group, itemIds: group.itemIds.filter((id) => id !== itemId) } : group).filter((group) => group.id !== groupId || group.itemIds.length >= 2))
+  const playObjectGroup = (group: ObjectGroup) => {
+    if (group.kind !== 'song') return
+    const ordered = orderedGroupItems(group, visibleSongs).map((item) => item.id)
+    const ids = ordered.length ? ordered : group.itemIds.filter((id) => songs.some((song) => song.id === id))
+    if (!ids.length) return
+    setGroupPlaybackIds(ids); playSong(ids[0], true, true); setOverflowMenu(null)
+  }
+
+  const songGroups = sortedGroupsFor('song', visibleSongs)
+  const groupedSongIds = new Set(songGroups.flatMap((group) => group.itemIds.filter((id) => visibleSongs.some((song) => song.id === id))))
+  const ungroupedVisibleSongs = visibleSongs.filter((song) => !groupedSongIds.has(song.id))
+  const playlistGroups = sortedGroupsFor('playlist', sidebarPlaylists)
+  const groupedPlaylistIds = new Set(playlistGroups.flatMap((group) => group.itemIds))
+  const ungroupedSidebarPlaylists = sidebarPlaylists.filter((playlist) => !groupedPlaylistIds.has(playlist.id))
+  const tagGroups = sortedGroupsFor('tag', sidebarTags)
+  const groupedTagIds = new Set(tagGroups.flatMap((group) => group.itemIds))
+  const ungroupedSidebarTags = sidebarTags.filter((tag) => !groupedTagIds.has(tag.id))
+
+  const renderGroupHeader = (group: ObjectGroup, allowed: Array<Song | Playlist | Tag>) => {
+    const items = orderedGroupItems(group, allowed)
+    return <div className="object-group-header"><div className="object-group-heading"><strong>{group.name}</strong><span>{items.length} Objekte · {formatTime(groupDuration(group, allowed))}</span></div>{groupMoveId === group.id && <div className="group-inline-tools"><button type="button" onClick={() => moveGroup(group.id, -1)}>↑</button><button type="button" onClick={() => moveGroup(group.id, 1)}>↓</button><button type="button" onClick={() => setGroupMoveId(null)}>Fertig</button></div>}{groupReorderId === group.id && <button className="group-finish" type="button" onClick={() => setGroupReorderId(null)}>Fertig</button>}<button className="overflow-button group-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'group', id: group.id })}>•••</button></div>
+  }
+  const renderSongRow = (song: Song, index: number, groupId?: string) => {
+    const groupReordering = groupId === groupReorderId
+    return <div key={song.id} className={`song-row${song.isNew ? ' new-import' : ''}${selectedSongIds.has(song.id) ? ' selected-song' : ''}${groupId ? ' grouped-object-row' : ''}`}>{groupReordering && <div className="group-item-reorder"><button type="button" onClick={() => moveGroupItem(groupId!, song.id, -1)}>↑</button><button type="button" onClick={() => moveGroupItem(groupId!, song.id, 1)}>↓</button></div>}{!groupId && songEditMode && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'song', id: song.id, targetIndex: null })}>↕</button>}{selectionMode && <button className="selection-check" type="button" onClick={() => toggleSelected(song.id)}>{selectedSongIds.has(song.id) ? '✓' : ''}</button>}<button className="song-main" type="button" onClick={() => playSong(song.id)} disabled={(!groupId && songEditMode) || groupReordering}><span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span><span className="song-copy"><strong>{song.name}</strong><small className="song-subline"><span className="song-tag-dots">{songTags(song.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} title={tag.name} />)}</span><span>{view === 'history' ? formatDate(song.addedAt) : membershipText(song.id)}</span></small></span><span className="song-meta"><small>{!song.file || song.file.size === 0 ? 'FEHLT' : formatTime(song.duration)}</small>{song.loopStart !== undefined && song.loopEnd !== undefined && <span className="loop-badge">↻</span>}</span></button><button className="overflow-button song-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'song', id: song.id })}>•••</button>{activePlaylist && view === 'library' && !selectionMode && !songEditMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActivePlaylist(song.id)}>Entfernen</button>}{activeTag && view === 'tag' && !selectionMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActiveTag(song.id)}>Entfernen</button>}</div>
+  }
+  const renderPlaylistRow = (playlist: Playlist, index: number, groupId?: string) => {
+    const groupReordering = groupId === groupReorderId
+    const selected = selectedPlaylistIds.has(playlist.id)
+    return <div className={`playlist-nav-row${groupId ? ' grouped-object-row' : ''}`} key={playlist.id}>{groupReordering && <div className="group-item-reorder"><button type="button" onClick={() => moveGroupItem(groupId!, playlist.id, -1)}>↑</button><button type="button" onClick={() => moveGroupItem(groupId!, playlist.id, 1)}>↓</button></div>}{sidebarSelectionKind === 'playlist' && <button className="selection-check sidebar-selection-check" type="button" onClick={() => toggleSidebarSelected('playlist', playlist.id)}>{selected ? '✓' : ''}</button>}{!groupId && sidebarSelectionKind !== 'playlist' && reorderScope === 'sidebar' && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'playlist', id: playlist.id, targetIndex: null })}>↕</button>}<button className={`nav-item${activePlaylistId === playlist.id && view === 'library' ? ' active' : ''}${selected ? ' selected-sidebar-object' : ''}`} type="button" onClick={() => sidebarSelectionKind === 'playlist' ? toggleSidebarSelected('playlist', playlist.id) : void openPlaylist(playlist.id)} disabled={reorderScope === 'sidebar' || groupReordering}><span className="playlist-nav-name">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span className="playlist-mini-cover">♫</span>}<span className="nav-tag-dots">{playlistTags(playlist.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} />)}</span><span>{playlist.name}</span></span><strong>{playlist.songIds.length}</strong></button>{sidebarSelectionKind !== 'playlist' && <button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id })}>•••</button>}</div>
+  }
+  const renderTagRow = (tag: Tag, index: number, groupId?: string) => {
+    const groupReordering = groupId === groupReorderId
+    const selected = selectedTagIds.has(tag.id)
+    return <div className={`playlist-nav-row tag-nav-row${groupId ? ' grouped-object-row' : ''}`} key={tag.id}>{groupReordering && <div className="group-item-reorder"><button type="button" onClick={() => moveGroupItem(groupId!, tag.id, -1)}>↑</button><button type="button" onClick={() => moveGroupItem(groupId!, tag.id, 1)}>↓</button></div>}{sidebarSelectionKind === 'tag' && <button className="selection-check sidebar-selection-check" type="button" onClick={() => toggleSidebarSelected('tag', tag.id)}>{selected ? '✓' : ''}</button>}{!groupId && sidebarSelectionKind !== 'tag' && tagEditMode && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'tag', id: tag.id, targetIndex: null })}>↕</button>}<button className={`nav-item${activeTagId === tag.id && view === 'tag' ? ' active' : ''}${selected ? ' selected-sidebar-object' : ''}`} type="button" onClick={() => sidebarSelectionKind === 'tag' ? toggleSidebarSelected('tag', tag.id) : void openTag(tag.id)} disabled={tagEditMode || groupReordering}><span className="tag-nav-name"><i className="tag-dot" style={{ background: tag.color }} /><span>{tag.name}</span></span><strong>{tag.songIds.filter((id) => songs.some((song) => song.id === id)).length}</strong></button>{sidebarSelectionKind !== 'tag' && <button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'tag', id: tag.id })}>•••</button>}</div>
+  }
+  const renderPlaylistCard = (playlist: Playlist) => <div className="playlist-card-wrap" key={playlist.id}><button className="playlist-card" type="button" onClick={() => void openPlaylist(playlist.id)}><span className="playlist-card-cover">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : '♫'}</span><strong><span className="card-tag-dots">{playlistTags(playlist.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} />)}</span>{playlist.name}</strong><small>{playlist.songIds.length} {playlist.songIds.length === 1 ? 'Lied' : 'Lieder'}</small></button><button className="overflow-button card-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id })}>•••</button></div>
   const repeatBadge = repeatSetting?.kind === 'infinite' ? '∞' : repeatSetting?.kind === 'count' ? String(repeatRemaining ?? repeatSetting.count) : null
 
   const songEditMode = reorderScope === (activePlaylist ? 'playlist' : 'library') && view === 'library'
@@ -1267,13 +1412,18 @@ function App() {
   const handleAudioTimeUpdate = (audio: HTMLAudioElement) => { if (currentPlaybackAudio() !== audio) return; setCurrentTime(audio.currentTime); if (loopEditorSongId) setLoopCursor(audio.currentTime) }
   const handleAudioEnded = (audio: HTMLAudioElement) => {
     if (loopTransitionRef.current?.outgoing === audio || currentPlaybackAudio() !== audio) return
-    const finiteAvailable = repeatSetting?.kind !== 'count' || (repeatRemaining ?? 0) > 0
+    const remaining = repeatRemainingRef.current ?? 0
+    const finiteAvailable = repeatSetting?.kind !== 'count' || remaining > 0
     if (currentSong?.loopEnabled && currentSong.loopStart !== undefined && currentSong.loopEnd !== undefined && finiteAvailable) {
       const automatic = loopOverlapBlockedRef.current ? automaticLoopSeamsRef.current.get(currentSong.id) : undefined
-      audio.currentTime = automatic?.start ?? currentSong.loopStart; setCurrentTime(audio.currentTime); if (repeatSetting?.kind === 'count') setRepeatRemaining((value) => Math.max(0, (value ?? 0) - 1)); void audio.play().catch(() => undefined); return
+      audio.currentTime = automatic?.start ?? currentSong.loopStart
+      setCurrentTime(audio.currentTime)
+      if (repeatSetting?.kind === 'count') consumeRepeat()
+      void audio.play().catch(() => undefined)
+      return
     }
-    if (currentSong && !currentSong.loopEnabled && repeatSetting?.kind === 'infinite') { audio.currentTime = 0; setCurrentTime(0); void audio.play().catch(() => undefined); return }
-    if (currentSong && !currentSong.loopEnabled && repeatSetting?.kind === 'count' && (repeatRemaining ?? 0) > 0) { setRepeatRemaining((value) => Math.max(0, (value ?? 0) - 1)); audio.currentTime = 0; setCurrentTime(0); void audio.play().catch(() => undefined); return }
+    if (currentSong && !currentSong.loopEnabled && repeatSetting?.kind === 'infinite') { restartFinishedAudio(audio); return }
+    if (currentSong && !currentSong.loopEnabled && repeatSetting?.kind === 'count' && remaining > 0) { consumeRepeat(); restartFinishedAudio(audio); return }
     if (currentSong) void updateSong({ ...currentSong, completedPlays: (currentSong.completedPlays ?? 0) + 1 })
     moveSong(1)
   }
@@ -1290,10 +1440,10 @@ function App() {
       <button className={`nav-item history-nav${view === 'loops' ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'loops', playlistId: null, detailOpen: false })}><span>Loops</span><strong>{songs.filter((song) => song.loopStart !== undefined && song.loopEnd !== undefined).length}</strong></button>
       <button className={`nav-item history-nav${view === 'trash' ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'trash', playlistId: null, detailOpen: false })}><span>Papierkorb</span><strong>{trashCount}</strong></button>
       <div className="sidebar-heading collapsible-heading" onClick={() => setPlaylistsCollapsed((value) => !value)}><span className="heading-label"><b className="section-chevron">{playlistsCollapsed ? '▸' : '▾'}</b> Playlists</span><button className="overflow-button small-overflow" type="button" onClick={(event) => { event.stopPropagation(); setOverflowMenu({ kind: 'playlists' }) }}>•••</button>{reorderScope === 'sidebar' && <button className="finish-inline" type="button" onClick={(event) => { event.stopPropagation(); finishReorder() }}>Fertig</button>}</div>
-      {!playlistsCollapsed && <><div className="playlist-nav">{renderDropZone(0, 'playlist')}{sidebarPlaylists.map((playlist, index) => <div className="playlist-nav-row" key={playlist.id}>{reorderScope === 'sidebar' && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'playlist', id: playlist.id, targetIndex: null })}>↕</button>}<button className={`nav-item${activePlaylistId === playlist.id && view === 'library' ? ' active' : ''}`} type="button" onClick={() => void openPlaylist(playlist.id)} disabled={reorderScope === 'sidebar'}><span className="playlist-nav-name">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span className="playlist-mini-cover">♫</span>}<span className="nav-tag-dots">{playlistTags(playlist.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} />)}</span><span>{playlist.name}</span></span><strong>{playlist.songIds.length}</strong></button><button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id })}>•••</button>{renderDropZone(index + 1, 'playlist')}</div>)}</div>
+      {!playlistsCollapsed && <><div className="playlist-nav grouped-sidebar-list">{playlistGroups.map((group) => <section className="object-group sidebar-object-group" key={group.id}>{renderGroupHeader(group, sidebarPlaylists)}{orderedGroupItems(group, sidebarPlaylists).map((item, index) => renderPlaylistRow(item as Playlist, index, group.id))}</section>)}{renderDropZone(0, 'playlist')}{ungroupedSidebarPlaylists.map((playlist, index) => <div key={playlist.id}>{renderPlaylistRow(playlist, index)}{renderDropZone(index + 1, 'playlist')}</div>)}</div>
       <form className="new-playlist" onSubmit={createPlaylist}><input value={playlistName} onChange={(event) => setPlaylistName(event.target.value)} placeholder="Neue Playlist" /><button type="submit" disabled={!playlistName.trim()}>+</button></form></>}
       <div className="sidebar-heading collapsible-heading tag-heading" onClick={() => setTagsCollapsed((value) => !value)}><span className="heading-label"><b className="section-chevron">{tagsCollapsed ? '▸' : '▾'}</b> Tags</span><button className="overflow-button small-overflow" type="button" onClick={(event) => { event.stopPropagation(); setOverflowMenu({ kind: 'tags' }) }}>•••</button>{tagEditMode && <button className="finish-inline" type="button" onClick={(event) => { event.stopPropagation(); finishReorder() }}>Fertig</button>}</div>
-      {!tagsCollapsed && <><div className="tag-nav">{renderDropZone(0, 'tag')}{sidebarTags.map((tag, index) => <div className="playlist-nav-row tag-nav-row" key={tag.id}>{tagEditMode && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'tag', id: tag.id, targetIndex: null })}>↕</button>}<button className={`nav-item${activeTagId === tag.id && view === 'tag' ? ' active' : ''}`} type="button" onClick={() => void openTag(tag.id)} disabled={tagEditMode}><span className="tag-nav-name"><i className="tag-dot" style={{ background: tag.color }} /><span>{tag.name}</span></span><strong>{tag.songIds.filter((id) => songs.some((song) => song.id === id)).length}</strong></button><button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'tag', id: tag.id })}>•••</button>{renderDropZone(index + 1, 'tag')}</div>)}</div><form className="new-playlist new-tag" onSubmit={createTag}><input value={tagName} onChange={(event) => setTagName(event.target.value)} placeholder="Neuer Tag" /><div className="tag-color-picker-wrap"><button className="tag-color-trigger" type="button" style={{ background: tagColor }} onClick={() => setTagColorPickerOpen((value) => !value)} aria-label="Tag-Farbe wählen" />{tagColorPickerOpen && <div className="tag-color-popover">{renderTagColorPalette(tagColor, (color) => { setTagColor(color); setTagColorPickerOpen(false) })}</div>}</div><button type="submit" disabled={!tagName.trim()}>+</button></form></>}
+      {!tagsCollapsed && <><div className="tag-nav grouped-sidebar-list">{tagGroups.map((group) => <section className="object-group sidebar-object-group" key={group.id}>{renderGroupHeader(group, sidebarTags)}{orderedGroupItems(group, sidebarTags).map((item, index) => renderTagRow(item as Tag, index, group.id))}</section>)}{renderDropZone(0, 'tag')}{ungroupedSidebarTags.map((tag, index) => <div key={tag.id}>{renderTagRow(tag, index)}{renderDropZone(index + 1, 'tag')}</div>)}</div><form className="new-playlist new-tag" onSubmit={createTag}><input value={tagName} onChange={(event) => setTagName(event.target.value)} placeholder="Neuer Tag" /><div className="tag-color-picker-wrap rainbow-ring"><button className="tag-color-trigger" type="button" style={{ background: tagColor }} onClick={() => setColorPickerTarget('create')} aria-label="Tag-Farbe wählen" /></div><button type="submit" disabled={!tagName.trim()}>+</button></form></>}
     </aside>
 
     <section className="library-panel"><div className={`library-heading${activePlaylist ? ' playlist-heading' : ''}`}>
@@ -1311,15 +1461,15 @@ function App() {
       {trashedTags.map((tag) => <article className="trash-item" key={`trash-tag-${tag.id}`}><div><small>TAG</small><strong><i className="tag-dot" style={{ background: tag.color }} /> {tag.name}</strong><span>{tag.trashedAt ? formatDate(tag.trashedAt) : ''}</span></div><button type="button" onClick={() => void restoreTrashedTag(tag)}>Wiederherstellen</button></article>)}
       {songs.filter((song) => song.trashedLoop).map((song) => <article className="trash-item" key={`trash-loop-${song.id}`}><div><small>LOOP</small><strong>{song.name}</strong><span>{song.trashedLoop ? `${formatPrecise(song.trashedLoop.start)} – ${formatPrecise(song.trashedLoop.end)}` : ''}</span></div><button type="button" onClick={() => void restoreTrashedLoop(song)}>Wiederherstellen</button></article>)}
       {!trashCount && <div className="empty-state trash-empty"><div className="empty-icon">⌫</div><h2>Der Papierkorb ist leer.</h2></div>}
-    </div> : visibleSongs.length ? <div className="song-list">{bulkMoveMode ? renderBulkMoveDropZone(0) : renderDropZone(0, 'song')}{visibleSongs.map((song, index) => <div key={song.id} className={`song-row${song.isNew ? ' new-import' : ''}${index > 0 && !song.isNew && visibleSongs[index - 1]?.isNew ? ' new-group-break' : ''}${selectedSongIds.has(song.id) ? ' selected-song' : ''}`}>{songEditMode && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'song', id: song.id, targetIndex: null })}>↕</button>}{selectionMode && <button className="selection-check" type="button" onClick={() => toggleSelected(song.id)}>{selectedSongIds.has(song.id) ? '✓' : ''}</button>}<button className="song-main" type="button" onClick={() => playSong(song.id)} disabled={songEditMode}><span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span><span className="song-copy"><strong>{song.name}</strong><small className="song-subline"><span className="song-tag-dots">{songTags(song.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} title={tag.name} />)}</span><span>{view === 'history' ? formatDate(song.addedAt) : membershipText(song.id)}</span></small></span><span className="song-meta"><small>{!song.file || song.file.size === 0 ? 'FEHLT' : formatTime(song.duration)}</small>{song.loopStart !== undefined && song.loopEnd !== undefined && <span className="loop-badge">↻</span>}</span></button><button className="overflow-button song-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'song', id: song.id })}>•••</button>{activePlaylist && view === 'library' && !selectionMode && !songEditMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActivePlaylist(song.id)}>Entfernen</button>}{activeTag && view === 'tag' && !selectionMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActiveTag(song.id)}>Entfernen</button>}{bulkMoveMode ? renderBulkMoveDropZone(index + 1) : renderDropZone(index + 1, 'song')}</div>)}</div> : <div className="empty-state"><div className="empty-icon">♫</div><h2>{view === 'library' && searchQuery.trim() ? 'Keine Treffer.' : view === 'loops' ? 'Noch keine Loops gespeichert.' : view === 'history' ? 'Keine neuen Importe.' : 'Noch keine Musik hier.'}</h2></div>}
+    </div> : visibleSongs.length ? <div className="song-list grouped-song-list">{songGroups.map((group) => <section className="object-group song-object-group" key={group.id}>{renderGroupHeader(group, visibleSongs)}{orderedGroupItems(group, visibleSongs).map((item, index) => renderSongRow(item as Song, index, group.id))}</section>)}{bulkMoveMode ? renderBulkMoveDropZone(0) : renderDropZone(0, 'song')}{ungroupedVisibleSongs.map((song, index) => <div key={song.id}>{renderSongRow(song, index)}{bulkMoveMode ? renderBulkMoveDropZone(index + 1) : renderDropZone(index + 1, 'song')}</div>)}</div> : <div className="empty-state"><div className="empty-icon">♫</div><h2>{view === 'library' && searchQuery.trim() ? 'Keine Treffer.' : view === 'loops' ? 'Noch keine Loops gespeichert.' : view === 'history' ? 'Keine neuen Importe.' : 'Noch keine Musik hier.'}</h2></div>}
     </section></main>}
 
-    {view === 'playlistOverview' && <section className="playlist-overview"><div className="playlist-overview-heading"><p className="eyebrow">DEINE MUSIK</p><h1>Playlists</h1><p>{playlists.length} Playlists</p></div><div className="playlist-grid">{sidebarPlaylists.map((playlist) => <div className="playlist-card-wrap" key={playlist.id}><button className="playlist-card" type="button" onClick={() => void openPlaylist(playlist.id)}><span className="playlist-card-cover">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : '♫'}</span><strong><span className="card-tag-dots">{playlistTags(playlist.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} />)}</span>{playlist.name}</strong><small>{playlist.songIds.length} {playlist.songIds.length === 1 ? 'Lied' : 'Lieder'}</small></button><button className="overflow-button card-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id })}>•••</button></div>)}</div></section>}
+    {view === 'playlistOverview' && <section className="playlist-overview"><div className="playlist-overview-heading"><p className="eyebrow">DEINE MUSIK</p><h1>Playlists</h1><p>{playlists.length} Playlists</p></div>{playlistGroups.map((group) => <section className="object-group overview-object-group" key={group.id}>{renderGroupHeader(group, sidebarPlaylists)}<div className="playlist-grid">{orderedGroupItems(group, sidebarPlaylists).map((item) => renderPlaylistCard(item as Playlist))}</div></section>)}<div className="playlist-grid">{ungroupedSidebarPlaylists.map(renderPlaylistCard)}</div></section>}
 
     <section className={`player${currentSong ? ' visible' : ''}`}><audio ref={audioRef} src={currentUrl ?? undefined} playsInline preload="auto" onTimeUpdate={(event) => handleAudioTimeUpdate(event.currentTarget)} onLoadedMetadata={(event) => { const value = event.currentTarget.duration; setDuration(value); if (currentSong && Number.isFinite(value) && (!currentSong.duration || Math.abs(currentSong.duration - value) > .5)) void updateSong({ ...currentSong, duration: value }) }} onPlay={() => { playbackAudioRef.current ??= audioRef.current; setIsPlaying(true) }} onPause={() => requestAnimationFrame(updatePlayingState)} onError={() => currentSong && setMessage(`„${currentSong.name}“ kann aus dem lokalen Speicher nicht geladen werden.`)} onEnded={(event) => handleAudioEnded(event.currentTarget)} /><audio ref={overlapAudioRef} src={currentUrl ?? undefined} playsInline preload="auto" onTimeUpdate={(event) => handleAudioTimeUpdate(event.currentTarget)} onPlay={() => setIsPlaying(true)} onPause={() => requestAnimationFrame(updatePlayingState)} onEnded={(event) => handleAudioEnded(event.currentTarget)} />
       <button className="now-playing" type="button" onClick={() => currentSong && navigateTo({ view, playlistId: activePlaylistId, tagId: activeTagId, detailOpen: true })} disabled={!currentSong}><span className="cover-placeholder">♫</span><span className="now-playing-copy"><small>JETZT</small><span className="marquee"><strong>{currentSong?.name ?? 'Kein Song ausgewählt'}</strong></span></span></button>
       <div className="transport"><div className="transport-buttons"><button className={shuffle ? 'active-control' : ''} onClick={() => setShuffle((value) => !value)} aria-label="Shuffle">⇄</button><button onClick={() => moveSong(-1)} aria-label="Vorheriges Lied">⏮</button><button onClick={() => skipSeconds(-seekSeconds)} aria-label={`${seekSeconds} Sekunden zurück`}>⏪</button><button className="play-button" onClick={togglePlayback}>{isPlaying ? '❚❚' : '▶'}</button><button onClick={() => skipSeconds(seekSeconds)} aria-label={`${seekSeconds} Sekunden vor`}>⏩</button><button onClick={() => moveSong(1)} aria-label="Nächstes Lied">⏭</button><button className={repeatQueue || repeatSetting ? 'active-control repeat-control' : 'repeat-control'} onPointerDown={beginRepeatHold} onPointerUp={endRepeatHold} onPointerCancel={endRepeatHold} onContextMenu={(event) => event.preventDefault()} onClick={handleRepeatClick} aria-label={repeatBadge ? `Wiederholung ${repeatBadge}` : 'Liste wiederholen'}><span className="repeat-symbol">↻{repeatBadge && <b>{repeatBadge}</b>}</span></button></div><div className="progress-row"><span>{formatTime(currentTime)}</span><input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} /><span>{formatTime(duration)}</span></div></div>
-      <div className={`quick-playlists${selectionMode ? ' selection-tools' : ''}`}><button className="all-playlists-button" type="button" onClick={() => setPlaylistChooserMode(selectionMode ? 'bulk' : 'current')} disabled={selectionMode ? !selectedSongIds.size : !currentSong}><span>Alle Playlists</span><strong>›</strong></button>{selectionMode && <div className="selection-more-wrap"><button className="selection-more-button" type="button" onClick={() => setSelectionMenuOpen((value) => !value)} aria-label="Weitere Auswahlaktionen">•••</button>{selectionMenuOpen && <><button className="selection-menu-shield" type="button" onClick={() => setSelectionMenuOpen(false)} /><div className="selection-action-menu"><button type="button" disabled>Gruppieren</button><button type="button" onClick={beginSelectedMove} disabled={!selectedSongIds.size || view !== 'library'}>Bewegen</button><button type="button" onClick={() => openTagChooser('song', [...selectedSongIds])} disabled={!selectedSongIds.size}>Tags</button><button className="danger-menu-action" type="button" onClick={() => { setSelectionMenuOpen(false); setSelectionConfirmation('deleteSelected') }} disabled={!selectedSongIds.size}>Alle löschen</button></div></>}</div>}</div>
+      <div className={`quick-playlists${selectionMode ? ' selection-tools' : ''}`}><button className="all-playlists-button" type="button" onClick={() => setPlaylistChooserMode(selectionMode ? 'bulk' : 'current')} disabled={selectionMode ? !selectedSongIds.size : !currentSong}><span>Alle Playlists</span><strong>›</strong></button>{selectionMode && <div className="selection-more-wrap"><button className="selection-more-button" type="button" onClick={() => setSelectionMenuOpen((value) => !value)} aria-label="Weitere Auswahlaktionen">•••</button>{selectionMenuOpen && <><button className="selection-menu-shield" type="button" onClick={() => setSelectionMenuOpen(false)} /><div className="selection-action-menu"><button type="button" onClick={() => createObjectGroup('song', [...selectedSongIds])} disabled={selectedSongIds.size < 2}>Gruppieren</button><button type="button" onClick={beginSelectedMove} disabled={!selectedSongIds.size || view !== 'library'}>Bewegen</button><button type="button" onClick={() => openTagChooser('song', [...selectedSongIds])} disabled={!selectedSongIds.size}>Tags</button><button className="danger-menu-action" type="button" onClick={() => { setSelectionMenuOpen(false); setSelectionConfirmation('deleteSelected') }} disabled={!selectedSongIds.size}>Alle löschen</button></div></>}</div>}</div>
     </section>
 
     {detailOpen && currentSong && <section className="song-detail"><div className="detail-topbar"><button type="button" onClick={navigateBack}>‹ Zurück</button><button className="overflow-button detail-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'songDetail', id: currentSong.id })} aria-label="Weitere Liedaktionen">•••</button></div><div className="detail-content"><p className="detail-label">JETZT</p><h2>{currentSong.name}</h2><div className="tag-membership-detail"><span>TAGS</span><strong>{currentSongTags.length ? currentSongTags.map((tag) => <span className="detail-tag-chip" key={tag.id}><i className="tag-dot" style={{ background: tag.color }} />{tag.name}</span>) : 'Keine Tags'}</strong></div><div className="playlist-membership"><span>IN PLAYLISTS</span><strong>{currentSongPlaylists.length ? currentSongPlaylists.map((playlist) => playlist.name).join(' · ') : 'In keiner Playlist'}</strong></div><div className="detail-progress"><input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} /><div><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div></div><div className="detail-controls detail-controls-expanded"><button className={shuffle ? 'active-control' : ''} onClick={() => setShuffle((value) => !value)} aria-label="Shuffle">⇄</button><button onClick={playPreviousFromHistory} disabled={!playHistory.length}>⏮</button><button onClick={() => skipSeconds(-seekSeconds)}>↶<small>{seekSeconds}</small></button><button className="detail-play" onClick={togglePlayback}>{isPlaying ? '❚❚' : '▶'}</button><button onClick={() => skipSeconds(seekSeconds)}>↷<small>{seekSeconds}</small></button><button onClick={() => moveSong(1)}>⏭</button><button className={repeatQueue || repeatSetting ? 'active-control repeat-control' : 'repeat-control'} onPointerDown={beginRepeatHold} onPointerUp={endRepeatHold} onPointerCancel={endRepeatHold} onContextMenu={(event) => event.preventDefault()} onClick={handleRepeatClick} aria-label={repeatBadge ? `Wiederholung ${repeatBadge}` : 'Liste wiederholen'}><span className="repeat-symbol">↻{repeatBadge && <b>{repeatBadge}</b>}</span></button></div><div className="loop-panel"><div><span className="loop-panel-label">LOOP</span><h3>{currentSong.loopStart !== undefined && currentSong.loopEnd !== undefined ? `${formatTime(currentSong.loopStart)} – ${formatTime(currentSong.loopEnd)}` : 'Noch kein Loop'}</h3><p>Den Bereich legst du präzise im Loop-Editor fest.</p></div><div className="loop-actions"><button type="button" onClick={() => openLoopEditor(currentSong.id)}>{currentSong.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{currentSong.loopStart !== undefined && currentSong.loopEnd !== undefined && <><button className={currentSong.loopEnabled ? 'loop-active' : ''} type="button" onClick={() => void toggleCurrentLoop()}>{currentSong.loopEnabled ? 'Loop aktiv' : 'Loop aktivieren'}</button><button className="danger-button" type="button" onClick={() => setLoopConfirmation('delete')}>Loop entfernen</button></>}</div></div></div></section>}
@@ -1367,10 +1517,15 @@ function App() {
 
     {playlistChooserMode && <div className="playlist-chooser-backdrop" onMouseDown={() => setPlaylistChooserMode(null)}><section className="playlist-chooser" onMouseDown={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">PLAYLISTS</p><h2>{playlistChooserMode === 'bulk' ? `${selectedSongIds.size} Lieder zuordnen` : 'Alle Playlists'}</h2></div><button type="button" onClick={() => setPlaylistChooserMode(null)}>×</button></div><div className="playlist-groups">{groupedPlaylists.map(([group, items]) => <div className="playlist-group" key={group}><strong>{group}</strong><div>{items.map((playlist) => { const contains = currentSong ? playlist.songIds.includes(currentSong.id) : false; return <button key={playlist.id} type="button" onClick={() => playlistChooserMode === 'bulk' ? void assignSelectedToPlaylist(playlist) : void toggleCurrentInPlaylist(playlist)}><span>{playlist.name}</span>{playlistChooserMode === 'current' && <b>{contains ? '−' : '+'}</b>}</button> })}</div></div>)}</div></section></div>}
 
-    {overflowMenu && <><button className="menu-shield" type="button" onClick={() => setOverflowMenu(null)} /><div className="overflow-menu">{overflowMenu.kind === 'playlists' && <><button type="button" onClick={() => beginReorder('sidebar')}>Bearbeiten</button><button type="button" onClick={() => { setOverflowMenu(null); navigateTo({ view: 'playlistOverview', playlistId: activePlaylistId, detailOpen: false }) }}>Übersicht</button></>}{overflowMenu.kind === 'tags' && <button type="button" onClick={() => beginReorder('tags')}>Bearbeiten</button>}{overflowMenu.kind === 'tag' && overflowMenu.id && (() => { const tag = tags.find((item) => item.id === overflowMenu.id); if (!tag) return null; return <><button type="button" onClick={() => beginRename('tag', tag.id)}>Umbenennen</button><button type="button" onClick={() => { setOverflowMenu(null); setSidebarSortTarget('tags') }}>Sortieren</button><button className="danger-menu-action" type="button" onClick={() => { setTagToDelete(tag); setOverflowMenu(null) }}>Löschen</button></> })()}{overflowMenu.kind === 'song' && overflowMenu.id && (() => { const song = songs.find((item) => item.id === overflowMenu.id); if (!song) return null; return <><button type="button" onClick={() => beginRename('song', song.id)}>Umbenennen</button><button type="button" onClick={() => copySong(song.id)}>Kopieren</button><button type="button" disabled={clipboard?.kind !== 'song'} onClick={pasteFromSongMenu}>Einfügen</button><button type="button" onClick={() => openTagChooser('song', [song.id])}>Tags</button><button type="button" onClick={() => void shareSong(song.id)}>Teilen</button><button type="button" onClick={() => openLoopEditor(song.id)}>{song.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{song.loopStart !== undefined && song.loopEnd !== undefined && <button type="button" onClick={() => void toggleSongLoop(song.id)}>{song.loopEnabled ? 'Loop deaktivieren' : 'Loop aktivieren'}</button>}{song.isNew && <><button className="blue-menu-action" type="button" onClick={() => void markSeen(song.id)}>Als gelesen markieren</button><button className="blue-menu-action" type="button" onClick={() => void markSeen()}>Alle als gelesen markieren</button></>}<button className="danger-menu-action" type="button" onClick={() => { setSongToDelete(song); setOverflowMenu(null) }}>Löschen</button></> })()}{overflowMenu.kind === 'songDetail' && overflowMenu.id && (() => { const song = songs.find((item) => item.id === overflowMenu.id); if (!song) return null; return <><button type="button" onClick={() => beginRename('song', song.id)}>Umbenennen</button><button type="button" onClick={() => copySong(song.id)}>Kopieren</button><button type="button" disabled={clipboard?.kind !== 'song'} onClick={pasteFromSongMenu}>Einfügen</button><button type="button" onClick={() => openTagChooser('song', [song.id])}>Tags</button><button type="button" onClick={() => void shareSong(song.id)}>Teilen</button><button type="button" onClick={() => openLoopEditor(song.id)}>{song.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{song.loopStart !== undefined && song.loopEnd !== undefined && <button type="button" onClick={() => void toggleSongLoop(song.id)}>{song.loopEnabled ? 'Loop deaktivieren' : 'Loop aktivieren'}</button>}<button className="danger-menu-action" type="button" onClick={() => { setSongToDelete(song); setOverflowMenu(null) }}>Löschen</button></> })()}{overflowMenu.kind === 'playlist' && overflowMenu.id && (() => { const playlist = playlists.find((item) => item.id === overflowMenu.id); if (!playlist) return null; return <><button type="button" onClick={() => openPlaylistCoverPicker(playlist.id)}>Bild ändern</button><button type="button" onClick={() => beginRename('playlist', playlist.id)}>Umbenennen</button><button type="button" onClick={() => { setOverflowMenu(null); setSidebarSortTarget('playlists') }}>Sortieren</button><button type="button" onClick={() => copyPlaylist(playlist.id)}>Kopieren</button><button type="button" disabled={!clipboard} onClick={() => pasteFromPlaylistMenu(playlist.id)}>Einfügen</button><button type="button" onClick={() => openTagChooser('playlist', [playlist.id])}>Tags</button><button type="button" onClick={() => void sharePlaylist(playlist.id)}>Teilen</button><button className="danger-menu-action" type="button" onClick={() => { setPlaylistToDelete(playlist); setOverflowMenu(null) }}>Löschen</button></> })()}</div></>}
+    {overflowMenu && <><button className="menu-shield" type="button" onClick={() => setOverflowMenu(null)} /><div className="overflow-menu">{overflowMenu.kind === 'group' && overflowMenu.id && (() => { const group = objectGroups.find((item) => item.id === overflowMenu.id); if (!group) return null; return <>{group.kind === 'song' && <button type="button" onClick={() => playObjectGroup(group)}>Gruppe abspielen</button>}<button type="button" onClick={() => openGroupRename(group)}>Gruppe umbenennen</button><button type="button" onClick={() => { setGroupSortId(group.id); setOverflowMenu(null) }}>Sortieren</button><button type="button" onClick={() => { setGroupReorderId(group.id); setGroupMoveId(null); setOverflowMenu(null) }}>Reihenfolge ändern</button><button type="button" onClick={() => { setGroupMoveId(group.id); setGroupReorderId(null); setOverflowMenu(null) }}>Gruppe bewegen</button><button type="button" onClick={() => { setGroupMembershipTarget({ groupId: group.id, mode: 'add' }); setOverflowMenu(null) }}>Objekte hinzufügen</button><button type="button" onClick={() => { setGroupMembershipTarget({ groupId: group.id, mode: 'remove' }); setOverflowMenu(null) }}>Objekte entfernen</button><button className="danger-menu-action" type="button" onClick={() => dissolveGroup(group.id)}>Gruppe auflösen</button></> })()}{overflowMenu.kind === 'playlists' && <><button type="button" onClick={() => startSidebarSelection('playlist')}>Auswählen</button><button type="button" onClick={() => beginReorder('sidebar')}>Bearbeiten</button><button type="button" onClick={() => { setOverflowMenu(null); navigateTo({ view: 'playlistOverview', playlistId: activePlaylistId, detailOpen: false }) }}>Übersicht</button></>}{overflowMenu.kind === 'tags' && <><button type="button" onClick={() => startSidebarSelection('tag')}>Auswählen</button><button type="button" onClick={() => beginReorder('tags')}>Bearbeiten</button></>}{overflowMenu.kind === 'tag' && overflowMenu.id && (() => { const tag = tags.find((item) => item.id === overflowMenu.id); if (!tag) return null; return <><button type="button" onClick={() => beginRename('tag', tag.id)}>Umbenennen</button><button type="button" onClick={() => { setOverflowMenu(null); setSidebarSortTarget('tags') }}>Sortieren</button><button className="danger-menu-action" type="button" onClick={() => { setTagToDelete(tag); setOverflowMenu(null) }}>Löschen</button></> })()}{overflowMenu.kind === 'song' && overflowMenu.id && (() => { const song = songs.find((item) => item.id === overflowMenu.id); if (!song) return null; return <><button type="button" onClick={() => beginRename('song', song.id)}>Umbenennen</button><button type="button" onClick={() => copySong(song.id)}>Kopieren</button><button type="button" disabled={clipboard?.kind !== 'song'} onClick={pasteFromSongMenu}>Einfügen</button><button type="button" onClick={() => openTagChooser('song', [song.id])}>Tags</button><button type="button" onClick={() => void shareSong(song.id)}>Teilen</button><button type="button" onClick={() => openLoopEditor(song.id)}>{song.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{song.loopStart !== undefined && song.loopEnd !== undefined && <button type="button" onClick={() => void toggleSongLoop(song.id)}>{song.loopEnabled ? 'Loop deaktivieren' : 'Loop aktivieren'}</button>}{song.isNew && <><button className="blue-menu-action" type="button" onClick={() => void markSeen(song.id)}>Als gelesen markieren</button><button className="blue-menu-action" type="button" onClick={() => void markSeen()}>Alle als gelesen markieren</button></>}<button className="danger-menu-action" type="button" onClick={() => { setSongToDelete(song); setOverflowMenu(null) }}>Löschen</button></> })()}{overflowMenu.kind === 'songDetail' && overflowMenu.id && (() => { const song = songs.find((item) => item.id === overflowMenu.id); if (!song) return null; return <><button type="button" onClick={() => beginRename('song', song.id)}>Umbenennen</button><button type="button" onClick={() => copySong(song.id)}>Kopieren</button><button type="button" disabled={clipboard?.kind !== 'song'} onClick={pasteFromSongMenu}>Einfügen</button><button type="button" onClick={() => openTagChooser('song', [song.id])}>Tags</button><button type="button" onClick={() => void shareSong(song.id)}>Teilen</button><button type="button" onClick={() => openLoopEditor(song.id)}>{song.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{song.loopStart !== undefined && song.loopEnd !== undefined && <button type="button" onClick={() => void toggleSongLoop(song.id)}>{song.loopEnabled ? 'Loop deaktivieren' : 'Loop aktivieren'}</button>}<button className="danger-menu-action" type="button" onClick={() => { setSongToDelete(song); setOverflowMenu(null) }}>Löschen</button></> })()}{overflowMenu.kind === 'playlist' && overflowMenu.id && (() => { const playlist = playlists.find((item) => item.id === overflowMenu.id); if (!playlist) return null; return <><button type="button" onClick={() => openPlaylistCoverPicker(playlist.id)}>Bild ändern</button><button type="button" onClick={() => beginRename('playlist', playlist.id)}>Umbenennen</button><button type="button" onClick={() => { setOverflowMenu(null); setSidebarSortTarget('playlists') }}>Sortieren</button><button type="button" onClick={() => copyPlaylist(playlist.id)}>Kopieren</button><button type="button" disabled={!clipboard} onClick={() => pasteFromPlaylistMenu(playlist.id)}>Einfügen</button><button type="button" onClick={() => openTagChooser('playlist', [playlist.id])}>Tags</button><button type="button" onClick={() => void sharePlaylist(playlist.id)}>Teilen</button><button className="danger-menu-action" type="button" onClick={() => { setPlaylistToDelete(playlist); setOverflowMenu(null) }}>Löschen</button></> })()}</div></>}
 
     {tagChooserTarget && <div className="playlist-chooser-backdrop tag-chooser-backdrop" onMouseDown={() => setTagChooserTarget(null)}><section className="playlist-chooser tag-chooser" onMouseDown={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">TAGS</p><h2>{tagChooserTarget.kind === 'song' ? `${tagChooserTarget.ids.length} ${tagChooserTarget.ids.length === 1 ? 'Lied' : 'Lieder'}` : `${tagChooserTarget.ids.length} ${tagChooserTarget.ids.length === 1 ? 'Playlist' : 'Playlists'}`} taggen</h2></div><button type="button" onClick={() => setTagChooserTarget(null)}>×</button></div><div className="tag-chooser-list">{sidebarTags.map((tag) => { const ids = tagChooserTarget.kind === 'song' ? tag.songIds : tag.playlistIds; const all = tagChooserTarget.ids.every((id) => ids.includes(id)); const some = !all && tagChooserTarget.ids.some((id) => ids.includes(id)); return <button key={tag.id} type="button" onClick={() => void toggleTargetTag(tag)}><span><i className="tag-dot" style={{ background: tag.color }} /><b>{tag.name}</b></span><small>{tag.songIds.filter((id) => songs.some((song) => song.id === id)).length} Lieder</small><strong>{all ? '−' : some ? '±' : '+'}</strong></button> })}{!sidebarTags.length && <p className="tag-empty-hint">Erstelle zuerst links unter „Tags“ einen Tag.</p>}</div></section></div>}
 
+    {sidebarSelectionKind && <div className="sidebar-selection-dock"><strong>{sidebarSelectionKind === 'playlist' ? selectedPlaylistIds.size : selectedTagIds.size} ausgewählt</strong><button type="button" onClick={stopSidebarSelection}>Abbrechen</button><div className="selection-more-wrap"><button className="selection-more-button" type="button" onClick={() => setSidebarSelectionMenuOpen((value) => !value)}>•••</button>{sidebarSelectionMenuOpen && <><button className="selection-menu-shield" type="button" onClick={() => setSidebarSelectionMenuOpen(false)} /><div className="selection-action-menu sidebar-selection-action-menu"><button type="button" disabled={(sidebarSelectionKind === 'playlist' ? selectedPlaylistIds.size : selectedTagIds.size) < 2} onClick={() => createObjectGroup(sidebarSelectionKind, [...(sidebarSelectionKind === 'playlist' ? selectedPlaylistIds : selectedTagIds)])}>Gruppieren</button></div></>}</div></div>}
+    {groupRenameId && <div className="modal-backdrop" onMouseDown={() => setGroupRenameId(null)}><form className="confirm-dialog rename-dialog" onSubmit={saveGroupRename} onMouseDown={(event) => event.stopPropagation()}><h2>Gruppe umbenennen</h2><input value={groupRenameValue} onChange={(event) => setGroupRenameValue(event.target.value)} autoFocus /><div className="dialog-actions"><button type="button" onClick={() => setGroupRenameId(null)}>Abbrechen</button><button type="submit" disabled={!groupRenameValue.trim()}>Speichern</button></div></form></div>}
+    {groupSortId && (() => { const group = objectGroups.find((item) => item.id === groupSortId); if (!group) return null; const labels = group.kind === 'song' ? sortLabels : group.kind === 'playlist' ? playlistSortLabels : tagSortLabels; return <div className="modal-backdrop" onMouseDown={() => setGroupSortId(null)}><div className="confirm-dialog group-sort-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Gruppe sortieren</h2><div className="sidebar-sort-controls"><select value={group.sortMode} onChange={(event) => updateObjectGroup(group.id, (item) => ({ ...item, sortMode: event.target.value as GroupSortMode }))}><option value="general">Allgemeine Sortierung</option>{(Object.keys(labels) as SortMode[]).map((mode) => <option key={mode} value={mode}>{labels[mode]}</option>)}</select><button type="button" disabled={group.sortMode === 'general' || group.sortMode === 'manual'} onClick={() => updateObjectGroup(group.id, (item) => ({ ...item, sortDirection: item.sortDirection === 'down' ? 'up' : 'down' }))}>{group.sortMode === 'general' || group.sortMode === 'manual' ? '—' : group.sortDirection === 'down' ? '↓' : '↑'}</button></div><p>„Allgemeine Sortierung“ übernimmt automatisch die Sortierung der gesamten Liste.</p><div className="dialog-actions"><button type="button" onClick={() => setGroupSortId(null)}>Fertig</button></div></div></div> })()}
+    {groupMembershipTarget && (() => { const group = objectGroups.find((item) => item.id === groupMembershipTarget.groupId); if (!group) return null; const allItems: Array<Song | Playlist | Tag> = group.kind === 'song' ? songs : group.kind === 'playlist' ? playlists : tags; const candidates = groupMembershipTarget.mode === 'add' ? allItems.filter((item) => !group.itemIds.includes(item.id)) : orderedGroupItems(group, allItems); return <div className="playlist-chooser-backdrop group-membership-backdrop" onMouseDown={() => setGroupMembershipTarget(null)}><section className="playlist-chooser group-membership-dialog" onMouseDown={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">GRUPPE</p><h2>{groupMembershipTarget.mode === 'add' ? 'Objekte hinzufügen' : 'Objekte entfernen'}</h2></div><button type="button" onClick={() => setGroupMembershipTarget(null)}>×</button></div><div className="group-membership-list">{candidates.map((item) => <button type="button" key={item.id} onClick={() => groupMembershipTarget.mode === 'add' ? addItemToGroup(group.id, item.id) : removeItemFromGroup(group.id, item.id)}><span>{item.name}</span><strong>{groupMembershipTarget.mode === 'add' ? '+' : '−'}</strong></button>)}{!candidates.length && <p>Keine passenden Objekte.</p>}</div></section></div> })()}
+    {colorPickerTarget && <ColorSpectrumPicker initialColor={colorPickerTarget === 'create' ? tagColor : renameTagColor} onCancel={() => setColorPickerTarget(null)} onDone={(color) => { if (colorPickerTarget === 'create') setTagColor(color); else setRenameTagColor(color); setColorPickerTarget(null) }} />}
     {repeatMenuOpen && <div className="modal-backdrop repeat-choice-backdrop" onMouseDown={() => setRepeatMenuOpen(false)}><div className="confirm-dialog repeat-choice-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Wiederholung</h2><p>Unendlich wiederholen oder eine feste Anzahl wählen. Bei einem aktiven Loop zählt die Zahl pro Loop-Durchlauf herunter.</p><div className="repeat-choice-options"><button className="repeat-infinity-option" type="button" onClick={chooseInfiniteRepeat}><span>∞</span><strong>Unendlich</strong></button><div className="repeat-count-option"><input type="number" min="1" max="9999" inputMode="numeric" value={repeatCountInput} onChange={(event) => setRepeatCountInput(event.target.value)} aria-label="Anzahl Wiederholungen" /><button type="button" onClick={chooseCountRepeat}>Anwenden</button></div></div><div className="dialog-actions"><button type="button" onClick={() => setRepeatMenuOpen(false)}>Abbrechen</button></div></div></div>}
     {sidebarSortTarget && <div className="modal-backdrop sidebar-sort-backdrop" onMouseDown={() => setSidebarSortTarget(null)}><div className="confirm-dialog sidebar-sort-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>{sidebarSortTarget === 'tags' ? 'Tags sortieren' : 'Playlists sortieren'}</h2><div className="sidebar-sort-controls"><select value={sidebarSortTarget === 'tags' ? tagSortMode : playlistSortMode} onChange={(event) => sidebarSortTarget === 'tags' ? setTagSortMode(event.target.value as SortMode) : setPlaylistSortMode(event.target.value as SortMode)}>{(Object.keys(sidebarSortTarget === 'tags' ? tagSortLabels : playlistSortLabels) as SortMode[]).map((mode) => <option key={mode} value={mode}>{(sidebarSortTarget === 'tags' ? tagSortLabels : playlistSortLabels)[mode]}</option>)}</select><button type="button" disabled={(sidebarSortTarget === 'tags' ? tagSortMode : playlistSortMode) === 'manual'} onClick={() => sidebarSortTarget === 'tags' ? setTagSortDirection((value) => value === 'down' ? 'up' : 'down') : setPlaylistSortDirection((value) => value === 'down' ? 'up' : 'down')}>{(sidebarSortTarget === 'tags' ? tagSortMode : playlistSortMode) === 'manual' ? '—' : (sidebarSortTarget === 'tags' ? tagSortDirection : playlistSortDirection) === 'down' ? '↓' : '↑'}</button></div><p>Die Sortierung wird für diese Seitenleisten-Liste gespeichert. „Manuell“ verwendet die verschiebbare Reihenfolge.</p><div className="dialog-actions"><button type="button" onClick={() => setSidebarSortTarget(null)}>Fertig</button></div></div></div>}
     {duplicateConflict && <div className="modal-backdrop duplicate-conflict-backdrop" onMouseDown={cancelDuplicateConflict}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Gleicher Name bereits vorhanden</h2><p>{duplicateConflict.names.length === 1 ? `„${duplicateConflict.names[0]}“ ist am Ziel bereits vorhanden.` : `${duplicateConflict.names.length} gleichnamige Einträge sind am Ziel bereits vorhanden.`} Was soll Josi tun?</p><div className="dialog-actions duplicate-actions"><button type="button" onClick={cancelDuplicateConflict}>Abbrechen</button><button type="button" onClick={() => resolveDuplicateConflict('both')}>Beide einfügen</button><button type="button" onClick={() => resolveDuplicateConflict('replace')}>Ersetzen</button></div></div></div>}
@@ -1385,7 +1540,7 @@ function App() {
     {settingsOpen && <div className="modal-backdrop settings-backdrop" onMouseDown={() => setSettingsOpen(false)}><div className="confirm-dialog settings-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Einstellungen</h2><div className="settings-row"><div><strong>Spulweite</strong><small>Für ⏪/⏩ und die Detailansicht.</small></div><select value={seekSeconds} onChange={(event) => setSeekSeconds(Number(event.target.value))}>{SEEK_SECOND_OPTIONS.map((value) => <option key={value} value={value}>{value} Sekunden</option>)}</select></div><div className="settings-row settings-info-row"><div><strong>Loop-Übergang</strong><small>Josi überlappt Loop-Ende und Loop-Anfang kurz. Falls der zweite Wiedergabekanal technisch nicht startet, wird lokal nach einem ähnlichen Verbindungspunkt gesucht.</small></div><span className="settings-info-value">Automatisch</span></div><div className="dialog-actions"><button type="button" onClick={() => setSettingsOpen(false)}>Fertig</button></div></div></div>}
     {selectionConfirmation === 'switchManual' && <div className="modal-backdrop selection-confirm-backdrop" onMouseDown={() => setSelectionConfirmation(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Auf „Manuell“ umschalten?</h2><p>Ausgewählte Lieder können nur innerhalb der gespeicherten manuellen Reihenfolge bewegt werden.</p><div className="dialog-actions"><button type="button" onClick={() => setSelectionConfirmation(null)}>Nein</button><button type="button" onClick={() => { setSortMode('manual'); setSelectionConfirmation(null); setBulkMoveMode(true) }}>Ja, umschalten</button></div></div></div>}
     {selectionConfirmation === 'deleteSelected' && <div className="modal-backdrop selection-confirm-backdrop" onMouseDown={() => setSelectionConfirmation(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>{selectedSongIds.size} ausgewählte Lieder löschen?</h2><p>Die ausgewählten Lieder werden in den Papierkorb verschoben und aus allen Playlists entfernt.</p><div className="dialog-actions"><button type="button" onClick={() => setSelectionConfirmation(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void deleteSelectedSongs()}>In Papierkorb</button></div></div></div>}
-    {renameTarget && <div className="modal-backdrop" onMouseDown={() => setRenameTarget(null)}><form className="confirm-dialog rename-dialog" onSubmit={confirmRename} onMouseDown={(event) => event.stopPropagation()}><h2>Umbenennen</h2><input value={renameValue} onChange={(event) => setRenameValue(event.target.value)} autoFocus />{renameTarget.kind === 'tag' && <div className="rename-tag-color"><span>Farbe</span>{renderTagColorPalette(renameTagColor, setRenameTagColor)}</div>}<div className="dialog-actions"><button type="button" onClick={() => setRenameTarget(null)}>Abbrechen</button><button type="submit" disabled={!renameValue.trim()}>Speichern</button></div></form></div>}
+    {renameTarget && <div className="modal-backdrop" onMouseDown={() => setRenameTarget(null)}><form className="confirm-dialog rename-dialog" onSubmit={confirmRename} onMouseDown={(event) => event.stopPropagation()}><h2>Umbenennen</h2><input value={renameValue} onChange={(event) => setRenameValue(event.target.value)} autoFocus />{renameTarget.kind === 'tag' && <div className="rename-tag-color"><span>Farbe</span><div className="tag-color-picker-wrap rainbow-ring"><button className="tag-color-trigger" type="button" style={{ background: renameTagColor }} onClick={() => setColorPickerTarget('rename')} aria-label="Tag-Farbe wählen" /></div></div>}<div className="dialog-actions"><button type="button" onClick={() => setRenameTarget(null)}>Abbrechen</button><button type="submit" disabled={!renameValue.trim()}>Speichern</button></div></form></div>}
     {songToDelete && <div className="modal-backdrop" onMouseDown={() => setSongToDelete(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Lied löschen?</h2><p>„{songToDelete.name}“ wird in den Papierkorb verschoben und aus allen Playlists entfernt. Die Audiodatei bleibt bis zum Leeren des Papierkorbs wiederherstellbar.</p><div className="dialog-actions"><button type="button" onClick={() => setSongToDelete(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void confirmDeleteSong()}>In Papierkorb</button></div></div></div>}
     {playlistToDelete && <div className="modal-backdrop" onMouseDown={() => setPlaylistToDelete(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Playlist löschen?</h2><p>„{playlistToDelete.name}“ wird in den Papierkorb verschoben. Die Musikdateien bleiben erhalten.</p><div className="dialog-actions"><button type="button" onClick={() => setPlaylistToDelete(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void confirmDeletePlaylist()}>In Papierkorb</button></div></div></div>}
   </div>
