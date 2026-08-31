@@ -132,3 +132,74 @@
 .loop-editor-actions button:disabled { opacity: .35; }
 @media (max-width: 1040px) { .loop-editor-commandbar { grid-template-columns: 1fr; } .loop-command-toggles { grid-template-columns: repeat(4, minmax(0,1fr)); } .loop-command-toggles > label { min-width: 0; } .marker-clear-all { min-height: 42px; } .loop-control-grid { grid-template-columns: 1fr 1fr; } .loop-card { grid-column: 1 / -1; } }
 @media (max-width: 720px) { .loop-editor-scroll { padding-left: 10px; padding-right: 10px; } .loop-command-fields > label, .focus-command { width: 100%; justify-content: space-between; } .loop-command-toggles { grid-template-columns: 1fr 1fr; } .loop-editor-title { align-items: flex-start; flex-direction: column; } .loop-timeline { height: 196px; } .loop-control-grid { grid-template-columns: 1fr; } .loop-card, .marker-card { grid-column: auto; } .boundary-preview-row { grid-template-columns: 1fr; } .loop-edge-row { align-items: stretch; flex-direction: column; } .loop-edge-row > div { justify-content: space-between; } .loop-edge-row > label { align-self: center; } }
+
+
+/* Compact refinement after iPad layout testing */
+.loop-command-fields select {
+  min-width: 72px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid #3c4657;
+  border-radius: 8px;
+  background: #090d14;
+  color: #fff;
+}
+.marker-command-actions { display: grid; gap: 5px; }
+.marker-set-top, .marker-clear-all { min-height: 34px; padding: 0 9px; border-radius: 9px; font-size: 11px; }
+.marker-set-top { border: 1px solid rgba(245,158,11,.48); background: rgba(146,64,14,.22); color: #fed7aa !important; cursor: pointer; }
+.marker-set-top:disabled { opacity: .35; }
+.loop-control-grid {
+  grid-template-columns: minmax(150px,.8fr) minmax(190px,1fr) minmax(340px,1.55fr);
+  gap: 8px;
+  margin-top: 12px;
+}
+.editor-control-card { padding: 9px 10px; border-radius: 11px; }
+.editor-control-card header { margin-bottom: 7px; }
+.editor-control-card header span { display: flex; flex-wrap: wrap; align-items: baseline; gap: 5px; font-size: 11px; }
+.editor-control-card header span strong { font-size: 11px; font-variant-numeric: tabular-nums; }
+.focus-card header span strong { color: #86efac; }
+.cursor-card header span strong { color: #93c5fd; }
+.loop-card header span strong { color: #fca5a5; }
+.marker-card header span strong { color: #fdba74; }
+.control-step-row, .loop-edge-row, .marker-location-row { gap: 5px; }
+.control-step-row > button, .loop-edge-row button, .marker-location-row > button, .boundary-preview-row button, .marker-tabs button, .marker-more {
+  min-width: 34px;
+  min-height: 34px;
+  padding: 0 7px;
+  border-radius: 8px;
+}
+.step-select select, .boundary-preview-row select {
+  height: 34px;
+  min-width: 72px;
+  padding: 0 7px;
+  border: 1px solid #3e4858;
+  border-radius: 8px;
+  background: #090d14;
+  color: #fff;
+}
+.cursor-step-row { flex-wrap: nowrap; }
+.cursor-step-row .step-select { margin-left: auto; }
+.mini-play { min-width: 40px !important; }
+.loop-edge-row > div { gap: 4px; }
+.loop-edge-row > div span { min-width: 34px; font-size: 10px; }
+.boundary-preview-row { gap: 6px; margin-top: 7px; }
+.boundary-preview-row label { gap: 4px; }
+.boundary-preview-row button { min-width: 88px; font-size: 10px; }
+.marker-tabs { gap: 5px; margin-bottom: 7px; }
+.marker-location-row { flex-wrap: nowrap; }
+.marker-card { grid-column: 1 / -1; }
+.loop-time-bubble, .loop-cursor em, .loop-marker em, .loop-focus-cursor em { font-size: 9px; }
+.save-loop-confirm { border-color: #b91c1c !important; background: #4b171b !important; color: #fecaca !important; }
+@media (min-width: 821px) and (max-width: 1040px) {
+  .loop-control-grid { grid-template-columns: minmax(145px,.78fr) minmax(185px,.95fr) minmax(330px,1.5fr); }
+  .loop-card { grid-column: auto; }
+}
+@media (max-width: 820px) {
+  .loop-control-grid { grid-template-columns: 1fr 1fr; }
+  .loop-card { grid-column: 1 / -1; }
+}
+@media (max-width: 620px) {
+  .loop-control-grid { grid-template-columns: 1fr; }
+  .loop-card, .marker-card { grid-column: auto; }
+  .cursor-step-row, .marker-location-row { flex-wrap: wrap; }
+}

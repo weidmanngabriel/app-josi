@@ -84,7 +84,7 @@ Alle Songlisten unterstützen `Manuell`, `A–Z Anfang`, `A–Z Ende`, `Anzahl d
 
 Die Loop-Ansicht folgt dem vom Nutzer skizzierten Schnittplatz-Layout. Sie ist eine feste Vollbildansicht mit eigener vertikaler Scrollfläche; die normale App-Seite wird dabei nicht verschoben.
 
-Oben liegt eine kompakte, beim Scrollen sichtbare Steuerleiste mit Zurück/Vor sowie **lokalem Editor-Undo/Redo**. Daneben stehen Eingabefelder für Zoom und Cursor-Geschwindigkeit. `Fokus folgt Cursor` ist dreistufig: Zentrieren, seitenweises Umblättern oder aus. Loop-Kasten, Cursor-Loop und Markierungen werden als Schalter dargestellt. Die erläuternden Begriffe aus der Skizze in Klammern erscheinen nicht als sichtbarer UI-Text.
+Oben liegt eine kompakte, beim Scrollen sichtbare Steuerleiste mit Zurück/Vor sowie **lokalem Editor-Undo/Redo**. Zoom wird über eine Liste von 1× bis 15× gewählt. Die Cursor-Geschwindigkeit wird über 5%, 10%, 25%, 50%, 75%, 100%, 150%, 200%, 500%, 1000% oder 5000% gewählt. `Fokus folgt Cursor` ist dreistufig: Zentrieren, seitenweises Umblättern oder aus. Loop-Kasten, Cursor-Loop und Markierungen werden als Schalter dargestellt. Die erläuternden Begriffe aus der Skizze in Klammern erscheinen nicht als sichtbarer UI-Text.
 
 Die Hauptzeitachse zeigt weiterhin die lokal berechnete Amplituden-Wellenform. Alle visuellen Bereiche sind farblich nach Funktion getrennt:
 
@@ -95,11 +95,11 @@ Die Hauptzeitachse zeigt weiterhin die lokal berechnete Amplituden-Wellenform. A
 
 Cursor, Loop-Start, Loop-Ende, Fokus und Markierungen zeigen direkt an ihren Strichen eine nicht interaktive Zeitangabe. Der blaue Cursor bleibt ausschließlich über seinen Punkt greifbar. Der grüne Fokus ist nur bei ausgeschaltetem automatischem Folgen direkt verschiebbar.
 
-Unter der Zeitachse liegen getrennte Präzisionsbereiche für Fokus-Standort, Cursor-Standort, Loop-Start/-Ende und Markierungen. Fokus, Cursor und Markierungen besitzen jeweils eine frei eingebbare Schrittweite in Sekunden. Loop-Start und Loop-Ende teilen sich die frei eingebbare Kanten-Schrittweite. Vor Start und vor Ende kann mit getrennten Vorlaufwerten abgespielt werden.
+Unter der Zeitachse liegen kompakte Präzisionsbereiche. Fokus und Cursor stehen links, der Loop-Block direkt rechts daneben; Markierungen liegen darunter über die ganze Breite. Direkt hinter jedem Standort steht die Position bis auf Millisekunden. Freie Zahleneingaben wurden durch kompakte Auswahllisten für Schrittweiten ersetzt. Auch Vorlaufwerte sind positive Auswahlen und bedeuten ausschließlich eine Position **vor** Start bzw. Ende.
 
-Markierungen werden als A, B, C usw. angezeigt. Eine ausgewählte Markierung kann über `•••` zum Zoom-Fokus, zum Loop-Anfang oder zum Loop-Ende übertragen, einzeln gelöscht oder zusammen mit allen Markierungen gelöscht werden.
+Markierungen werden als A, B, C usw. angezeigt. Über den globalen Löschknopf steht ein eigener **Markierung setzen**-Knopf. Eine ausgewählte Markierung kann über `•••` zum Zoom-Fokus, zum Loop-Anfang oder zum Loop-Ende übertragen oder einzeln gelöscht werden. Das Löschen aller Markierungen verlangt eine Bestätigung.
 
-Die Audiodatei bleibt beim gesamten Bearbeiten unverändert. `Loop speichern` persistiert weiterhin ausschließlich Start, Ende, Aktivstatus und Marker als Metadaten.
+Die Audiodatei bleibt beim gesamten Bearbeiten unverändert. `Loop speichern` persistiert weiterhin ausschließlich Start, Ende, Aktivstatus und Marker als Metadaten. Sowohl **Loop speichern** als auch **Loop löschen** verlangen vor der Änderung eine Bestätigung.
 
 ## Player-Stabilität bei Song-Metadaten
 
