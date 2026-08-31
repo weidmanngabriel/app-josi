@@ -61,7 +61,7 @@ Dateien, die bereits vor dieser Änderung beschädigt oder leer geworden sind, k
 
 ## Mehrfachauswahl
 
-„Auswählen“ funktioniert in Bibliothek, Playlist, Verlauf und Loops. Mehrere markierte Songs werden ausschließlich über den Kasten **„Alle Playlists“** unten rechts einer Playlist zugeordnet.
+„Auswählen“ funktioniert in Bibliothek, Playlist, Verlauf und Loops. Rechts neben **„Alle Playlists“** erscheint ein runder `•••`-Knopf mit **Gruppieren** (später), **Bewegen**, **Tags** (später) und **Alle löschen**. Bewegen ist nur in Bibliothek bzw. geöffneter Playlist verfügbar und verschiebt die Auswahl als zusammenhängenden Block. Bei einer nicht-manuellen Sortierung fragt Josi, ob auf Manuell umgeschaltet werden soll; Nein bricht die Aktion ab. Alle löschen verlangt eine Sicherheitsabfrage.
 
 ## Sortierung
 
@@ -100,7 +100,7 @@ Kurzer Druck auf den Wiederholen-Knopf schaltet die normale Listenwiederholung. 
 
 Das Speichern oder Umschalten eines Loops darf die zugrunde liegende Audiodatei weder neu laden noch neu in IndexedDB schreiben. Die Audioquelle wird nur dann neu erzeugt, wenn sich der ausgewählte Song oder dessen tatsächlicher Datei-Blob ändert.
 
-Änderungen wie Loop speichern, Loop an/aus, Marker, Dauer oder Umbenennen verändern nur Metadaten. Dadurch bleibt die Wiedergabequelle stabil und die importierte Datei geschützt.
+Änderungen wie Loop speichern, Loop an/aus, Marker, Dauer oder Umbenennen verändern nur Metadaten. Dadurch bleibt die Wiedergabequelle stabil und die importierte Datei geschützt. Für die Loop-Grenze nutzt der Player während der Wiedergabe eine häufige Frame-Prüfung statt ausschließlich `timeupdate`, um die hörbare Pause beim Rücksprung zu verkleinern. Da echtes sample-genaues Gapless-Segment-Looping in Safari-PWAs nicht garantiert ist, gibt es zusätzlich **Loop-Auslauf +1 s**: ein globaler Master-Schalter in den Einstellungen und eine pro Song ein-/ausschaltbare Ausnahme in Detailansicht und `•••`.
 
 ## Teilen
 
@@ -110,7 +110,7 @@ Playlists sind keine einzelne Datei. Deshalb teilt Josi bei Playlists eine Text�
 
 ## Navigation und Bearbeitungsverlauf
 
-Zurück und Vor öffnen vorherige bzw. nächste App-Ansichten. Undo und Redo bleiben rechts daneben. Bei einer vorgemerkten manuellen Verschiebung folgen Haken und X. Im Loop-Editor schließt Zurück zuerst den Editor.
+Ganz links stehen **Home** und **Einstellungen**, danach Zurück/Vor sowie Undo/Redo. Home öffnet von jedem Tab direkt die Bibliothek. Die Einstellungen sind zunächst ein Prototyp für die Spulweite (5/10/15/30/60 Sekunden) und den globalen Loop-Auslauf. Der Hauptplayer zeigt zwischen Shuffle und Wiederholen **⏪ / Play-Pause / ⏩** mit der gewählten Spulweite. In der näheren Song-Ansicht sitzen Shuffle und Wiederholen außen um die bisherigen Transportknöpfe; Langdruck auf Wiederholen nutzt dort ebenfalls `↻1`.
 
 ## Abgrenzung
 

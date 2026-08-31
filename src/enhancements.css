@@ -139,3 +139,36 @@
 /* editor overscroll protection */
 html, body, #root { overscroll-behavior-y: none; }
 .loop-editor { overscroll-behavior: none; }
+
+
+/* Home/settings, selection overflow, settings prototype */
+.history-controls .home-button,
+.history-controls .settings-button { font-size: 20px; }
+.quick-playlists.selection-tools { position: relative; display: flex; align-items: center; gap: 9px; }
+.quick-playlists.selection-tools .all-playlists-button { min-width: 0; flex: 1; }
+.selection-more-wrap { position: relative; flex: 0 0 auto; }
+.selection-more-button { display: grid; place-items: center; width: 48px; height: 48px; padding: 0; border: 1px solid #3b4354; border-radius: 50%; background: #171c27; color: #cbd5e1; font-weight: 900; letter-spacing: 1px; cursor: pointer; }
+.selection-menu-shield { position: fixed; inset: 0; z-index: 158; border: 0; background: transparent; }
+.selection-action-menu { position: absolute; right: 0; bottom: 58px; z-index: 159; display: grid; width: 210px; padding: 6px; border: 1px solid #3b4352; border-radius: 13px; background: #171b24; box-shadow: 0 18px 50px rgba(0,0,0,.5); }
+.selection-action-menu button { min-height: 42px; padding: 0 12px; border: 0; border-radius: 8px; background: transparent; text-align: left; cursor: pointer; }
+.selection-action-menu button:not(:disabled):hover { background: #252a36; }
+.selection-action-menu .danger-menu-action { color: #f87171; }
+.bulk-move-zone { height: 20px; margin: -4px 0; }
+.bulk-move-zone span { top: 8px; height: 3px; background: #a78bfa; box-shadow: 0 0 0 1px rgba(167,139,250,.18); }
+.settings-backdrop, .selection-confirm-backdrop { z-index: 220 !important; }
+.settings-dialog { width: min(520px, calc(100vw - 28px)); }
+.settings-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 15px 0; border-bottom: 1px solid #2b313d; }
+.settings-row > div { display: grid; gap: 4px; min-width: 0; }
+.settings-row small { color: #8d96a6; line-height: 1.35; }
+.settings-row select { min-height: 40px; padding: 0 34px 0 10px; border: 1px solid #3b4352; border-radius: 10px; background: #11161f; color: #fff; }
+.settings-switch { position: relative; flex: 0 0 48px; width: 48px; height: 28px; padding: 0; border: 1px solid #4b5563; border-radius: 999px; background: #242b36; cursor: pointer; }
+.settings-switch i { position: absolute; top: 4px; left: 4px; width: 18px; height: 18px; border-radius: 50%; background: #9ca3af; transition: transform .14s ease; }
+.settings-switch.on { border-color: #ef4444; background: #7f1d1d; }
+.settings-switch.on i { transform: translateX(20px); background: #fff; }
+.loop-actions .loop-tail-active { border-color: #b45309; background: #3b2513; color: #fed7aa; }
+.detail-controls-expanded { flex-wrap: wrap; }
+.detail-controls-expanded .active-control { border-color: #7657d7; background: #2b2148; color: white; }
+@media (max-width: 720px) {
+  .settings-row { align-items: flex-start; flex-direction: column; }
+  .settings-row select { width: 100%; }
+}

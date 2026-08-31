@@ -15,6 +15,7 @@ Ein Song enthält unter anderem ID, Name, Audiodatei als Blob, MIME-Typ, Importz
 - `loopStart`
 - `loopEnd`
 - `loopEnabled`
+- `loopTailEnabled` als optionale Song-Ausnahme für den einsekündigen Loop-Auslauf
 - `loopMarkers` für orange Hilfsmarkierungen im Loop-Editor
 
 ### Audiodatei und Metadaten sind getrennt geschützt
@@ -74,7 +75,7 @@ Die sichere Metadaten-Speicherung prüft bei Undo, ob der Basis-Song noch existi
 
 ## Mehrfachauswahl und Playlist-Zuordnung
 
-Bibliothek, Playlists, Verlauf und Loops verwenden denselben Auswahlmodus. Die Zuordnung erfolgt ausschließlich über „Alle Playlists“ unten rechts. Die Playlist-Liste ist nach Symbolen, Zahlen und danach Buchstaben gruppiert.
+Bibliothek, Playlists, Verlauf und Loops verwenden denselben Auswahlmodus. Rechts neben „Alle Playlists“ liegt im Auswahlmodus ein runder `•••`-Knopf. Er zeigt die reservierten Aktionen Gruppieren und Tags sowie Bewegen und Alle löschen. Gruppieren/Tags bleiben im Prototyp deaktiviert. Bewegen arbeitet nur in Bibliothek bzw. geöffneter Playlist und verschiebt die Auswahl als Block innerhalb der manuellen Reihenfolge. Ist eine andere Sortierung aktiv, fragt Josi vorab nach dem Wechsel auf Manuell; bei Nein wird abgebrochen. Alle löschen verlangt eine Sicherheitsabfrage und entfernt die ausgewählten lokalen Dateien aus allen Playlists.
 
 ## Sortierung
 
@@ -111,7 +112,9 @@ Deshalb hängt die Objekt-URL nur noch von der **Song-ID und dem tatsächlichen 
 
 Ein kurzer Druck auf `↻` schaltet weiterhin die Wiederholung der aktuellen Liste um. Ein Langdruck auf denselben Knopf aktiviert einen Sondermodus mit `↻1`: Ohne Mehrfachauswahl wird der aktuell gewählte Song wiederholt. Mit aktiver Mehrfachauswahl werden die ausgewählten Songs als feste Wiederholgruppe übernommen und anschließend grün in den Listen markiert. Die Gruppe läuft in ihrer Reihenfolge zyklisch weiter; das Symbol bleibt auch bei mehreren Songs `↻1`. Ein normaler kurzer Druck beendet den Sondermodus zunächst vollständig; ein weiterer kurzer Druck kann danach wieder die normale Listenwiederholung einschalten.
 
-Ein einzelnes HTML-Audio-Element übernimmt Wiedergabe, Fortschritt, Systemsteuerung und Loop-Vorschau. Vollständig gehörte Songs werden nur beim natürlichen `ended`-Ereignis gezählt. Media Session wird genutzt, soweit Safari/iPadOS sie bereitstellt.
+Ein einzelnes HTML-Audio-Element übernimmt Wiedergabe, Fortschritt, Systemsteuerung und Loop-Vorschau. Loop-Grenzen werden während laufender Wiedergabe zusätzlich per `requestAnimationFrame` überwacht, statt nur auf das deutlich seltenere `timeupdate` zu warten. Das reduziert die hörbare Verzögerung beim Zurückspringen erheblich, kann auf Safari/iPadOS aber kein sample-genaues Gapless-Segment-Looping garantieren. Als Fallback existiert ein globaler Loop-Auslauf-Master in den Einstellungen: Ist er aktiv, kann ein Song bis eine Sekunde nach dem gesetzten Loop-Ende weiterlaufen, bevor zum Loop-Start gesprungen wird. Pro Song kann dieser Auslauf deaktiviert werden. Vollständig gehörte Songs werden nur beim natürlichen `ended`-Ereignis gezählt. Media Session wird genutzt, soweit Safari/iPadOS sie bereitstellt.
+
+Im Kopfbereich stehen Home und Einstellungen links vor Zurück/Vor. Home öffnet immer die Bibliothek. Die Einstellungen enthalten zunächst die globale Spulweite (5/10/15/30/60 Sekunden) und den Master-Schalter für den Loop-Auslauf. Der Hauptplayer verwendet die konfigurierte Spulweite als ⏪ / Play-Pause / ⏩-Gruppe. Die Song-Detailansicht zeigt Shuffle und Wiederholen außen um ihre bisherigen Transportknöpfe; derselbe Langdruck auf Wiederholen aktiviert dort ebenfalls `↻1`.
 
 ## PWA und Deployment
 
