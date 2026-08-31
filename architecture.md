@@ -82,27 +82,24 @@ Alle Songlisten unterstützen `Manuell`, `A–Z Anfang`, `A–Z Ende`, `Anzahl d
 
 ## Präziser Loop-Editor
 
-Die automatische Loop-Erkennung bleibt entfernt. Der Editor arbeitet mit dem bestehenden HTML-Audio-Element und einer zoombaren Zeitachse.
+Die Loop-Ansicht folgt dem vom Nutzer skizzierten Schnittplatz-Layout. Sie ist eine feste Vollbildansicht mit eigener vertikaler Scrollfläche; die normale App-Seite wird dabei nicht verschoben.
 
-Funktionen:
+Oben liegt eine kompakte, beim Scrollen sichtbare Steuerleiste mit Zurück/Vor sowie **lokalem Editor-Undo/Redo**. Daneben stehen Eingabefelder für Zoom und Cursor-Geschwindigkeit. `Fokus folgt Cursor` ist dreistufig: Zentrieren, seitenweises Umblättern oder aus. Loop-Kasten, Cursor-Loop und Markierungen werden als Schalter dargestellt. Die erläuternden Begriffe aus der Skizze in Klammern erscheinen nicht als sichtbarer UI-Text.
 
-- Zoom von 1× bis 16×; bei Zoom wird die Zeitachse horizontal scrollbar.
-- Klassische Audio-Wellenform als **Amplitude über Zeit**. Dafür wird die Datei beim Öffnen des Editors einmal mit `AudioContext.decodeAudioData()` dekodiert und auf eine begrenzte Zahl von Spitzenwerten reduziert.
-- Die Wellenform ist nur eine Anzeigehilfe. Wenn das Dekodieren für ein Format fehlschlägt, bleibt die normale Wiedergabe vollständig verfügbar; der Editor zeigt dann lediglich keine Wellenform.
-- Roter Loop-Bereich mit verschiebbarem Gesamtfenster und getrennten Start-/Endgriffen.
-- Die roten Kanten besitzen größere Touch-Flächen als ihre sichtbaren Striche, damit sie auf dem iPad leichter getroffen werden.
-- Der zuletzt berührte rote Rand wird hervorgehoben.
-- Die Schrittweite für die Feinkorrektur ist frei in Sekunden eingebbar, z. B. `0,01` für 10 ms, `0,1` für 100 ms oder `1` für eine Sekunde.
-- Der rote Bereich kann gesperrt werden. Dann wird er transparenter und reagiert nicht auf Pointer-Eingaben.
-- Der blaue Abspielcursor ist nur über seinen sichtbaren blauen Punkt interaktiv. Der lange blaue Strich selbst nimmt keine Pointer-Eingaben an und kollidiert dadurch weniger mit Loop-Kanten und Markierungen.
-- Unter der Zeitachse liegt eine zweite grüne Fokus-Leiste. Ihr grüner Strich bestimmt den Mittelpunkt, um den beim Ändern des Zooms zentriert wird.
-- `Fokus folgt Cursor` koppelt den grünen Fokus an den blauen Cursor und hält den Cursor beim Abspielen automatisch im sichtbaren Bereich. Ist der Schalter aus, kann der grüne Fokus unabhängig verschoben werden.
-- `Cursor-Loop` bestimmt getrennt vom gespeicherten Song-Loop, ob die Wiedergabe im geöffneten Editor am Entwurfs-Endpunkt wieder zum Entwurfs-Start springt.
-- Transport im Editor: −5 Sekunden, Play/Pause, +5 Sekunden.
-- Eine hellblaue Geschwindigkeitsbox steuert die Vorschau mit 10%, 25%, 33%, 50%, 66%, 75%, 100%, 150% oder 200%. 100% entspricht `playbackRate = 1`; die übrigen Werte werden als Prozentfaktor davon gesetzt. Außerhalb des Loop-Editors wird immer wieder Normalgeschwindigkeit verwendet.
-- Orange Markierungen können am blauen Cursor gesetzt werden. Markierungen sind anklickbar und springen den Cursor an ihre Position. Die Markierungsfunktion kann ein-/ausgeschaltet werden; gespeicherte Markierungen bleiben im Song erhalten.
-- Ein frei eingebbarer Vorlaufwert in Sekunden (Komma oder Punkt möglich) steuert „vor Start abspielen“ und „vor Ende abspielen“.
-- „Loop speichern“ persistiert Start, Ende, Aktivstatus und Marker ausschließlich als Metadaten.
+Die Hauptzeitachse zeigt weiterhin die lokal berechnete Amplituden-Wellenform. Alle visuellen Bereiche sind farblich nach Funktion getrennt:
+
+- Loop-Kasten, Loop-Start/Ende und zugehörige Kontrollen: leicht rot.
+- Cursor, Cursor-Geschwindigkeit und Cursor-Kontrollen: leicht blau.
+- Fokuslinie und Fokus-Kontrollen: leicht grün.
+- Markierungen und Markierungs-Kontrollen: leicht orange.
+
+Cursor, Loop-Start, Loop-Ende, Fokus und Markierungen zeigen direkt an ihren Strichen eine nicht interaktive Zeitangabe. Der blaue Cursor bleibt ausschließlich über seinen Punkt greifbar. Der grüne Fokus ist nur bei ausgeschaltetem automatischem Folgen direkt verschiebbar.
+
+Unter der Zeitachse liegen getrennte Präzisionsbereiche für Fokus-Standort, Cursor-Standort, Loop-Start/-Ende und Markierungen. Fokus, Cursor und Markierungen besitzen jeweils eine frei eingebbare Schrittweite in Sekunden. Loop-Start und Loop-Ende teilen sich die frei eingebbare Kanten-Schrittweite. Vor Start und vor Ende kann mit getrennten Vorlaufwerten abgespielt werden.
+
+Markierungen werden als A, B, C usw. angezeigt. Eine ausgewählte Markierung kann über `•••` zum Zoom-Fokus, zum Loop-Anfang oder zum Loop-Ende übertragen, einzeln gelöscht oder zusammen mit allen Markierungen gelöscht werden.
+
+Die Audiodatei bleibt beim gesamten Bearbeiten unverändert. `Loop speichern` persistiert weiterhin ausschließlich Start, Ende, Aktivstatus und Marker als Metadaten.
 
 ## Player-Stabilität bei Song-Metadaten
 
@@ -118,7 +115,7 @@ Ein einzelnes HTML-Audio-Element übernimmt Wiedergabe, Fortschritt, Systemsteue
 
 ## PWA und Deployment
 
-`vite-plugin-pwa` erzeugt Manifest und Service Worker. Der Vite-Basispfad bleibt relativ (`./`). `.github/workflows/deploy.yml` baut `main` und veröffentlicht `dist` auf GitHub Pages.
+`vite-plugin-pwa` erzeugt Manifest und Service Worker. Der Vite-Basispfad bleibt relativ (`./`). `.github/workflows/deploy.yml` baut `main` und veröffentlicht `dist` auf GitHub Pages. Der frühere eigene Pull-to-Refresh-Wrapper ist entfernt; `main.tsx` rendert `App` direkt. Dadurch kann vertikales Ziehen/Scrollen nicht mehr absichtlich `window.location.reload()` auslösen. Zusätzlich unterbindet die Oberfläche Scroll-Chaining per `overscroll-behavior`.
 
 ## Grenzen
 

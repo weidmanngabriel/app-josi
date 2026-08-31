@@ -78,35 +78,22 @@ Der Pfeil kehrt die Sortierung um. Die manuelle Reihenfolge bleibt separat gespe
 
 ## Präziser Loop-Editor
 
-`•••` → **Loop erstellen** öffnet eine eigene Vollbildansicht. Die automatische Loop-Erkennung bleibt entfernt.
+`•••` → **Loop erstellen** öffnet den Schnittplatz als feste Vollbildansicht. Das Interface orientiert sich direkt an der vom Nutzer gezeichneten Skizze.
 
-Der Editor enthält:
+Oben stehen Zurück/Vor, Editor-Undo/Redo sowie kompakte Eingabefelder für Zoom und Cursor-Geschwindigkeit. **Fokus folgt Cursor** hat drei Zustände: zentriert folgen, seitenweise weiterblättern oder aus. Loop-Kasten, Cursor-Loop und Markierungen werden mit Schaltern gesteuert. Erläuterungen aus der Skizze, die in Klammern standen, werden nicht als zusätzlicher Text angezeigt.
 
-- einen **roten Loop-Kasten** mit verschiebbarem Gesamtbereich,
-- getrennte rote Start- und Endkanten mit größeren Touch-Flächen,
-- **Zoom von 1× bis 16×** und horizontales Scrollen,
-- eine klassische **Audio-Wellenform** als Amplitude über Zeit,
-- einen **blauen Abspielstrich**, der nur über seinen blauen Punkt bewegt werden kann,
-- einen Schalter, der den roten Loop-Bereich transparent und unbeweglich macht,
-- einen Schalter **„Cursor-Loop“**, der bestimmt, ob die Wiedergabe im Editor am roten Endpunkt wieder zum roten Startpunkt springt,
-- eine zweite **grüne Fokus-Leiste unter der Zeitachse**,
-- einen grünen Fokusstrich, der den Mittelpunkt für den nächsten Zoom bestimmt,
-- einen Schalter **„Fokus folgt Cursor“**: eingeschaltet folgt der grüne Fokus dem blauen Cursor und die sichtbare Zeitleiste bewegt sich beim Abspielen mit; ausgeschaltet kann der Fokus unabhängig gesetzt werden,
-- **−5 s**, **Play/Pause** und **+5 s**,
-- eine leicht bläuliche Geschwindigkeitsbox mit **10%, 25%, 33%, 50%, 66%, 75%, 100%, 150% und 200%**, wobei 100% Normalgeschwindigkeit ist,
-- **orange Markierungen**, die an der Position des blauen Cursors gesetzt werden,
-- anklickbare orange Markierungen, die den blauen Cursor direkt dorthin bringen,
-- einen Schalter zum Aktivieren/Deaktivieren der Markierungsbedienung,
-- ein Eingabefeld für die **Feinschrittweite der zuletzt berührten roten Kante**, z. B. `0,01` = 10 ms, `0,1` = 100 ms oder `1` = eine Sekunde,
-- zwei Knöpfe **− Schritt / + Schritt**, die genau diese eingestellte Schrittweite verwenden,
-- ein Eingabefeld für einen frei wählbaren Vorlauf in Sekunden, z. B. `0,5` oder `1`,
-- **vor Start abspielen** und **vor Ende abspielen**, die den blauen Cursor entsprechend vor die gewünschte rote Kante setzen und die Wiedergabe starten.
+Die Zeitachse verwendet die bestehende Amplituden-Wellenform und vier klare Farbfamilien: Loop leicht rot, Cursor leicht blau, Fokus leicht grün und Markierungen leicht orange. Direkt an den jeweiligen Strichen werden ihre aktuellen Zeiten angezeigt; diese Zahlen sind reine Anzeigen und nicht bedienbar. Der Cursor wird weiterhin nur am blauen Punkt verschoben.
 
-Die Wellenform entspricht dem, was man aus Schnittprogrammen kennt: Sie zeigt nicht die Frequenz in Hertz, sondern die Stärke des Audios über die Zeit. Das macht Einsätze, Pausen und Übergänge leichter sichtbar. Kann die Datei lokal nicht für die Wellenform dekodiert werden, bleibt der Song trotzdem normal abspielbar.
+Unter der Zeitachse gibt es vier Funktionsblöcke:
 
-Das Bedienprinzip priorisiert große, eindeutige Touch-Flächen. Unsichtbare Trefferbereiche dürfen größer als die sichtbaren Striche sein, solange sie sich nicht gegenseitig blockieren. Besonders der blaue Cursor nimmt deshalb entlang seines Strichs keine Eingaben an; nur der blaue Punkt ist greifbar.
+- **Fokus-Standort:** frei einstellbare Schrittweite und links/rechts bewegen.
+- **Cursor-Standort:** frei einstellbare Spulweite, links/rechts sowie Play/Pause.
+- **Loop Start / Loop Ende:** getrennte Start-/Endknöpfe mit gemeinsamer frei einstellbarer Kanten-Schrittweite sowie getrennte Vorlaufwerte für „Vor Start“ und „Vor Ende“.
+- **Markierungen:** A, B, C usw., frei einstellbare Markierungs-Schrittweite und `•••` mit „Zoom hinbewegen“, „Loop-Anfang hinbewegen“, „Loop-Ende hinbewegen“, „Markierung löschen“ und „Alle Markierungen löschen“.
 
-Beim Abspielen innerhalb des Editors springt die Wiedergabe nur dann am Loop-Ende wieder zum Loop-Start, wenn **Cursor-Loop** eingeschaltet ist. **Loop speichern** übernimmt Start, Ende, Marker und aktiviert den gespeicherten Song-Loop. Diese Werte werden nur als Metadaten gespeichert; die Audiodatei selbst bleibt unangetastet. Gespeicherte Loops werden weiterhin mit einer roten Schleife markiert und im Tab **Loops** gesammelt.
+Loop-Kasten sperren, Cursor-Loop, Marker an/aus, Fokus-Modus, Zoom und Geschwindigkeit verändern nur den Editorzustand. **Loop speichern** schreibt weiterhin nur Metadaten und niemals den Audio-Blob.
+
+Der Editor besitzt eine eigene Scrollfläche und die App verwendet keinen selbst gebauten Pull-to-Refresh mehr. Nach oben oder unten scrollen darf deshalb keinen App-Reload auslösen.
 
 ## Wiederholen: Liste oder ausgewählte Songs
 
