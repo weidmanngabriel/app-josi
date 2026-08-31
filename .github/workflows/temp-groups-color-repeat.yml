@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  apply-build-commit:
+  verify-final:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -20,20 +20,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 20
-      - name: Apply product changes
-        run: python .github/scripts/apply-groups-color-repeat.py
+      - name: Clean documentation
+        run: python .github/scripts/cleanup-groups-docs.py
       - name: Install dependencies
         run: npm install
       - name: Build
         run: npm run build
-      - name: Commit checked product changes
+      - name: Commit checked documentation
         run: |
           git config user.name "Josi Build Bot"
           git config user.email "actions@users.noreply.github.com"
-          git add src/App.tsx src/enhancements.css architecture.md concept.md
+          git add architecture.md concept.md
           if git diff --cached --quiet; then
-            echo "No product changes to commit"
+            echo "No documentation changes to commit"
           else
-            git commit -m "Implement object groups and spectrum colors"
+            git commit -m "Update grouping documentation"
             git push origin codex/groups-color-repeat-20260831
           fi
