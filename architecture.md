@@ -29,9 +29,9 @@ Ein vollständiger Song inklusive Blob wird nur geschrieben, wenn noch kein Basi
 
 Diese Trennung ist eine Datenintegritätsmaßnahme für Safari/iPadOS. Sie verhindert insbesondere, dass eine reine Loop-Änderung die lokal gespeicherte Audiodatei erneut schreiben muss.
 
-### Playlists
+### Playlists und Tags
 
-Playlists enthalten ID, Name, geordnete Song-IDs, optionales Bild, Erstellungs-/Nutzungszeit und manuelle Sortierposition. Eine kopierte Playlist erhält eine neue ID, verweist aber auf dieselben Songs; Audiodateien werden dadurch nicht dupliziert.
+Playlists enthalten ID, Name, geordnete Song-IDs, optionales Bild, Erstellungs-/Nutzungszeit und manuelle Sortierposition. Tags liegen ab IndexedDB-Version 3 in einem eigenen `tags`-Store und enthalten Name, Farbe, Song-IDs, Playlist-IDs und eine manuelle Sortierposition. Tags referenzieren ausschließlich vorhandene Objekte und duplizieren niemals Audiodateien. Ein Song oder eine Playlist kann mehrere Tags besitzen; Tags selbst können nicht Mitglied einer Playlist sein.
 
 ## Import und Speicherstabilität
 
@@ -51,18 +51,20 @@ In dieser Reihenfolge:
 
 1. Umbenennen
 2. Kopieren
-3. Teilen
-4. Loop erstellen bzw. Loop bearbeiten
-5. Bei vorhandenem Loop: Loop aktivieren bzw. Loop deaktivieren
-6. Nur bei blau markierten Songs: „Als gelesen markieren“ in Blau
-7. Nur bei blau markierten Songs: „Alle als gelesen markieren“ in Blau
-8. Löschen in Rot
+3. Einfügen
+4. Tags
+5. Teilen
+6. Loop erstellen bzw. Loop bearbeiten
+7. Bei vorhandenem Loop: Loop aktivieren bzw. Loop deaktivieren
+8. Nur bei blau markierten Songs: „Als gelesen markieren“ in Blau
+9. Nur bei blau markierten Songs: „Alle als gelesen markieren“ in Blau
+10. Löschen in Rot
 
 Beim Teilen wird aus dem gespeicherten Blob eine `File` erzeugt und über die Web Share API an die Systemfreigabe übergeben, sofern Browser/iPadOS Dateifreigabe unterstützt. Bei fehlender Unterstützung zeigt Josi eine Meldung.
 
 ### Playlist-Menü
 
-Einzelne Playlists bieten Bild ändern, Umbenennen, Kopieren, Teilen und Löschen. „Teilen“ übergibt eine Textübersicht mit Playlistname und Liedliste an die Systemfreigabe. Der separate Löschknopf in der geöffneten Playlist wurde entfernt; die Bestätigungsabfrage bleibt erhalten.
+Einzelne Playlists bieten Bild ändern, Umbenennen, Kopieren, Einfügen, Tags, Teilen und Löschen. „Teilen“ übergibt eine Textübersicht mit Playlistname und Liedliste an die Systemfreigabe. Der separate Löschknopf in der geöffneten Playlist wurde entfernt; die Bestätigungsabfrage bleibt erhalten.
 
 Das `•••` neben der Überschrift „Playlists“ bleibt für „Bearbeiten“ und „Übersicht“ zuständig.
 
@@ -134,3 +136,14 @@ Im Kopfbereich stehen Home und Einstellungen links vor Zurück/Vor. Home öffnet
 ## Grenzen
 
 IndexedDB und Web Share werden vom Browser/iPadOS kontrolliert. Verlorene lokale Audiodaten können ohne erneuten Import nicht rekonstruiert werden. Dateifreigabe kann je nach Safari-/PWA-Version eingeschränkt sein. Die Wellenform benötigt lokale Dekodierunterstützung für das jeweilige Audioformat. Für eine Produktversion bleiben Backup, Wiederherstellung und gegebenenfalls eine native App-Hülle wichtige Themen.
+
+
+## Josi-Zwischenablage und Namenskonflikte
+
+`Kopieren` legt Songs oder Playlists zunächst nur in eine app-interne Zwischenablage; die eigentliche Kopie entsteht erst über `Einfügen`. Beim Einfügen in die Bibliothek bzw. eine Playlist wird ein neuer Song-Datensatz mit neuer ID angelegt, ohne bestehende Audiodaten neu zu schreiben. Gleichnamige Ziele lösen eine Auswahl `Ersetzen`, `Beide einfügen` oder `Abbrechen` aus. Bei Abbrechen wird der Konflikt als wiederholbare Aktion vorgemerkt; der globale Redo-Pfeil öffnet dieselbe Konfliktprüfung erneut.
+
+## Tags
+
+Playlists und Tags sind getrennte, einklappbare Bereiche in der Seitenleiste. Ein Klick auf die freie Überschriftsfläche klappt den Bereich ein oder aus; interaktive Knöpfe stoppen diese Aktion. Tags besitzen eine eigene in `localStorage` gespeicherte Sortierung mit denselben Modi wie Songlisten; `Dauer` heißt bei Tags `Anzahl der Lieder`, und `Anzahl des Hörens` summiert die vollständigen Wiedergaben der verknüpften Songs. Die manuelle Tag-Reihenfolge kann wie bei Playlists verschoben werden.
+
+Songzeilen zeigen Tags platzsparend nur als farbige Punkte vor der Playlist-Zuordnung. In der Song-Detailansicht erscheinen Punkt und Tagname gemeinsam. Playlists zeigen ihre Tag-Punkte ebenfalls in Navigation und Übersicht. Das Tag-`•••` bei Songs, Playlists und Mehrfachauswahl öffnet eine Mehrfachauswahl der vorhandenen Tags. Wenn innerhalb eines Tags bereits ein gleichnamiger Song bzw. eine gleichnamige Playlist existiert, gilt ebenfalls `Ersetzen`, `Beide einfügen` oder `Abbrechen`. Gelöschte Tags landen wie Songs, Playlists und Loops im Papierkorb.

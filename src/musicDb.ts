@@ -20,6 +20,18 @@ export type Song = {
   trashedLoop?: { deletedAt: number; start: number; end: number; enabled: boolean; markers?: number[] }
 }
 
+export type Tag = {
+  id: string
+  name: string
+  color: string
+  songIds: string[]
+  playlistIds: string[]
+  createdAt: number
+  lastUsedAt: number
+  sortOrder?: number
+  trashedAt?: number
+}
+
 export type Playlist = {
   id: string
   name: string
@@ -34,10 +46,11 @@ export type Playlist = {
 type SongMetadata = Omit<Song, 'file'>
 
 const DB_NAME = 'josi-music'
-const DB_VERSION = 2
+const DB_VERSION = 3
 const SONGS = 'songs'
 const SONG_METADATA = 'songMetadata'
 const PLAYLISTS = 'playlists'
+const TAGS = 'tags'
 
 function withoutFile(song: Song): SongMetadata {
   const { file: _file, ...metadata } = song
@@ -52,6 +65,7 @@ function openDb(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(SONGS)) db.createObjectStore(SONGS, { keyPath: 'id' })
       if (!db.objectStoreNames.contains(SONG_METADATA)) db.createObjectStore(SONG_METADATA, { keyPath: 'id' })
       if (!db.objectStoreNames.contains(PLAYLISTS)) db.createObjectStore(PLAYLISTS, { keyPath: 'id' })
+      if (!db.objectStoreNames.contains(TAGS)) db.createObjectStore(TAGS, { keyPath: 'id' })
     }
     request.onsuccess = () => resolve(request.result)
     request.onerror = () => reject(request.error)
@@ -193,6 +207,42 @@ export async function deletePlaylist(id: string): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(PLAYLISTS, 'readwrite')
     tx.objectStore(PLAYLISTS).delete(id)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+    tx.onabort = () => reject(tx.error)
+  })
+  db.close()
+}
+
+
+async function getAllTags(): Promise<Tag[]> {
+  const db = await openDb()
+  try {
+    const tx = db.transaction(TAGS, 'readonly')
+    return await requestResult(tx.objectStore(TAGS).getAll() as IDBRequest<Tag[]>)
+  } finally { db.close() }
+}
+
+export async function getTags(): Promise<Tag[]> { return (await getAllTags()).filter((tag) => !tag.trashedAt) }
+export async function getTrashedTags(): Promise<Tag[]> { return (await getAllTags()).filter((tag) => Boolean(tag.trashedAt)).sort((a, b) => (b.trashedAt ?? 0) - (a.trashedAt ?? 0)) }
+
+export async function saveTag(tag: Tag): Promise<void> {
+  const db = await openDb()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(TAGS, 'readwrite')
+    tx.objectStore(TAGS).put(tag)
+    tx.oncomplete = () => resolve()
+    tx.onerror = () => reject(tx.error)
+    tx.onabort = () => reject(tx.error)
+  })
+  db.close()
+}
+
+export async function deleteTag(id: string): Promise<void> {
+  const db = await openDb()
+  await new Promise<void>((resolve, reject) => {
+    const tx = db.transaction(TAGS, 'readwrite')
+    tx.objectStore(TAGS).delete(id)
     tx.oncomplete = () => resolve()
     tx.onerror = () => reject(tx.error)
     tx.onabort = () => reject(tx.error)

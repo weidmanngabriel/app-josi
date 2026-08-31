@@ -11,7 +11,8 @@ Der Proof of Concept validiert vor allem **Importieren → organisieren → zuve
 - Mehrere lokale Audiodateien über den normalen Dateidialog importieren.
 - Bibliothek, Importverlauf und eigener Loops-Tab.
 - Neu importierte Songs blau markieren.
-- Songs und Playlists über sichtbare Drei-Punkte-Menüs verwalten.
+- Songs, Playlists und Tags über sichtbare Drei-Punkte-Menüs verwalten.
+- Playlists und Tags in einklappbaren Bereichen der Seitenleiste organisieren.
 - Mehrere Songs auswählen und über „Alle Playlists“ einer Playlist zuordnen.
 - Songlisten nach Manuell, A–Z Anfang, A–Z Ende, Höranzahl, Dauer oder Chronik sortieren.
 - Bibliothek und Playlists per einfacher Zeichenfolgen-Suche durchsuchen.
@@ -26,14 +27,16 @@ Die Aktionen stehen in dieser Reihenfolge:
 
 1. **Umbenennen**
 2. **Kopieren**
-3. **Teilen**
-4. **Loop erstellen** bzw. **Loop bearbeiten**
-5. Bei vorhandenem Loop: **Loop aktivieren** bzw. **Loop deaktivieren**
-6. Nur bei blau markierten Songs in blauer Schrift: **Als gelesen markieren**
-7. Nur bei blau markierten Songs in blauer Schrift: **Alle als gelesen markieren**
-8. In roter Schrift: **Löschen**
+3. **Einfügen**
+4. **Tags**
+5. **Teilen**
+6. **Loop erstellen** bzw. **Loop bearbeiten**
+7. Bei vorhandenem Loop: **Loop aktivieren** bzw. **Loop deaktivieren**
+8. Nur bei blau markierten Songs in blauer Schrift: **Als gelesen markieren**
+9. Nur bei blau markierten Songs in blauer Schrift: **Alle als gelesen markieren**
+10. In roter Schrift: **Löschen**
 
-„Kopieren“ erstellt einen zweiten Bibliothekseintrag mit eigener ID. „Teilen“ öffnet nach Möglichkeit die iPad-Systemfreigabe mit der Audiodatei. „Löschen“ fragt vorher nach und entfernt den Song anschließend auch aus Playlists, ohne die Playlists selbst zu löschen.
+„Kopieren“ legt das Objekt in die Josi-Zwischenablage; erst „Einfügen“ erstellt den zweiten Eintrag mit eigener ID. „Teilen“ öffnet nach Möglichkeit die iPad-Systemfreigabe mit der Audiodatei. „Löschen“ fragt vorher nach und entfernt den Song anschließend auch aus Playlists, ohne die Playlists selbst zu löschen.
 
 ## Drei-Punkte-Menü für Playlists
 
@@ -42,8 +45,10 @@ Einzelne Playlists bieten:
 1. **Bild ändern**
 2. **Umbenennen**
 3. **Kopieren**
-4. **Teilen**
-5. **Löschen** in Rot
+4. **Einfügen**
+5. **Tags**
+6. **Teilen**
+7. **Löschen** in Rot
 
 Eine kopierte Playlist verweist auf dieselben Songs; Audiodateien werden nicht verdoppelt. Beim Teilen wird eine Textübersicht der Playlist mit ihren Liedern an die Systemfreigabe übergeben.
 
@@ -63,7 +68,7 @@ Dateien, die bereits vor dieser Änderung beschädigt oder leer geworden sind, k
 
 ## Mehrfachauswahl
 
-„Auswählen“ funktioniert in Bibliothek, Playlist, Importverlauf und Loops. Rechts neben **„Alle Playlists“** erscheint ein runder `•••`-Knopf mit **Gruppieren** (später), **Bewegen**, **Tags** (später) und **Alle löschen**. Bewegen ist nur in Bibliothek bzw. geöffneter Playlist verfügbar und verschiebt die Auswahl als zusammenhängenden Block. Bei einer nicht-manuellen Sortierung fragt Josi, ob auf Manuell umgeschaltet werden soll; Nein bricht die Aktion ab. Alle löschen verlangt eine Sicherheitsabfrage.
+„Auswählen“ funktioniert in Bibliothek, Playlist, Importverlauf und Loops. Rechts neben **„Alle Playlists“** erscheint ein runder `•••`-Knopf mit **Gruppieren** (später), **Bewegen**, **Tags** und **Alle löschen**. Tags öffnet die Tag-Auswahl für alle markierten Songs. Bewegen ist nur in Bibliothek bzw. geöffneter Playlist verfügbar und verschiebt die Auswahl als zusammenhängenden Block. Bei einer nicht-manuellen Sortierung fragt Josi, ob auf Manuell umgeschaltet werden soll; Nein bricht die Aktion ab. Alle löschen verlangt eine Sicherheitsabfrage.
 
 ## Suche
 
@@ -88,7 +93,7 @@ Der Pfeil kehrt die Sortierung um. Die manuelle Reihenfolge bleibt separat gespe
 
 ## Papierkorb
 
-Unter Loops gibt es einen Papierkorb. Gelöschte Songs, Playlists und Loops landen zunächst dort und können einzeln wiederhergestellt werden. Bei Songs bleibt die lokale Audiodatei bis zum endgültigen Leeren erhalten. „Papierkorb leeren“ verlangt eine erneute Sicherheitsabfrage und entfernt die dortigen Einträge endgültig.
+Unter Loops gibt es einen Papierkorb. Gelöschte Songs, Playlists, Tags und Loops landen zunächst dort und können einzeln wiederhergestellt werden. Bei Songs bleibt die lokale Audiodatei bis zum endgültigen Leeren erhalten. „Papierkorb leeren“ verlangt eine erneute Sicherheitsabfrage und entfernt die dortigen Einträge endgültig.
 
 ## Präziser Loop-Editor
 
@@ -149,3 +154,12 @@ Der experimentelle Ordnerimport bleibt entfernt.
 - Die vergrößerten Trefferflächen und die getrennte Fokus-Leiste machen den Editor auf Touch-Geräten zuverlässiger bedienbar.
 - Die getrennte Speicherung von Audiodatei und Metadaten verhindert, dass reine Bearbeitungsschritte bestehende Audiodaten erneut schreiben.
 - Für eine spätere Produktversion müssen Backup, Speichergrenzen, Wiederherstellung verlorener Audiodaten und eventuell eine native App-Hülle geprüft werden.
+
+
+## Tags und Einfügen
+
+Tags sind eine zweite Organisationsschicht neben Playlists. Jeder Tag hat einen farbigen Punkt und kann beliebig viele Songs und Playlists enthalten; Tags selbst gehören nie zu Playlists. In normalen Songzeilen werden aus Platzgründen nur die Punkte angezeigt. In der näheren Songansicht stehen Punkt und Tagname zusammen.
+
+Der Tags-Bereich und der Playlists-Bereich lassen sich durch Antippen ihrer freien Überschrift ein- und ausklappen. Tags haben eine eigene gespeicherte Sortierung: Manuell, A–Z Anfang, A–Z Ende, summierte Höranzahl, Anzahl der Lieder und Chronik.
+
+Beim Taggen oder Einfügen eines Objekts mit einem Namen, der am Ziel bereits vorkommt, fragt Josi nach `Ersetzen`, `Beide einfügen` oder `Abbrechen`. Nach Abbrechen kann der Redo-Pfeil denselben Versuch wiederholen und öffnet die Konfliktfrage erneut.
