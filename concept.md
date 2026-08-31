@@ -168,3 +168,20 @@ Beim Taggen oder Einfügen eines Objekts mit einem Namen, der am Ziel bereits vo
 ## Detailansicht und kleine Bedienkorrekturen
 
 Die nähere Songansicht besitzt ein eigenes `•••` mit songbezogenen Aktionen wie Umbenennen, Kopieren/Einfügen, Tags, Teilen und Loop-Funktionen. Listenweite Aktionen wie das Sortieren von Tags oder Playlists werden dort bewusst nicht gezeigt. In der Tag-Zuordnung bedeutet `+` hinzufügen und `−` entfernen; eine teilweise Mehrfachzuordnung bleibt als `±` sichtbar. Home schließt auch aus dem Loop-Editor zuverlässig den Editor und öffnet die Bibliothek.
+
+
+## Gruppen
+
+Mehrere ausgewählte Lieder, Playlists oder Tags können über `••• → Gruppieren` zu einer eigenen Gruppe zusammengefasst werden. Die drei Typen werden nie vermischt, und ein Objekt liegt immer nur in einer Gruppe seines Typs. Neue Gruppen heißen zunächst **Unbenannt**. Gruppen stehen vor allen ungruppierten Objekten; untereinander folgen sie der Sortierung der Gesamtliste.
+
+Die fast weiße Gruppenzeile zeigt Gruppenname, Objektanzahl und Gesamtdauer. Die enthaltenen Objekte liegen auf einem hellgrauen Hintergrund. Das `•••` der Gruppe bietet bei Liedern **Gruppe abspielen** sowie für alle Typen **Gruppe umbenennen**, **Sortieren**, **Reihenfolge ändern**, **Gruppe bewegen**, **Objekte hinzufügen**, **Objekte entfernen** und **Gruppe auflösen**. Die interne Sortierung besitzt zusätzlich **Allgemeine Sortierung**, wodurch die Gruppe automatisch die Sortierung der gesamten Liste übernimmt.
+
+Playlists und Tags erhalten über das `•••` ihrer Überschrift einen Auswahlmodus. Während dieser Auswahl erscheint wie bei Liedern ein eigener Drei-Punkte-Knopf unten rechts, über den gruppiert werden kann.
+
+## Freie Tag-Farbe
+
+Die frühere Palette entfällt. Der Farbkreis öffnet ein großes Spektrum mit praktisch allen Farbtönen von hell bis dunkel. Ein Tippen setzt einen rein visuellen, nicht greifbaren Punkt. **Fertig** übernimmt die Farbe unter dem Punkt in den Kreis; **Abbrechen** verwirft die Auswahl.
+
+## Endliche Wiederholung ohne Loop
+
+Die eingegebene Wiederholungszahl zählt auch bei unbearbeiteten Liedern zuverlässig pro vollständigem Durchlauf herunter. Solange der Restwert größer als 0 ist, startet dasselbe Lied erneut. Erst bei 0 wird zum nächsten Lied gewechselt. Für gespeicherte Loops bleibt dasselbe Prinzip pro Loop-Durchlauf bestehen.

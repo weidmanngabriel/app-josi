@@ -152,3 +152,14 @@ Songzeilen zeigen Tags platzsparend nur als farbige Punkte vor der Playlist-Zuor
 ## Seitenleisten-Sortierung, Detailmenü und Navigation
 
 Die Sortierfelder für Tags und Playlists stehen nicht dauerhaft in der Seitenleiste. Bei einem einzelnen Tag bzw. einer Playlist liegt direkt unter `Umbenennen` die Aktion `Sortieren`; sie öffnet einen kompakten Dialog für Sortiermodus und Richtung. Beide Listen speichern ihre Auswahl separat. Die Song-Detailansicht besitzt ein eigenes `•••` mit nur songbezogenen Aktionen inklusive Tags; globale Listen-Sortierung erscheint dort nicht. `Home` schließt den Loop-Editor explizit, bevor zur Bibliothek navigiert wird, damit ein bereits aktiver Bibliotheks-Navigationseintrag den Editor nicht offen hält.
+
+
+## Objektgruppen und Farbfeld
+
+Lieder, Playlists und Tags können jeweils innerhalb ihres eigenen Typs zu persistenten Objektgruppen zusammengefasst werden. Gruppen sind reine lokale Metadaten in `localStorage` und enthalten ID, Typ, Namen, Objekt-IDs, manuelle Gruppenposition sowie eine interne Sortierung. Audiodateien, Playlist-Inhalte und Tag-Zuordnungen werden dadurch nicht dupliziert. Ein Objekt kann innerhalb seines Typs höchstens einer Gruppe angehören; beim Hinzufügen zu einer anderen Gruppe wird es aus der vorherigen entfernt. Gruppen stehen in der jeweiligen Liste immer vor ungruppierten Objekten und werden untereinander nach der Sortierung der Gesamtliste angeordnet. Innerhalb der Gruppe kann `Allgemeine Sortierung` verwendet werden oder eine eigene Sortierung inklusive manueller Reihenfolge.
+
+Die Gruppenzeile zeigt Name, Anzahl der aktuell dargestellten Objekte und deren Gesamtdauer. Gruppen für Songs können als temporäre Player-Queue abgespielt werden. Weitere Gruppenaktionen sind Umbenennen, Sortieren, Reihenfolge ändern, Gruppe bewegen, Objekte hinzufügen/entfernen und Auflösen. Playlists und Tags besitzen dafür einen eigenen Mehrfachauswahlmodus mit einem schwebenden `•••` unten rechts.
+
+Die Tag-Farbauswahl verwendet keine feste Palette mehr. Ein zweidimensionales Spektrum wird rein im Frontend dargestellt; ein Tippen setzt einen nicht interaktiven Zielpunkt. Erst `Fertig` übernimmt die Farbe unter diesem Punkt, `Abbrechen` verwirft sie.
+
+Die endliche Wiederholung verwendet zusätzlich einen synchronen Restzähler in einem Ref. Dadurch liest insbesondere das native `ended`-Ereignis bei normalen, nicht geloopten Songs immer den aktuellen Wert und startet das Audio zuverlässig neu, bevor nach Erreichen von 0 zum nächsten Song gewechselt wird.
