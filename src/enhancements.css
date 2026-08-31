@@ -185,4 +185,23 @@ html, body, #root { overscroll-behavior-y: none; }
 .player .transport-buttons .play-button { flex-basis:48px; }
 @media (min-width:881px) and (max-width:1100px) { .player { grid-template-columns:minmax(170px,.7fr) minmax(360px,1.25fr) minmax(220px,.9fr); gap:12px; } }
 @media (max-width:620px) { .player .transport-buttons { gap:4px; } .player .transport-buttons button { width:38px; height:38px; flex-basis:38px; } .player .transport-buttons .play-button { width:44px; height:44px; flex-basis:44px; } }
-\n\n/* Import groups, sort menu and Trash */\n.new-count-blue { color:#60a5fa; }\n.song-row.new-group-break { margin-top:22px; position:relative; }\n.song-row.new-group-break::before { content:'WEITERE LIEDER'; position:absolute; left:10px; top:-18px; color:#727d8e; font-size:9px; font-weight:900; letter-spacing:.1em; pointer-events:none; }\n.sort-more-wrap { position:relative; }\n.sort-more-button { width:38px; height:38px; padding:0; border:1px solid #343b49; border-radius:10px; background:#171b24; color:#cbd5e1; font-weight:900; cursor:pointer; }\n.sort-action-menu { position:absolute; z-index:145; top:44px; right:0; width:min(300px,80vw); padding:6px; border:1px solid #3a4050; border-radius:12px; background:#171b24; box-shadow:0 16px 45px rgba(0,0,0,.45); }\n.sort-action-menu button { width:100%; min-height:42px; padding:0 11px; border:0; border-radius:8px; background:transparent; text-align:left; cursor:pointer; }\n.sort-action-menu button:not(:disabled):hover { background:#252a36; }\n.trash-list { display:grid; gap:10px; padding-bottom:26px; }\n.trash-item { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:14px 15px; border:1px solid #343b49; border-radius:13px; background:#141820; }\n.trash-item > div { display:grid; min-width:0; gap:3px; }\n.trash-item small { color:#8d96a6; font-size:9px; font-weight:900; letter-spacing:.12em; }\n.trash-item strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }\n.trash-item span { color:#8d96a6; font-size:11px; }\n.trash-item > button { flex:0 0 auto; min-height:38px; padding:0 11px; border:1px solid #3b4352; border-radius:9px; background:#1b202a; cursor:pointer; }\n.trash-empty { margin-top:24px; }\n@media (max-width:620px) { .trash-item { align-items:flex-start; flex-direction:column; } .trash-item > button { width:100%; } }\n
+
+
+/* Import groups, sort menu and Trash */
+.new-count-blue { color:#60a5fa; }
+.song-row.new-group-break { margin-top:22px; position:relative; }
+.song-row.new-group-break::before { content:'WEITERE LIEDER'; position:absolute; left:10px; top:-18px; color:#727d8e; font-size:9px; font-weight:900; letter-spacing:.1em; pointer-events:none; }
+.sort-more-wrap { position:relative; }
+.sort-more-button { width:38px; height:38px; padding:0; border:1px solid #343b49; border-radius:10px; background:#171b24; color:#cbd5e1; font-weight:900; cursor:pointer; }
+.sort-action-menu { position:absolute; z-index:145; top:44px; right:0; width:min(300px,80vw); padding:6px; border:1px solid #3a4050; border-radius:12px; background:#171b24; box-shadow:0 16px 45px rgba(0,0,0,.45); }
+.sort-action-menu button { width:100%; min-height:42px; padding:0 11px; border:0; border-radius:8px; background:transparent; text-align:left; cursor:pointer; }
+.sort-action-menu button:not(:disabled):hover { background:#252a36; }
+.trash-list { display:grid; gap:10px; padding-bottom:26px; }
+.trash-item { display:flex; align-items:center; justify-content:space-between; gap:18px; padding:14px 15px; border:1px solid #343b49; border-radius:13px; background:#141820; }
+.trash-item > div { display:grid; min-width:0; gap:3px; }
+.trash-item small { color:#8d96a6; font-size:9px; font-weight:900; letter-spacing:.12em; }
+.trash-item strong { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.trash-item span { color:#8d96a6; font-size:11px; }
+.trash-item > button { flex:0 0 auto; min-height:38px; padding:0 11px; border:1px solid #3b4352; border-radius:9px; background:#1b202a; cursor:pointer; }
+.trash-empty { margin-top:24px; }
+@media (max-width:620px) { .trash-item { align-items:flex-start; flex-direction:column; } .trash-item > button { width:100%; } }
