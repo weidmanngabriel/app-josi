@@ -134,7 +134,7 @@ function App() {
   const [activeLoopEdge, setActiveLoopEdge] = useState<'start' | 'end'>('start')
   const [previewLeadStart, setPreviewLeadStart] = useState('1')
   const [previewLeadEnd, setPreviewLeadEnd] = useState('1')
-  const [edgeStep, setEdgeStep] = useState('0,01')
+  const [edgeStep, setEdgeStep] = useState('0.01')
   const [focusStep, setFocusStep] = useState('1')
   const [cursorStep, setCursorStep] = useState('5')
   const [markerStep, setMarkerStep] = useState('1')

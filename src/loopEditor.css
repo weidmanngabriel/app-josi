@@ -203,3 +203,6 @@
   .loop-card, .marker-card { grid-column: auto; }
   .cursor-step-row, .marker-location-row { flex-wrap: wrap; }
 }
+
+/* keep confirmations above the fixed loop editor */
+.modal-backdrop { z-index: 190 !important; }
