@@ -639,7 +639,11 @@ function App() {
       return
     }
     clearRepeatHold()
-    setRepeatSelectionIds(new Set())
+    if (repeatSelectionIds.size) {
+      setRepeatSelectionIds(new Set())
+      setRepeatQueue(false)
+      return
+    }
     setRepeatQueue((value) => !value)
   }
   const selectAllVisible = () => setSelectedSongIds(new Set(visibleSongs.map((song) => song.id)))
