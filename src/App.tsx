@@ -2,16 +2,21 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   deletePlaylist,
   deleteSong,
+  deleteTag,
   getPlaylists,
   getSongs,
+  getTags,
   getTrashedPlaylists,
   getTrashedSongs,
+  getTrashedTags,
   savePlaylist,
   saveSong,
   saveSongOrder,
   saveSongs,
+  saveTag,
   type Playlist,
   type Song,
+  type Tag,
 } from './musicDb'
 import './enhancements.css'
 import './loopEditor.css'
@@ -51,21 +56,28 @@ function groupPlaylists(playlists: Playlist[]) {
   return [...groups.entries()].sort((a, b) => order(a[0]) - order(b[0]) || a[0].localeCompare(b[0], 'de'))
 }
 
-type View = 'library' | 'history' | 'loops' | 'trash' | 'playlistOverview'
-type NavigationEntry = { view: View; playlistId: string | null; detailOpen: boolean }
-type ReorderScope = 'library' | 'playlist' | 'sidebar' | null
-type MoveCandidate = { kind: 'song' | 'playlist'; id: string; targetIndex: number | null } | null
-type Snapshot = { songs: Song[]; playlists: Playlist[] }
+type View = 'library' | 'history' | 'loops' | 'trash' | 'tag' | 'playlistOverview'
+type NavigationEntry = { view: View; playlistId: string | null; tagId?: string | null; detailOpen: boolean }
+type ReorderScope = 'library' | 'playlist' | 'sidebar' | 'tags' | null
+type MoveCandidate = { kind: 'song' | 'playlist' | 'tag'; id: string; targetIndex: number | null } | null
+type Snapshot = { songs: Song[]; playlists: Playlist[]; tags: Tag[] }
 type PlaylistChooserMode = 'current' | 'bulk' | null
 type SortMode = 'manual' | 'azStart' | 'azEnd' | 'plays' | 'duration' | 'chronology'
 type SortDirection = 'down' | 'up'
-type OverflowMenu = { kind: 'song' | 'playlist' | 'playlists'; id?: string } | null
+type OverflowMenu = { kind: 'song' | 'playlist' | 'playlists' | 'tag' | 'tags'; id?: string } | null
+type ClipboardItem = { kind: 'song'; song: Song } | { kind: 'playlist'; playlist: Playlist }
+type TagChooserTarget = { kind: 'song' | 'playlist'; ids: string[] } | null
+type DuplicateAction =
+  | { kind: 'tag-add'; tagId: string; targetKind: 'song' | 'playlist'; ids: string[] }
+  | { kind: 'paste-song'; source: Song; targetPlaylistId: string | null }
+  | { kind: 'paste-playlist'; source: Playlist }
+type DuplicateConflict = { action: DuplicateAction; names: string[] } | null
 type LoopDrag = { kind: 'move' | 'start' | 'end' | 'cursor' | 'focus'; offset: number } | null
 type FocusFollowMode = 'center' | 'page' | 'off'
 type LoopEditorSnapshot = { start: number; end: number; cursor: number; focus: number; markers: number[]; zoom: number }
 type LoopConfirmation = 'save' | 'delete' | 'deleteMarkers' | null
 type SelectionConfirmation = 'switchManual' | 'deleteSelected' | null
-type RenameTarget = { kind: 'song' | 'playlist'; id: string } | null
+type RenameTarget = { kind: 'song' | 'playlist' | 'tag'; id: string } | null
 type ShareNavigator = Navigator & {
   share?: (data: { title?: string; text?: string; files?: File[] }) => Promise<void>
   canShare?: (data: { title?: string; text?: string; files?: File[] }) => boolean
@@ -88,13 +100,17 @@ const LOOP_PREVIEW_OPTIONS = [0.05, 0.1, 0.25, 0.5, 1, 2, 3, 5, 10] as const
 const SEEK_SECOND_OPTIONS = [5, 10, 15, 30, 60] as const
 const LOOP_OVERLAP_SECONDS = .18
 const AUTO_LOOP_SEARCH_RADIUS_SECONDS = .6
+const TAG_COLORS = ['#60a5fa', '#f472b6', '#f59e0b', '#34d399', '#a78bfa', '#fb7185', '#22d3ee', '#facc15'] as const
 
 function App() {
   const [songs, setSongs] = useState<Song[]>([])
   const [playlists, setPlaylists] = useState<Playlist[]>([])
+  const [tags, setTags] = useState<Tag[]>([])
   const [trashedSongs, setTrashedSongs] = useState<Song[]>([])
   const [trashedPlaylists, setTrashedPlaylists] = useState<Playlist[]>([])
+  const [trashedTags, setTrashedTags] = useState<Tag[]>([])
   const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null)
+  const [activeTagId, setActiveTagId] = useState<string | null>(null)
   const [view, setView] = useState<View>('library')
   const [detailOpen, setDetailOpen] = useState(false)
   const [currentSongId, setCurrentSongId] = useState<string | null>(null)
@@ -107,6 +123,7 @@ function App() {
   const [currentTime, setCurrentTime] = useState(0)
   const [duration, setDuration] = useState(0)
   const [playlistName, setPlaylistName] = useState('')
+  const [tagName, setTagName] = useState('')
   const [editingName, setEditingName] = useState('')
   const [isEditingPlaylist, setIsEditingPlaylist] = useState(false)
   const [playlistToDelete, setPlaylistToDelete] = useState<Playlist | null>(null)
@@ -137,6 +154,15 @@ function App() {
   const [trashConfirmation, setTrashConfirmation] = useState(false)
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
   const [sortConfirmation, setSortConfirmation] = useState(false)
+  const [tagSortMode, setTagSortMode] = useState<SortMode>(() => (localStorage.getItem('josi-tag-sort-mode') as SortMode) || 'manual')
+  const [tagSortDirection, setTagSortDirection] = useState<SortDirection>(() => (localStorage.getItem('josi-tag-sort-direction') as SortDirection) || 'down')
+  const [playlistsCollapsed, setPlaylistsCollapsed] = useState(() => localStorage.getItem('josi-playlists-collapsed') === '1')
+  const [tagsCollapsed, setTagsCollapsed] = useState(() => localStorage.getItem('josi-tags-collapsed') === '1')
+  const [tagChooserTarget, setTagChooserTarget] = useState<TagChooserTarget>(null)
+  const [clipboard, setClipboard] = useState<ClipboardItem | null>(null)
+  const [duplicateConflict, setDuplicateConflict] = useState<DuplicateConflict>(null)
+  const [cancelledDuplicateAction, setCancelledDuplicateAction] = useState<DuplicateAction | null>(null)
+  const [tagToDelete, setTagToDelete] = useState<Tag | null>(null)
 
   const [loopEditorSongId, setLoopEditorSongId] = useState<string | null>(null)
   const [loopDraftStart, setLoopDraftStart] = useState(0)
@@ -250,11 +276,13 @@ function App() {
   }
 
   useEffect(() => {
-    Promise.all([getSongs(), getPlaylists(), getTrashedSongs(), getTrashedPlaylists()]).then(([storedSongs, storedPlaylists, storedTrashedSongs, storedTrashedPlaylists]) => {
+    Promise.all([getSongs(), getPlaylists(), getTags(), getTrashedSongs(), getTrashedPlaylists(), getTrashedTags()]).then(([storedSongs, storedPlaylists, storedTags, storedTrashedSongs, storedTrashedPlaylists, storedTrashedTags]) => {
       setSongs(storedSongs)
       setPlaylists(storedPlaylists)
+      setTags(storedTags)
       setTrashedSongs(storedTrashedSongs)
       setTrashedPlaylists(storedTrashedPlaylists)
+      setTrashedTags(storedTrashedTags)
       if (storedSongs.some((song) => !song.file || song.file.size === 0)) setMessage('Mindestens eine lokal gespeicherte Audiodatei ist nicht mehr verfügbar. Diese Lieder müssen neu importiert werden.')
     }).catch(() => setMessage('Lokale Musikdaten konnten nicht geladen werden.'))
   }, [])
@@ -262,25 +290,52 @@ function App() {
   useEffect(() => { localStorage.setItem('josi-sort-mode', sortMode) }, [sortMode])
   useEffect(() => { localStorage.setItem('josi-sort-direction', sortDirection) }, [sortDirection])
   useEffect(() => { localStorage.setItem('josi-seek-seconds', String(seekSeconds)) }, [seekSeconds])
+  useEffect(() => { localStorage.setItem('josi-tag-sort-mode', tagSortMode) }, [tagSortMode])
+  useEffect(() => { localStorage.setItem('josi-tag-sort-direction', tagSortDirection) }, [tagSortDirection])
+  useEffect(() => { localStorage.setItem('josi-playlists-collapsed', playlistsCollapsed ? '1' : '0') }, [playlistsCollapsed])
+  useEffect(() => { localStorage.setItem('josi-tags-collapsed', tagsCollapsed ? '1' : '0') }, [tagsCollapsed])
 
   const currentSong = songs.find((song) => song.id === currentSongId) ?? null
   const activePlaylist = playlists.find((playlist) => playlist.id === activePlaylistId) ?? null
+  const activeTag = tags.find((tag) => tag.id === activeTagId) ?? null
   const editorSong = songs.find((song) => song.id === loopEditorSongId) ?? null
   const editorDuration = loopEditorSongId && loopEditorSongId === currentSongId ? (duration || editorSong?.duration || 0) : (editorSong?.duration || 0)
   const parsedLoopPlaybackRate = Math.max(.05, Math.min(50, Number.parseFloat(loopPlaybackRate.replace(',', '.')) || 1))
 
   const sidebarPlaylists = useMemo(() => [...playlists].sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) || b.lastUsedAt - a.lastUsedAt), [playlists])
+  const sidebarTags = useMemo(() => {
+    const items = [...tags]
+    if (tagSortMode === 'manual') return items.sort((a, b) => (a.sortOrder ?? a.createdAt) - (b.sortOrder ?? b.createdAt))
+    const direction = tagSortDirection === 'down' ? 1 : -1
+    const playsFor = (tag: Tag) => tag.songIds.reduce((sum, id) => sum + (songs.find((song) => song.id === id)?.completedPlays ?? 0), 0)
+    const activeSongCount = (tag: Tag) => tag.songIds.filter((id) => songs.some((song) => song.id === id)).length
+    const compare = (a: Tag, b: Tag) => {
+      if (tagSortMode === 'azStart') return a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' })
+      if (tagSortMode === 'azEnd') return reverseText(a.name).localeCompare(reverseText(b.name), 'de', { numeric: true, sensitivity: 'base' })
+      if (tagSortMode === 'plays') return playsFor(a) - playsFor(b) || a.name.localeCompare(b.name, 'de')
+      if (tagSortMode === 'duration') return activeSongCount(a) - activeSongCount(b) || a.name.localeCompare(b.name, 'de')
+      return a.createdAt - b.createdAt
+    }
+    return items.sort((a, b) => compare(a, b) * direction)
+  }, [tags, songs, tagSortMode, tagSortDirection])
   const manualQueue = useMemo(() => {
     if (!activePlaylist) return [...songs].sort((a, b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt))
     const byId = new Map(songs.map((song) => [song.id, song]))
     return activePlaylist.songIds.map((id) => byId.get(id)).filter((song): song is Song => Boolean(song))
   }, [activePlaylist, songs])
 
+  const tagSongQueue = useMemo(() => {
+    if (!activeTag) return []
+    const byId = new Map(songs.map((song) => [song.id, song]))
+    return activeTag.songIds.map((id) => byId.get(id)).filter((song): song is Song => Boolean(song))
+  }, [activeTag, songs])
+
   const baseVisibleSongs = useMemo(() => {
     if (view === 'history') return [...songs]
     if (view === 'loops') return songs.filter((song) => song.loopStart !== undefined && song.loopEnd !== undefined)
+    if (view === 'tag') return tagSongQueue
     return manualQueue
-  }, [view, songs, manualQueue])
+  }, [view, songs, manualQueue, tagSongQueue])
 
   const searchedVisibleSongs = useMemo(() => {
     if (view !== 'library' || !searchQuery.trim()) return baseVisibleSongs
@@ -304,9 +359,11 @@ function App() {
     return [...fresh, ...normal]
   }, [searchedVisibleSongs, sortMode, sortDirection])
 
-  const playerQueue = activePlaylist ? manualQueue : [...songs].sort((a, b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt))
+  const playerQueue = view === 'tag' && activeTag ? tagSongQueue : activePlaylist ? manualQueue : [...songs].sort((a, b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt))
   const repeatSelectionQueue = repeatSelectionIds.size ? playerQueue.filter((song) => repeatSelectionIds.has(song.id)) : []
   const currentSongPlaylists = useMemo(() => currentSong ? playlists.filter((playlist) => playlist.songIds.includes(currentSong.id)) : [], [currentSong, playlists])
+  const currentSongTags = useMemo(() => currentSong ? tags.filter((tag) => tag.songIds.includes(currentSong.id)) : [], [currentSong, tags])
+  const taggedPlaylists = useMemo(() => activeTag ? activeTag.playlistIds.map((id) => playlists.find((playlist) => playlist.id === id)).filter((playlist): playlist is Playlist => Boolean(playlist)) : [], [activeTag, playlists])
   const groupedPlaylists = useMemo(() => groupPlaylists(playlists), [playlists])
 
   useEffect(() => {
@@ -508,29 +565,37 @@ function App() {
     return () => cancelAnimationFrame(frame)
   }, [loopZoom])
 
-  const snapshot = (): Snapshot => ({ songs: songs.map((song) => ({ ...song, loopMarkers: song.loopMarkers ? [...song.loopMarkers] : undefined })), playlists: playlists.map((playlist) => ({ ...playlist, songIds: [...playlist.songIds] })) })
+  const snapshot = (): Snapshot => ({ songs: songs.map((song) => ({ ...song, loopMarkers: song.loopMarkers ? [...song.loopMarkers] : undefined })), playlists: playlists.map((playlist) => ({ ...playlist, songIds: [...playlist.songIds] })), tags: tags.map((tag) => ({ ...tag, songIds: [...tag.songIds], playlistIds: [...tag.playlistIds] })) })
   const recordHistory = () => { setUndoStack((items) => [...items, snapshot()].slice(-50)); setRedoStack([]) }
   const restoreSnapshot = async (target: Snapshot) => {
     const previousSongs = songs
     const previousPlaylists = playlists
+    const previousTags = tags
     setSongs(target.songs)
     setPlaylists(target.playlists)
+    setTags(target.tags)
     const songIds = new Set(target.songs.map((song) => song.id))
     const playlistIds = new Set(target.playlists.map((playlist) => playlist.id))
     await Promise.all(previousSongs.filter((song) => !songIds.has(song.id)).map((song) => deleteSong(song.id)))
     await saveSongOrder(target.songs)
     await Promise.all(previousPlaylists.filter((playlist) => !playlistIds.has(playlist.id)).map((playlist) => deletePlaylist(playlist.id)))
     await Promise.all(target.playlists.map(savePlaylist))
+    const tagIds = new Set(target.tags.map((tag) => tag.id))
+    await Promise.all(previousTags.filter((tag) => !tagIds.has(tag.id)).map((tag) => deleteTag(tag.id)))
+    await Promise.all(target.tags.map(saveTag))
   }
-  const undo = async () => { const target = undoStack.at(-1); if (!target || moveCandidate) return; setUndoStack((items) => items.slice(0, -1)); setRedoStack((items) => [...items, snapshot()].slice(-50)); await restoreSnapshot(target) }
-  const redo = async () => { const target = redoStack.at(-1); if (!target || moveCandidate) return; setRedoStack((items) => items.slice(0, -1)); setUndoStack((items) => [...items, snapshot()].slice(-50)); await restoreSnapshot(target) }
+  const undo = async () => { const target = undoStack.at(-1); if (!target || moveCandidate) return; setCancelledDuplicateAction(null); setUndoStack((items) => items.slice(0, -1)); setRedoStack((items) => [...items, snapshot()].slice(-50)); await restoreSnapshot(target) }
+  const redo = async () => {
+    if (cancelledDuplicateAction) { const action = cancelledDuplicateAction; setCancelledDuplicateAction(null); requestDuplicateAction(action); return }
+    const target = redoStack.at(-1); if (!target || moveCandidate) return; setRedoStack((items) => items.slice(0, -1)); setUndoStack((items) => [...items, snapshot()].slice(-50)); await restoreSnapshot(target)
+  }
 
   const applyNavigation = (entry: NavigationEntry) => {
-    setView(entry.view); setActivePlaylistId(entry.playlistId); setDetailOpen(entry.detailOpen); setSelectionMode(false); setSelectedSongIds(new Set()); setOverflowMenu(null); setLoopEditorSongId(null); setSearchQuery('')
+    setView(entry.view); setActivePlaylistId(entry.playlistId); setActiveTagId(entry.tagId ?? null); setDetailOpen(entry.detailOpen); setSelectionMode(false); setSelectedSongIds(new Set()); setOverflowMenu(null); setLoopEditorSongId(null); setSearchQuery('')
   }
   const navigateTo = (entry: NavigationEntry) => {
     const current = navigation[navigationIndex]
-    if (current && current.view === entry.view && current.playlistId === entry.playlistId && current.detailOpen === entry.detailOpen) return
+    if (current && current.view === entry.view && current.playlistId === entry.playlistId && (current.tagId ?? null) === (entry.tagId ?? null) && current.detailOpen === entry.detailOpen) return
     const next = [...navigation.slice(0, navigationIndex + 1), entry].slice(-60)
     setNavigation(next); setNavigationIndex(next.length - 1); applyNavigation(entry)
   }
@@ -540,6 +605,7 @@ function App() {
 
   const updateSong = async (updated: Song, addHistory = false) => { if (addHistory) recordHistory(); setSongs((items) => items.map((song) => song.id === updated.id ? updated : song)); await saveSong(updated) }
   const updatePlaylist = async (updated: Playlist, addHistory = false) => { if (addHistory) recordHistory(); setPlaylists((items) => items.map((playlist) => playlist.id === updated.id ? updated : playlist)); await savePlaylist(updated) }
+  const updateTag = async (updated: Tag, addHistory = false) => { if (addHistory) recordHistory(); setTags((items) => items.map((tag) => tag.id === updated.id ? updated : tag)); await saveTag(updated) }
 
   const toggleSelected = (id: string) => setSelectedSongIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next })
   const playSong = (id: string, remember = true) => {
@@ -628,8 +694,8 @@ function App() {
     setOverflowMenu(null)
   }
 
-  const beginRename = (kind: 'song' | 'playlist', id: string) => {
-    const name = kind === 'song' ? songs.find((song) => song.id === id)?.name : playlists.find((playlist) => playlist.id === id)?.name
+  const beginRename = (kind: 'song' | 'playlist' | 'tag', id: string) => {
+    const name = kind === 'song' ? songs.find((song) => song.id === id)?.name : kind === 'playlist' ? playlists.find((playlist) => playlist.id === id)?.name : tags.find((tag) => tag.id === id)?.name
     if (!name) return
     setRenameTarget({ kind, id }); setRenameValue(name); setOverflowMenu(null)
   }
@@ -640,33 +706,109 @@ function App() {
     if (renameTarget.kind === 'song') {
       const song = songs.find((item) => item.id === renameTarget.id)
       if (song) await updateSong({ ...song, name }, true)
-    } else {
+    } else if (renameTarget.kind === 'playlist') {
       const playlist = playlists.find((item) => item.id === renameTarget.id)
       if (playlist) await updatePlaylist({ ...playlist, name, lastUsedAt: Date.now() }, true)
+    } else {
+      const tag = tags.find((item) => item.id === renameTarget.id)
+      if (tag) await updateTag({ ...tag, name, lastUsedAt: Date.now() }, true)
     }
     setRenameTarget(null)
   }
 
-  const copySong = async (id: string) => {
+  const normalizeName = (value: string) => value.trim().toLocaleLowerCase('de-DE')
+  const copySong = (id: string) => {
     const song = songs.find((item) => item.id === id)
     if (!song?.file || song.file.size === 0) { setMessage('Diese Datei kann nicht kopiert werden, weil der lokale Audioblob fehlt.'); setOverflowMenu(null); return }
-    recordHistory()
-    const now = Date.now()
-    const copy: Song = { ...song, id: crypto.randomUUID(), name: `${song.name} Kopie`, addedAt: now, libraryOrder: now, importBatchId: crypto.randomUUID(), isNew: false, completedPlays: 0, loopMarkers: song.loopMarkers ? [...song.loopMarkers] : undefined, trashedAt: undefined, trashPlaylistIds: undefined, trashedLoop: undefined }
-    await saveSong(copy)
-    setSongs((items) => [...items, copy])
-    setOverflowMenu(null)
-    setMessage(`„${song.name}“ wurde kopiert.`)
+    setClipboard({ kind: 'song', song: { ...song, loopMarkers: song.loopMarkers ? [...song.loopMarkers] : undefined } })
+    setOverflowMenu(null); setMessage(`„${song.name}“ liegt in der Josi-Zwischenablage.`)
   }
-
-  const copyPlaylist = async (id: string) => {
+  const copyPlaylist = (id: string) => {
     const playlist = playlists.find((item) => item.id === id)
     if (!playlist) return
-    recordHistory()
-    const copy: Playlist = { ...playlist, id: crypto.randomUUID(), name: `${playlist.name} Kopie`, songIds: [...playlist.songIds], createdAt: Date.now(), lastUsedAt: Date.now(), sortOrder: -Date.now() }
-    await savePlaylist(copy)
-    setPlaylists((items) => [copy, ...items])
-    setOverflowMenu(null)
+    setClipboard({ kind: 'playlist', playlist: { ...playlist, songIds: [...playlist.songIds] } })
+    setOverflowMenu(null); setMessage(`„${playlist.name}“ liegt in der Josi-Zwischenablage.`)
+  }
+
+  const duplicateNamesForAction = (action: DuplicateAction) => {
+    if (action.kind === 'tag-add') {
+      const tag = tags.find((item) => item.id === action.tagId)
+      if (!tag) return []
+      const pool = action.targetKind === 'song' ? songs : playlists
+      const memberIds = action.targetKind === 'song' ? tag.songIds : tag.playlistIds
+      const newNames = new Set(action.ids.map((id) => normalizeName(pool.find((item) => item.id === id)?.name ?? '')).filter(Boolean))
+      return [...new Set(memberIds.filter((id) => !action.ids.includes(id)).map((id) => pool.find((item) => item.id === id)?.name).filter((name): name is string => Boolean(name)).filter((name) => newNames.has(normalizeName(name))))]
+    }
+    if (action.kind === 'paste-song') {
+      const destination = action.targetPlaylistId ? playlists.find((playlist) => playlist.id === action.targetPlaylistId)?.songIds.map((id) => songs.find((song) => song.id === id)).filter((song): song is Song => Boolean(song)) ?? [] : songs
+      return [...new Set(destination.filter((song) => normalizeName(song.name) === normalizeName(action.source.name)).map((song) => song.name))]
+    }
+    return [...new Set(playlists.filter((playlist) => normalizeName(playlist.name) === normalizeName(action.source.name)).map((playlist) => playlist.name))]
+  }
+  const requestDuplicateAction = (action: DuplicateAction) => {
+    const names = duplicateNamesForAction(action)
+    if (names.length) { setDuplicateConflict({ action, names }); return }
+    void applyDuplicateAction(action, 'both')
+  }
+  const moveSongsToTrash = async (ids: string[]) => {
+    const idSet = new Set(ids)
+    const moving = songs.filter((song) => idSet.has(song.id)).map((song) => ({ ...song, trashedAt: Date.now(), trashPlaylistIds: playlists.filter((playlist) => playlist.songIds.includes(song.id)).map((playlist) => playlist.id) }))
+    if (!moving.length) return
+    await Promise.all(moving.map(saveSong))
+    const affected = playlists.filter((playlist) => playlist.songIds.some((id) => idSet.has(id))).map((playlist) => ({ ...playlist, songIds: playlist.songIds.filter((id) => !idSet.has(id)) }))
+    if (affected.length) await Promise.all(affected.map(savePlaylist))
+    setPlaylists((items) => items.map((playlist) => affected.find((changed) => changed.id === playlist.id) ?? playlist))
+    setSongs((items) => items.filter((song) => !idSet.has(song.id)))
+    setTrashedSongs((items) => [...moving, ...items.filter((song) => !idSet.has(song.id))])
+  }
+  const applyDuplicateAction = async (action: DuplicateAction, resolution: 'replace' | 'both') => {
+    setDuplicateConflict(null); setCancelledDuplicateAction(null)
+    if (action.kind === 'tag-add') {
+      const tag = tags.find((item) => item.id === action.tagId)
+      if (!tag) return
+      const pool = action.targetKind === 'song' ? songs : playlists
+      const newNames = new Set(action.ids.map((id) => normalizeName(pool.find((item) => item.id === id)?.name ?? '')).filter(Boolean))
+      if (action.targetKind === 'song') {
+        const kept = resolution === 'replace' ? tag.songIds.filter((id) => action.ids.includes(id) || !newNames.has(normalizeName(songs.find((song) => song.id === id)?.name ?? ''))) : tag.songIds
+        await updateTag({ ...tag, songIds: [...new Set([...kept, ...action.ids])], lastUsedAt: Date.now() }, true)
+      } else {
+        const kept = resolution === 'replace' ? tag.playlistIds.filter((id) => action.ids.includes(id) || !newNames.has(normalizeName(playlists.find((playlist) => playlist.id === id)?.name ?? ''))) : tag.playlistIds
+        await updateTag({ ...tag, playlistIds: [...new Set([...kept, ...action.ids])], lastUsedAt: Date.now() }, true)
+      }
+      return
+    }
+    if (action.kind === 'paste-song') {
+      const now = Date.now()
+      const conflicts = songs.filter((song) => normalizeName(song.name) === normalizeName(action.source.name))
+      if (resolution === 'both' || action.targetPlaylistId) recordHistory()
+      if (resolution === 'replace' && action.targetPlaylistId) {
+        const target = playlists.find((playlist) => playlist.id === action.targetPlaylistId)
+        if (target) await updatePlaylist({ ...target, songIds: target.songIds.filter((id) => !conflicts.some((song) => song.id === id)), lastUsedAt: Date.now() })
+      } else if (resolution === 'replace' && conflicts.length) await moveSongsToTrash(conflicts.map((song) => song.id))
+      const copy: Song = { ...action.source, id: crypto.randomUUID(), addedAt: now, libraryOrder: now, importBatchId: crypto.randomUUID(), isNew: false, completedPlays: 0, loopMarkers: action.source.loopMarkers ? [...action.source.loopMarkers] : undefined, trashedAt: undefined, trashPlaylistIds: undefined, trashedLoop: undefined }
+      await saveSong(copy); setSongs((items) => [...items, copy])
+      if (action.targetPlaylistId) {
+        const target = playlists.find((playlist) => playlist.id === action.targetPlaylistId)
+        if (target) await updatePlaylist({ ...target, songIds: [...target.songIds.filter((id) => resolution !== 'replace' || !conflicts.some((song) => song.id === id)), copy.id], lastUsedAt: Date.now() })
+      }
+      setOverflowMenu(null); setMessage(`„${copy.name}“ wurde eingefügt.`); return
+    }
+    const conflicts = playlists.filter((playlist) => normalizeName(playlist.name) === normalizeName(action.source.name))
+    if (resolution === 'both') recordHistory()
+    if (resolution === 'replace' && conflicts.length) {
+      const trashedAt = Date.now()
+      const moving = conflicts.map((playlist) => ({ ...playlist, trashedAt }))
+      await Promise.all(moving.map(savePlaylist)); setPlaylists((items) => items.filter((playlist) => !conflicts.some((conflict) => conflict.id === playlist.id))); setTrashedPlaylists((items) => [...moving, ...items.filter((playlist) => !conflicts.some((conflict) => conflict.id === playlist.id))])
+    }
+    const copy: Playlist = { ...action.source, id: crypto.randomUUID(), songIds: [...action.source.songIds], createdAt: Date.now(), lastUsedAt: Date.now(), sortOrder: -Date.now(), trashedAt: undefined }
+    await savePlaylist(copy); setPlaylists((items) => [copy, ...items]); setOverflowMenu(null); setMessage(`„${copy.name}“ wurde eingefügt.`)
+  }
+  const resolveDuplicateConflict = (resolution: 'replace' | 'both') => { const action = duplicateConflict?.action; if (action) void applyDuplicateAction(action, resolution) }
+  const cancelDuplicateConflict = () => { if (duplicateConflict) setCancelledDuplicateAction(duplicateConflict.action); setDuplicateConflict(null) }
+  const pasteFromSongMenu = () => { if (clipboard?.kind !== 'song') return; requestDuplicateAction({ kind: 'paste-song', source: clipboard.song, targetPlaylistId: view === 'library' ? activePlaylistId : null }) }
+  const pasteFromPlaylistMenu = (playlistId: string) => {
+    if (clipboard?.kind === 'song') requestDuplicateAction({ kind: 'paste-song', source: clipboard.song, targetPlaylistId: playlistId })
+    else if (clipboard?.kind === 'playlist') requestDuplicateAction({ kind: 'paste-playlist', source: clipboard.playlist })
   }
 
   const shareSong = async (id: string) => {
@@ -868,6 +1010,21 @@ function App() {
     setMessage(`Loop für „${editorSong.name}“ gespeichert.`)
   }
 
+  const createTag = async (event: React.FormEvent) => {
+    event.preventDefault(); const name = tagName.trim(); if (!name) return
+    if (tags.some((tag) => normalizeName(tag.name) === normalizeName(name))) { setMessage('Ein Tag mit diesem Namen existiert bereits.'); return }
+    recordHistory(); const now = Date.now(); const tag: Tag = { id: crypto.randomUUID(), name, color: TAG_COLORS[tags.length % TAG_COLORS.length], songIds: [], playlistIds: [], createdAt: now, lastUsedAt: now, sortOrder: tags.length }
+    await saveTag(tag); setTags((items) => [...items, tag]); setTagName('')
+  }
+  const openTag = async (id: string) => {
+    if (reorderScope === 'tags') return
+    navigateTo({ view: 'tag', playlistId: null, tagId: id, detailOpen: false })
+    const tag = tags.find((item) => item.id === id); if (tag) await updateTag({ ...tag, lastUsedAt: Date.now() })
+  }
+  const confirmDeleteTag = async () => {
+    if (!tagToDelete) return; const trashed = { ...tagToDelete, trashedAt: Date.now() }; await saveTag(trashed); setTags((items) => items.filter((tag) => tag.id !== tagToDelete.id)); setTrashedTags((items) => [trashed, ...items.filter((tag) => tag.id !== trashed.id)]); if (activeTagId === tagToDelete.id) goHome(); setTagToDelete(null)
+  }
+
   const createPlaylist = async (event: React.FormEvent) => {
     event.preventDefault(); const name = playlistName.trim(); if (!name) return; recordHistory()
     const playlist: Playlist = { id: crypto.randomUUID(), name, songIds: [], createdAt: Date.now(), lastUsedAt: Date.now(), sortOrder: -Date.now() }
@@ -881,20 +1038,38 @@ function App() {
   const changePlaylistCover = async (files: FileList | null) => { const playlist = playlists.find((item) => item.id === playlistCoverTargetId); if (!playlist || !files?.[0] || !files[0].type.startsWith('image/')) return; await updatePlaylist({ ...playlist, cover: files[0], lastUsedAt: Date.now() }, true); setPlaylistCoverTargetId(null); if (coverInputRef.current) coverInputRef.current.value = '' }
   const confirmDeletePlaylist = async () => { if (!playlistToDelete) return; const trashed = { ...playlistToDelete, trashedAt: Date.now() }; await savePlaylist(trashed); setPlaylists((items) => items.filter((playlist) => playlist.id !== playlistToDelete.id)); setTrashedPlaylists((items) => [trashed, ...items.filter((playlist) => playlist.id !== trashed.id)]); if (activePlaylistId === playlistToDelete.id) navigateTo({ view: 'library', playlistId: null, detailOpen: false }); setPlaylistToDelete(null) }
 
-  const beginReorder = (scope: Exclude<ReorderScope, null>) => { if (scope === 'library' || scope === 'playlist') setSearchQuery(''); setReorderScope(scope); setMoveCandidate(null); setOverflowMenu(null); setSortMode('manual') }
+  const beginReorder = (scope: Exclude<ReorderScope, null>) => { if (scope === 'library' || scope === 'playlist') setSearchQuery(''); setReorderScope(scope); setMoveCandidate(null); setOverflowMenu(null); if (scope === 'tags') setTagSortMode('manual'); else setSortMode('manual') }
   const finishReorder = () => { setReorderScope(null); setMoveCandidate(null) }
   const reorderIds = (ids: string[], sourceId: string, targetIndex: number) => { const sourceIndex = ids.indexOf(sourceId); if (sourceIndex < 0) return ids; const next = [...ids]; const [moved] = next.splice(sourceIndex, 1); next.splice(Math.max(0, Math.min(targetIndex > sourceIndex ? targetIndex - 1 : targetIndex, next.length)), 0, moved); return next }
   const confirmPendingMove = async () => {
     if (!moveCandidate || moveCandidate.targetIndex === null) return; recordHistory()
     if (moveCandidate.kind === 'playlist') {
       const ids = reorderIds(sidebarPlaylists.map((playlist) => playlist.id), moveCandidate.id, moveCandidate.targetIndex); const order = new Map(ids.map((id, index) => [id, index])); const updated = playlists.map((playlist) => ({ ...playlist, sortOrder: order.get(playlist.id) ?? playlist.sortOrder })); setPlaylists(updated); await Promise.all(updated.map(savePlaylist))
+    } else if (moveCandidate.kind === 'tag') {
+      const ids = reorderIds(sidebarTags.map((tag) => tag.id), moveCandidate.id, moveCandidate.targetIndex); const order = new Map(ids.map((id, index) => [id, index])); const updated = tags.map((tag) => ({ ...tag, sortOrder: order.get(tag.id) ?? tag.sortOrder })); setTags(updated); await Promise.all(updated.map(saveTag))
     } else if (reorderScope === 'playlist' && activePlaylist) await updatePlaylist({ ...activePlaylist, songIds: reorderIds(activePlaylist.songIds, moveCandidate.id, moveCandidate.targetIndex) })
     else { const ids = reorderIds(songs.map((song) => song.id), moveCandidate.id, moveCandidate.targetIndex); const byId = new Map(songs.map((song) => [song.id, song])); const updated = ids.map((id, index) => ({ ...byId.get(id)!, libraryOrder: index })); setSongs(updated); await saveSongOrder(updated) }
     setMoveCandidate(null)
   }
-  const renderDropZone = (index: number, kind: 'song' | 'playlist') => !moveCandidate || moveCandidate.kind !== kind ? null : <button className={`drop-zone${moveCandidate.targetIndex === index ? ' selected' : ''}`} type="button" onClick={() => setMoveCandidate({ ...moveCandidate, targetIndex: index })}><span /></button>
+  const renderDropZone = (index: number, kind: 'song' | 'playlist' | 'tag') => !moveCandidate || moveCandidate.kind !== kind ? null : <button className={`drop-zone${moveCandidate.targetIndex === index ? ' selected' : ''}`} type="button" onClick={() => setMoveCandidate({ ...moveCandidate, targetIndex: index })}><span /></button>
 
   const membershipText = (songId: string) => { const names = playlists.filter((playlist) => playlist.songIds.includes(songId)).map((playlist) => playlist.name); return names.length ? names.join(' · ') : 'In keiner Playlist' }
+  const songTags = (songId: string) => tags.filter((tag) => tag.songIds.includes(songId))
+  const playlistTags = (playlistId: string) => tags.filter((tag) => tag.playlistIds.includes(playlistId))
+  const openTagChooser = (kind: 'song' | 'playlist', ids: string[]) => { setTagChooserTarget({ kind, ids }); setOverflowMenu(null); setSelectionMenuOpen(false) }
+  const toggleTargetTag = async (tag: Tag) => {
+    if (!tagChooserTarget?.ids.length) return
+    const memberIds = tagChooserTarget.kind === 'song' ? tag.songIds : tag.playlistIds
+    const allAssigned = tagChooserTarget.ids.every((id) => memberIds.includes(id))
+    if (allAssigned) {
+      if (tagChooserTarget.kind === 'song') await updateTag({ ...tag, songIds: tag.songIds.filter((id) => !tagChooserTarget.ids.includes(id)), lastUsedAt: Date.now() }, true)
+      else await updateTag({ ...tag, playlistIds: tag.playlistIds.filter((id) => !tagChooserTarget.ids.includes(id)), lastUsedAt: Date.now() }, true)
+      return
+    }
+    const ids = tagChooserTarget.ids.filter((id) => !memberIds.includes(id))
+    requestDuplicateAction({ kind: 'tag-add', tagId: tag.id, targetKind: tagChooserTarget.kind, ids })
+  }
+  const removeSongFromActiveTag = async (songId: string) => { if (!activeTag) return; await updateTag({ ...activeTag, songIds: activeTag.songIds.filter((id) => id !== songId), lastUsedAt: Date.now() }, true) }
   const startSelection = () => { setSelectionMode(true); setSelectedSongIds(new Set()); setSelectionMenuOpen(false); setBulkMoveMode(false) }
   const stopSelection = () => { setSelectionMode(false); setSelectedSongIds(new Set()); setPlaylistChooserMode(null); setSelectionMenuOpen(false); setBulkMoveMode(false); setSelectionConfirmation(null) }
   const beginSelectedMove = () => {
@@ -1001,6 +1176,7 @@ function App() {
     setTrashedSongs((items) => items.filter((item) => item.id !== song.id))
     setSongs((items) => [...items, restored].sort((a, b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt)))
   }
+  const restoreTrashedTag = async (tag: Tag) => { const restored = { ...tag, trashedAt: undefined }; await saveTag(restored); setTrashedTags((items) => items.filter((item) => item.id !== tag.id)); setTags((items) => [...items, restored]) }
   const restoreTrashedPlaylist = async (playlist: Playlist) => {
     const waitingSongs = songs.filter((song) => song.trashPlaylistIds?.includes(playlist.id))
     const restored = { ...playlist, trashedAt: undefined, songIds: [...playlist.songIds, ...waitingSongs.map((song) => song.id).filter((id) => !playlist.songIds.includes(id))] }
@@ -1013,12 +1189,16 @@ function App() {
   }
   const restoreTrashedLoop = async (song: Song) => { if (!song.trashedLoop) return; const loop = song.trashedLoop; await updateSong({ ...song, loopStart: loop.start, loopEnd: loop.end, loopEnabled: loop.enabled, loopMarkers: loop.markers ? [...loop.markers] : undefined, trashedLoop: undefined }); }
   const emptyTrash = async () => {
+    const deletedSongIds = new Set(trashedSongs.map((song) => song.id)); const deletedPlaylistIds = new Set(trashedPlaylists.map((playlist) => playlist.id))
+    const cleanedTags = tags.map((tag) => ({ ...tag, songIds: tag.songIds.filter((id) => !deletedSongIds.has(id)), playlistIds: tag.playlistIds.filter((id) => !deletedPlaylistIds.has(id)) }))
+    await Promise.all(cleanedTags.filter((tag, index) => tag.songIds.length !== tags[index].songIds.length || tag.playlistIds.length !== tags[index].playlistIds.length).map(saveTag)); setTags(cleanedTags)
     await Promise.all(trashedSongs.map((song) => deleteSong(song.id)))
     await Promise.all(trashedPlaylists.map((playlist) => deletePlaylist(playlist.id)))
+    await Promise.all(trashedTags.map((tag) => deleteTag(tag.id)))
     const loopTrashSongs = songs.filter((song) => song.trashedLoop)
     if (loopTrashSongs.length) await Promise.all(loopTrashSongs.map((song) => saveSong({ ...song, trashedLoop: undefined })))
     setSongs((items) => items.map((song) => song.trashedLoop ? { ...song, trashedLoop: undefined } : song))
-    setTrashedSongs([]); setTrashedPlaylists([]); setTrashConfirmation(false)
+    setTrashedSongs([]); setTrashedPlaylists([]); setTrashedTags([]); setTrashConfirmation(false)
   }
   const applyCurrentSortAsManual = async () => {
     if (view !== 'library' || sortMode === 'manual') { setSortConfirmation(false); return }
@@ -1039,10 +1219,12 @@ function App() {
   }
 
   const songEditMode = reorderScope === (activePlaylist ? 'playlist' : 'library') && view === 'library'
+  const tagEditMode = reorderScope === 'tags'
   const newImportCount = songs.filter((song) => song.isNew).length
-  const title = view === 'history' ? 'Importverlauf' : view === 'loops' ? 'Loops' : view === 'trash' ? 'Papierkorb' : activePlaylist?.name ?? 'Bibliothek'
-  const trashCount = trashedSongs.length + trashedPlaylists.length + songs.filter((song) => song.trashedLoop).length
+  const title = view === 'history' ? 'Importverlauf' : view === 'loops' ? 'Loops' : view === 'trash' ? 'Papierkorb' : view === 'tag' ? activeTag?.name ?? 'Tag' : activePlaylist?.name ?? 'Bibliothek'
+  const trashCount = trashedSongs.length + trashedPlaylists.length + trashedTags.length + songs.filter((song) => song.trashedLoop).length
   const sortLabels: Record<SortMode, string> = { manual: 'Manuell', azStart: 'A–Z Anfang', azEnd: 'A–Z Ende', plays: 'Anzahl des Hörens', duration: 'Dauer', chronology: 'Chronik' }
+  const tagSortLabels: Record<SortMode, string> = { ...sortLabels, duration: 'Anzahl der Lieder' }
   const loopLeft = editorDuration ? (loopDraftStart / editorDuration) * 100 : 0
   const loopWidth = editorDuration ? Math.max(0, ((loopDraftEnd - loopDraftStart) / editorDuration) * 100) : 0
   const cursorLeft = editorDuration ? (loopCursor / editorDuration) * 100 : 0
@@ -1065,7 +1247,7 @@ function App() {
 
   return <div className="app-shell">
     <header className="site-header">
-      <div className="history-controls" aria-label="Navigation und Verlauf"><button className="home-button" type="button" onClick={goHome} aria-label="Bibliothek">⌂</button><button className="settings-button" type="button" onClick={() => setSettingsOpen(true)} aria-label="Einstellungen">⚙</button><button type="button" onClick={navigateBack} disabled={navigationIndex === 0 && !loopEditorSongId}>‹</button><button type="button" onClick={navigateForward} disabled={navigationIndex >= navigation.length - 1 || Boolean(loopEditorSongId)}>›</button><button type="button" onClick={() => void undo()} disabled={!undoStack.length || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↶</button><button type="button" onClick={() => void redo()} disabled={!redoStack.length || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↷</button>{moveCandidate && <><button className="confirm-move" type="button" onClick={() => void confirmPendingMove()} disabled={moveCandidate.targetIndex === null}>✓</button><button className="cancel-move" type="button" onClick={() => setMoveCandidate(null)}>×</button></>}</div>
+      <div className="history-controls" aria-label="Navigation und Verlauf"><button className="home-button" type="button" onClick={goHome} aria-label="Bibliothek">⌂</button><button className="settings-button" type="button" onClick={() => setSettingsOpen(true)} aria-label="Einstellungen">⚙</button><button type="button" onClick={navigateBack} disabled={navigationIndex === 0 && !loopEditorSongId}>‹</button><button type="button" onClick={navigateForward} disabled={navigationIndex >= navigation.length - 1 || Boolean(loopEditorSongId)}>›</button><button type="button" onClick={() => void undo()} disabled={!undoStack.length || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↶</button><button type="button" onClick={() => void redo()} disabled={(!redoStack.length && !cancelledDuplicateAction) || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↷</button>{moveCandidate && <><button className="confirm-move" type="button" onClick={() => void confirmPendingMove()} disabled={moveCandidate.targetIndex === null}>✓</button><button className="cancel-move" type="button" onClick={() => setMoveCandidate(null)}>×</button></>}</div>
       <button className="import-button" type="button" onClick={openImportPicker}>+ Musik importieren</button><input ref={fileInputRef} className="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac" multiple onChange={(event) => void importFiles(event.target.files)} /><input ref={coverInputRef} className="file-input" type="file" accept="image/*" onChange={(event) => void changePlaylistCover(event.target.files)} />
     </header>
 
@@ -1074,36 +1256,40 @@ function App() {
       <button className={`nav-item history-nav${view === 'history' ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'history', playlistId: null, detailOpen: false })}><span>Importverlauf</span><strong><span className="new-count-blue">{newImportCount}</span>/{songs.length}</strong></button>
       <button className={`nav-item history-nav${view === 'loops' ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'loops', playlistId: null, detailOpen: false })}><span>Loops</span><strong>{songs.filter((song) => song.loopStart !== undefined && song.loopEnd !== undefined).length}</strong></button>
       <button className={`nav-item history-nav${view === 'trash' ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'trash', playlistId: null, detailOpen: false })}><span>Papierkorb</span><strong>{trashCount}</strong></button>
-      <div className="sidebar-heading"><span className="heading-label">Playlists</span><button className="overflow-button small-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlists' })}>•••</button>{reorderScope === 'sidebar' && <button className="finish-inline" type="button" onClick={finishReorder}>Fertig</button>}</div>
-      <div className="playlist-nav">{renderDropZone(0, 'playlist')}{sidebarPlaylists.map((playlist, index) => <div className="playlist-nav-row" key={playlist.id}>{reorderScope === 'sidebar' && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'playlist', id: playlist.id, targetIndex: null })}>↕</button>}<button className={`nav-item${activePlaylistId === playlist.id && view === 'library' ? ' active' : ''}`} type="button" onClick={() => void openPlaylist(playlist.id)} disabled={reorderScope === 'sidebar'}><span className="playlist-nav-name">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span className="playlist-mini-cover">♫</span>}<span>{playlist.name}</span></span><strong>{playlist.songIds.length}</strong></button><button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id })}>•••</button>{renderDropZone(index + 1, 'playlist')}</div>)}</div>
-      <form className="new-playlist" onSubmit={createPlaylist}><input value={playlistName} onChange={(event) => setPlaylistName(event.target.value)} placeholder="Neue Playlist" /><button type="submit" disabled={!playlistName.trim()}>+</button></form>
+      <div className="sidebar-heading collapsible-heading" onClick={() => setPlaylistsCollapsed((value) => !value)}><span className="heading-label"><b className="section-chevron">{playlistsCollapsed ? '▸' : '▾'}</b> Playlists</span><button className="overflow-button small-overflow" type="button" onClick={(event) => { event.stopPropagation(); setOverflowMenu({ kind: 'playlists' }) }}>•••</button>{reorderScope === 'sidebar' && <button className="finish-inline" type="button" onClick={(event) => { event.stopPropagation(); finishReorder() }}>Fertig</button>}</div>
+      {!playlistsCollapsed && <><div className="playlist-nav">{renderDropZone(0, 'playlist')}{sidebarPlaylists.map((playlist, index) => <div className="playlist-nav-row" key={playlist.id}>{reorderScope === 'sidebar' && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'playlist', id: playlist.id, targetIndex: null })}>↕</button>}<button className={`nav-item${activePlaylistId === playlist.id && view === 'library' ? ' active' : ''}`} type="button" onClick={() => void openPlaylist(playlist.id)} disabled={reorderScope === 'sidebar'}><span className="playlist-nav-name">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span className="playlist-mini-cover">♫</span>}<span className="nav-tag-dots">{playlistTags(playlist.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} />)}</span><span>{playlist.name}</span></span><strong>{playlist.songIds.length}</strong></button><button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id })}>•••</button>{renderDropZone(index + 1, 'playlist')}</div>)}</div>
+      <form className="new-playlist" onSubmit={createPlaylist}><input value={playlistName} onChange={(event) => setPlaylistName(event.target.value)} placeholder="Neue Playlist" /><button type="submit" disabled={!playlistName.trim()}>+</button></form></>}
+      <div className="sidebar-heading collapsible-heading tag-heading" onClick={() => setTagsCollapsed((value) => !value)}><span className="heading-label"><b className="section-chevron">{tagsCollapsed ? '▸' : '▾'}</b> Tags</span><button className="overflow-button small-overflow" type="button" onClick={(event) => { event.stopPropagation(); setOverflowMenu({ kind: 'tags' }) }}>•••</button>{tagEditMode && <button className="finish-inline" type="button" onClick={(event) => { event.stopPropagation(); finishReorder() }}>Fertig</button>}</div>
+      {!tagsCollapsed && <><div className="tag-sort-row" onClick={(event) => event.stopPropagation()}><select value={tagSortMode} onChange={(event) => setTagSortMode(event.target.value as SortMode)}>{(Object.keys(tagSortLabels) as SortMode[]).map((mode) => <option key={mode} value={mode}>{tagSortLabels[mode]}</option>)}</select><button type="button" disabled={tagSortMode === 'manual'} onClick={() => setTagSortDirection((value) => value === 'down' ? 'up' : 'down')}>{tagSortMode === 'manual' ? '—' : tagSortDirection === 'down' ? '↓' : '↑'}</button></div><div className="tag-nav">{renderDropZone(0, 'tag')}{sidebarTags.map((tag, index) => <div className="playlist-nav-row tag-nav-row" key={tag.id}>{tagEditMode && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'tag', id: tag.id, targetIndex: null })}>↕</button>}<button className={`nav-item${activeTagId === tag.id && view === 'tag' ? ' active' : ''}`} type="button" onClick={() => void openTag(tag.id)} disabled={tagEditMode}><span className="tag-nav-name"><i className="tag-dot" style={{ background: tag.color }} /><span>{tag.name}</span></span><strong>{tag.songIds.filter((id) => songs.some((song) => song.id === id)).length}</strong></button><button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'tag', id: tag.id })}>•••</button>{renderDropZone(index + 1, 'tag')}</div>)}</div><form className="new-playlist new-tag" onSubmit={createTag}><input value={tagName} onChange={(event) => setTagName(event.target.value)} placeholder="Neuer Tag" /><button type="submit" disabled={!tagName.trim()}>+</button></form></>}
     </aside>
 
     <section className="library-panel"><div className={`library-heading${activePlaylist ? ' playlist-heading' : ''}`}>
       {activePlaylist && view === 'library' && <button className="playlist-cover" type="button" onClick={() => openPlaylistCoverPicker(activePlaylist.id)}>{coverUrls[activePlaylist.id] ? <img src={coverUrls[activePlaylist.id]} alt="" /> : <span>+ Bild</span>}</button>}
-      <div className="library-title"><p className="eyebrow">{view === 'history' ? 'IMPORTVERLAUF' : view === 'loops' ? 'GESPEICHERTE LOOPS' : view === 'trash' ? 'PAPIERKORB' : activePlaylist ? 'PLAYLIST' : 'DEINE MUSIK'}</p>{activePlaylist && view === 'library' && isEditingPlaylist ? <form className="rename-playlist" onSubmit={savePlaylistName}><input value={editingName} onChange={(event) => setEditingName(event.target.value)} autoFocus /><button type="submit">Speichern</button><button type="button" onClick={() => setIsEditingPlaylist(false)}>Abbrechen</button></form> : <h1>{title}</h1>}<p>{view === 'history' ? <><span className="new-count-blue">{newImportCount}</span>/{songs.length} neue Importe</> : view === 'trash' ? `${trashCount} ${trashCount === 1 ? 'Eintrag' : 'Einträge'}` : `${visibleSongs.length} ${visibleSongs.length === 1 ? 'Lied' : 'Lieder'}`}</p></div>
+      <div className="library-title"><p className="eyebrow">{view === 'history' ? 'IMPORTVERLAUF' : view === 'loops' ? 'GESPEICHERTE LOOPS' : view === 'trash' ? 'PAPIERKORB' : view === 'tag' ? 'TAG' : activePlaylist ? 'PLAYLIST' : 'DEINE MUSIK'}</p>{activePlaylist && view === 'library' && isEditingPlaylist ? <form className="rename-playlist" onSubmit={savePlaylistName}><input value={editingName} onChange={(event) => setEditingName(event.target.value)} autoFocus /><button type="submit">Speichern</button><button type="button" onClick={() => setIsEditingPlaylist(false)}>Abbrechen</button></form> : <h1>{title}</h1>}<p>{view === 'history' ? <><span className="new-count-blue">{newImportCount}</span>/{songs.length} neue Importe</> : view === 'trash' ? `${trashCount} ${trashCount === 1 ? 'Eintrag' : 'Einträge'}` : view === 'tag' && activeTag ? `${activeTag.songIds.filter((id) => songs.some((song) => song.id === id)).length} Lieder · ${taggedPlaylists.length} Playlists` : `${visibleSongs.length} ${visibleSongs.length === 1 ? 'Lied' : 'Lieder'}`}</p></div>
       <div className="playlist-actions">{!selectionMode && view !== 'trash' && <button type="button" onClick={startSelection}>Auswählen</button>}{view === 'trash' && <button className="danger-button" type="button" onClick={() => setTrashConfirmation(true)} disabled={!trashCount}>Papierkorb leeren</button>}{selectionMode && <><button type="button" onClick={selectAllVisible}>Alle</button><button type="button" onClick={stopSelection}>Abbrechen</button></>}{activePlaylist && view === 'library' && !selectionMode && <><button type="button" onClick={startEditingPlaylist}>Name ändern</button><button type="button" onClick={() => openPlaylistCoverPicker(activePlaylist.id)}>Bild ändern</button><button type="button" onClick={() => reorderScope === 'playlist' ? finishReorder() : beginReorder('playlist')}>{reorderScope === 'playlist' ? 'Fertig' : 'Reihenfolge ändern'}</button></>}{!activePlaylist && view === 'library' && !selectionMode && <button type="button" onClick={() => reorderScope === 'library' ? finishReorder() : beginReorder('library')}>{reorderScope === 'library' ? 'Fertig' : 'Reihenfolge ändern'}</button>}</div>
     </div>
+    {view === 'tag' && taggedPlaylists.length > 0 && <div className="tagged-playlists-strip"><span>PLAYLISTS</span>{taggedPlaylists.map((playlist) => <button key={playlist.id} type="button" onClick={() => void openPlaylist(playlist.id)}><span className="nav-tag-dots">{playlistTags(playlist.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} />)}</span>{playlist.name}</button>)}</div>}
     {view === 'library' && <div className="search-bar"><span aria-hidden="true">⌕</span><input type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={activePlaylist ? 'Playlist durchsuchen' : 'Bibliothek durchsuchen'} aria-label={activePlaylist ? 'Playlist durchsuchen' : 'Bibliothek durchsuchen'} />{searchQuery && <button type="button" onClick={() => setSearchQuery('')} aria-label="Suche leeren">×</button>}</div>}
     {view !== 'trash' && <div className="sort-bar"><span>Sortierung</span><select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>{(Object.keys(sortLabels) as SortMode[]).map((mode) => <option key={mode} value={mode}>{sortLabels[mode]}</option>)}</select><button type="button" className="sort-direction" disabled={sortMode === 'manual'} onClick={() => setSortDirection((value) => value === 'down' ? 'up' : 'down')}>{sortMode === 'manual' ? '—' : sortDirection === 'down' ? '↓' : '↑'}</button><div className="sort-more-wrap"><button className="sort-more-button" type="button" onClick={() => setSortMenuOpen((value) => !value)} aria-label="Weitere Sortieraktionen">•••</button>{sortMenuOpen && <div className="sort-action-menu"><button type="button" disabled={sortMode === 'manual' || view !== 'library'} onClick={() => { setSortMenuOpen(false); setSortConfirmation(true) }}>Aktuelle Sortierung als Manuell übernehmen</button></div>}</div></div>}
     {message && <div className="message">{message}</div>}{selectionMode && <div className="selection-hint">{bulkMoveMode ? 'Zielposition in der Liste antippen.' : `${selectedSongIds.size} ausgewählt. Playlists und weitere Aktionen findest du unten rechts.`}</div>}
     {view === 'trash' ? <div className="trash-list">
       {trashedSongs.map((song) => <article className="trash-item" key={`trash-song-${song.id}`}><div><small>LIED</small><strong>{song.name}</strong><span>{song.trashedAt ? formatDate(song.trashedAt) : ''}</span></div><button type="button" onClick={() => void restoreTrashedSong(song)}>Wiederherstellen</button></article>)}
       {trashedPlaylists.map((playlist) => <article className="trash-item" key={`trash-playlist-${playlist.id}`}><div><small>PLAYLIST</small><strong>{playlist.name}</strong><span>{playlist.trashedAt ? formatDate(playlist.trashedAt) : ''}</span></div><button type="button" onClick={() => void restoreTrashedPlaylist(playlist)}>Wiederherstellen</button></article>)}
+      {trashedTags.map((tag) => <article className="trash-item" key={`trash-tag-${tag.id}`}><div><small>TAG</small><strong><i className="tag-dot" style={{ background: tag.color }} /> {tag.name}</strong><span>{tag.trashedAt ? formatDate(tag.trashedAt) : ''}</span></div><button type="button" onClick={() => void restoreTrashedTag(tag)}>Wiederherstellen</button></article>)}
       {songs.filter((song) => song.trashedLoop).map((song) => <article className="trash-item" key={`trash-loop-${song.id}`}><div><small>LOOP</small><strong>{song.name}</strong><span>{song.trashedLoop ? `${formatPrecise(song.trashedLoop.start)} – ${formatPrecise(song.trashedLoop.end)}` : ''}</span></div><button type="button" onClick={() => void restoreTrashedLoop(song)}>Wiederherstellen</button></article>)}
       {!trashCount && <div className="empty-state trash-empty"><div className="empty-icon">⌫</div><h2>Der Papierkorb ist leer.</h2></div>}
-    </div> : visibleSongs.length ? <div className="song-list">{bulkMoveMode ? renderBulkMoveDropZone(0) : renderDropZone(0, 'song')}{visibleSongs.map((song, index) => <div key={song.id} className={`song-row${song.isNew ? ' new-import' : ''}${index > 0 && !song.isNew && visibleSongs[index - 1]?.isNew ? ' new-group-break' : ''}${selectedSongIds.has(song.id) ? ' selected-song' : ''}${repeatSelectionIds.has(song.id) ? ' repeat-selected-song' : ''}`}>{songEditMode && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'song', id: song.id, targetIndex: null })}>↕</button>}{selectionMode && <button className="selection-check" type="button" onClick={() => toggleSelected(song.id)}>{selectedSongIds.has(song.id) ? '✓' : ''}</button>}<button className="song-main" type="button" onClick={() => playSong(song.id)} disabled={songEditMode}><span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span><span className="song-copy"><strong>{song.name}</strong><small>{view === 'history' ? formatDate(song.addedAt) : membershipText(song.id)}</small></span><span className="song-meta"><small>{!song.file || song.file.size === 0 ? 'FEHLT' : formatTime(song.duration)}</small>{song.loopStart !== undefined && song.loopEnd !== undefined && <span className="loop-badge">↻</span>}</span></button><button className="overflow-button song-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'song', id: song.id })}>•••</button>{activePlaylist && view === 'library' && !selectionMode && !songEditMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActivePlaylist(song.id)}>Entfernen</button>}{bulkMoveMode ? renderBulkMoveDropZone(index + 1) : renderDropZone(index + 1, 'song')}</div>)}</div> : <div className="empty-state"><div className="empty-icon">♫</div><h2>{view === 'library' && searchQuery.trim() ? 'Keine Treffer.' : view === 'loops' ? 'Noch keine Loops gespeichert.' : view === 'history' ? 'Keine neuen Importe.' : 'Noch keine Musik hier.'}</h2></div>}
+    </div> : visibleSongs.length ? <div className="song-list">{bulkMoveMode ? renderBulkMoveDropZone(0) : renderDropZone(0, 'song')}{visibleSongs.map((song, index) => <div key={song.id} className={`song-row${song.isNew ? ' new-import' : ''}${index > 0 && !song.isNew && visibleSongs[index - 1]?.isNew ? ' new-group-break' : ''}${selectedSongIds.has(song.id) ? ' selected-song' : ''}${repeatSelectionIds.has(song.id) ? ' repeat-selected-song' : ''}`}>{songEditMode && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'song', id: song.id, targetIndex: null })}>↕</button>}{selectionMode && <button className="selection-check" type="button" onClick={() => toggleSelected(song.id)}>{selectedSongIds.has(song.id) ? '✓' : ''}</button>}<button className="song-main" type="button" onClick={() => playSong(song.id)} disabled={songEditMode}><span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span><span className="song-copy"><strong>{song.name}</strong><small className="song-subline"><span className="song-tag-dots">{songTags(song.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} title={tag.name} />)}</span><span>{view === 'history' ? formatDate(song.addedAt) : membershipText(song.id)}</span></small></span><span className="song-meta"><small>{!song.file || song.file.size === 0 ? 'FEHLT' : formatTime(song.duration)}</small>{song.loopStart !== undefined && song.loopEnd !== undefined && <span className="loop-badge">↻</span>}</span></button><button className="overflow-button song-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'song', id: song.id })}>•••</button>{activePlaylist && view === 'library' && !selectionMode && !songEditMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActivePlaylist(song.id)}>Entfernen</button>}{activeTag && view === 'tag' && !selectionMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActiveTag(song.id)}>Entfernen</button>}{bulkMoveMode ? renderBulkMoveDropZone(index + 1) : renderDropZone(index + 1, 'song')}</div>)}</div> : <div className="empty-state"><div className="empty-icon">♫</div><h2>{view === 'library' && searchQuery.trim() ? 'Keine Treffer.' : view === 'loops' ? 'Noch keine Loops gespeichert.' : view === 'history' ? 'Keine neuen Importe.' : 'Noch keine Musik hier.'}</h2></div>}
     </section></main>}
 
-    {view === 'playlistOverview' && <section className="playlist-overview"><div className="playlist-overview-heading"><p className="eyebrow">DEINE MUSIK</p><h1>Playlists</h1><p>{playlists.length} Playlists</p></div><div className="playlist-grid">{sidebarPlaylists.map((playlist) => <div className="playlist-card-wrap" key={playlist.id}><button className="playlist-card" type="button" onClick={() => void openPlaylist(playlist.id)}><span className="playlist-card-cover">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : '♫'}</span><strong>{playlist.name}</strong><small>{playlist.songIds.length} {playlist.songIds.length === 1 ? 'Lied' : 'Lieder'}</small></button><button className="overflow-button card-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id })}>•••</button></div>)}</div></section>}
+    {view === 'playlistOverview' && <section className="playlist-overview"><div className="playlist-overview-heading"><p className="eyebrow">DEINE MUSIK</p><h1>Playlists</h1><p>{playlists.length} Playlists</p></div><div className="playlist-grid">{sidebarPlaylists.map((playlist) => <div className="playlist-card-wrap" key={playlist.id}><button className="playlist-card" type="button" onClick={() => void openPlaylist(playlist.id)}><span className="playlist-card-cover">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : '♫'}</span><strong><span className="card-tag-dots">{playlistTags(playlist.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} />)}</span>{playlist.name}</strong><small>{playlist.songIds.length} {playlist.songIds.length === 1 ? 'Lied' : 'Lieder'}</small></button><button className="overflow-button card-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id })}>•••</button></div>)}</div></section>}
 
     <section className={`player${currentSong ? ' visible' : ''}`}><audio ref={audioRef} src={currentUrl ?? undefined} playsInline preload="auto" onTimeUpdate={(event) => handleAudioTimeUpdate(event.currentTarget)} onLoadedMetadata={(event) => { const value = event.currentTarget.duration; setDuration(value); if (currentSong && Number.isFinite(value) && (!currentSong.duration || Math.abs(currentSong.duration - value) > .5)) void updateSong({ ...currentSong, duration: value }) }} onPlay={() => { playbackAudioRef.current ??= audioRef.current; setIsPlaying(true) }} onPause={() => requestAnimationFrame(updatePlayingState)} onError={() => currentSong && setMessage(`„${currentSong.name}“ kann aus dem lokalen Speicher nicht geladen werden.`)} onEnded={(event) => handleAudioEnded(event.currentTarget)} /><audio ref={overlapAudioRef} src={currentUrl ?? undefined} playsInline preload="auto" onTimeUpdate={(event) => handleAudioTimeUpdate(event.currentTarget)} onPlay={() => setIsPlaying(true)} onPause={() => requestAnimationFrame(updatePlayingState)} onEnded={(event) => handleAudioEnded(event.currentTarget)} />
-      <button className="now-playing" type="button" onClick={() => currentSong && navigateTo({ view, playlistId: activePlaylistId, detailOpen: true })} disabled={!currentSong}><span className="cover-placeholder">♫</span><span className="now-playing-copy"><small>JETZT</small><span className="marquee"><strong>{currentSong?.name ?? 'Kein Song ausgewählt'}</strong></span></span></button>
+      <button className="now-playing" type="button" onClick={() => currentSong && navigateTo({ view, playlistId: activePlaylistId, tagId: activeTagId, detailOpen: true })} disabled={!currentSong}><span className="cover-placeholder">♫</span><span className="now-playing-copy"><small>JETZT</small><span className="marquee"><strong>{currentSong?.name ?? 'Kein Song ausgewählt'}</strong></span></span></button>
       <div className="transport"><div className="transport-buttons"><button className={shuffle ? 'active-control' : ''} onClick={() => setShuffle((value) => !value)} aria-label="Shuffle">⇄</button><button onClick={() => moveSong(-1)} aria-label="Vorheriges Lied">⏮</button><button onClick={() => skipSeconds(-seekSeconds)} aria-label={`${seekSeconds} Sekunden zurück`}>⏪</button><button className="play-button" onClick={togglePlayback}>{isPlaying ? '❚❚' : '▶'}</button><button onClick={() => skipSeconds(seekSeconds)} aria-label={`${seekSeconds} Sekunden vor`}>⏩</button><button onClick={() => moveSong(1)} aria-label="Nächstes Lied">⏭</button><button className={repeatQueue || repeatSelectionIds.size ? 'active-control repeat-control' : 'repeat-control'} onPointerDown={beginRepeatHold} onPointerUp={endRepeatHold} onPointerCancel={endRepeatHold} onContextMenu={(event) => event.preventDefault()} onClick={handleRepeatClick} aria-label={repeatSelectionIds.size ? 'Ausgewählte Lieder wiederholen' : 'Liste wiederholen'}><span className={`repeat-symbol${repeatSelectionIds.size ? ' repeat-one-symbol' : ''}`}>↻{repeatSelectionIds.size > 0 && <b>1</b>}</span></button></div><div className="progress-row"><span>{formatTime(currentTime)}</span><input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} /><span>{formatTime(duration)}</span></div></div>
-      <div className={`quick-playlists${selectionMode ? ' selection-tools' : ''}`}><button className="all-playlists-button" type="button" onClick={() => setPlaylistChooserMode(selectionMode ? 'bulk' : 'current')} disabled={selectionMode ? !selectedSongIds.size : !currentSong}><span>Alle Playlists</span><strong>›</strong></button>{selectionMode && <div className="selection-more-wrap"><button className="selection-more-button" type="button" onClick={() => setSelectionMenuOpen((value) => !value)} aria-label="Weitere Auswahlaktionen">•••</button>{selectionMenuOpen && <><button className="selection-menu-shield" type="button" onClick={() => setSelectionMenuOpen(false)} /><div className="selection-action-menu"><button type="button" disabled>Gruppieren</button><button type="button" onClick={beginSelectedMove} disabled={!selectedSongIds.size || view !== 'library'}>Bewegen</button><button type="button" disabled>Tags</button><button className="danger-menu-action" type="button" onClick={() => { setSelectionMenuOpen(false); setSelectionConfirmation('deleteSelected') }} disabled={!selectedSongIds.size}>Alle löschen</button></div></>}</div>}</div>
+      <div className={`quick-playlists${selectionMode ? ' selection-tools' : ''}`}><button className="all-playlists-button" type="button" onClick={() => setPlaylistChooserMode(selectionMode ? 'bulk' : 'current')} disabled={selectionMode ? !selectedSongIds.size : !currentSong}><span>Alle Playlists</span><strong>›</strong></button>{selectionMode && <div className="selection-more-wrap"><button className="selection-more-button" type="button" onClick={() => setSelectionMenuOpen((value) => !value)} aria-label="Weitere Auswahlaktionen">•••</button>{selectionMenuOpen && <><button className="selection-menu-shield" type="button" onClick={() => setSelectionMenuOpen(false)} /><div className="selection-action-menu"><button type="button" disabled>Gruppieren</button><button type="button" onClick={beginSelectedMove} disabled={!selectedSongIds.size || view !== 'library'}>Bewegen</button><button type="button" onClick={() => openTagChooser('song', [...selectedSongIds])} disabled={!selectedSongIds.size}>Tags</button><button className="danger-menu-action" type="button" onClick={() => { setSelectionMenuOpen(false); setSelectionConfirmation('deleteSelected') }} disabled={!selectedSongIds.size}>Alle löschen</button></div></>}</div>}</div>
     </section>
 
-    {detailOpen && currentSong && <section className="song-detail"><div className="detail-topbar"><button type="button" onClick={navigateBack}>‹ Zurück</button></div><div className="detail-content"><p className="detail-label">JETZT</p><h2>{currentSong.name}</h2><div className="playlist-membership"><span>IN PLAYLISTS</span><strong>{currentSongPlaylists.length ? currentSongPlaylists.map((playlist) => playlist.name).join(' · ') : 'In keiner Playlist'}</strong></div><div className="detail-progress"><input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} /><div><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div></div><div className="detail-controls detail-controls-expanded"><button className={shuffle ? 'active-control' : ''} onClick={() => setShuffle((value) => !value)} aria-label="Shuffle">⇄</button><button onClick={playPreviousFromHistory} disabled={!playHistory.length}>⏮</button><button onClick={() => skipSeconds(-seekSeconds)}>↶<small>{seekSeconds}</small></button><button className="detail-play" onClick={togglePlayback}>{isPlaying ? '❚❚' : '▶'}</button><button onClick={() => skipSeconds(seekSeconds)}>↷<small>{seekSeconds}</small></button><button onClick={() => moveSong(1)}>⏭</button><button className={repeatQueue || repeatSelectionIds.size ? 'active-control repeat-control' : 'repeat-control'} onPointerDown={beginRepeatHold} onPointerUp={endRepeatHold} onPointerCancel={endRepeatHold} onContextMenu={(event) => event.preventDefault()} onClick={handleRepeatClick} aria-label={repeatSelectionIds.size ? 'Ausgewählte Lieder wiederholen' : 'Liste wiederholen'}><span className={`repeat-symbol${repeatSelectionIds.size ? ' repeat-one-symbol' : ''}`}>↻{repeatSelectionIds.size > 0 && <b>1</b>}</span></button></div><div className="loop-panel"><div><span className="loop-panel-label">LOOP</span><h3>{currentSong.loopStart !== undefined && currentSong.loopEnd !== undefined ? `${formatTime(currentSong.loopStart)} – ${formatTime(currentSong.loopEnd)}` : 'Noch kein Loop'}</h3><p>Den Bereich legst du präzise im Loop-Editor fest.</p></div><div className="loop-actions"><button type="button" onClick={() => openLoopEditor(currentSong.id)}>{currentSong.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{currentSong.loopStart !== undefined && currentSong.loopEnd !== undefined && <><button className={currentSong.loopEnabled ? 'loop-active' : ''} type="button" onClick={() => void toggleCurrentLoop()}>{currentSong.loopEnabled ? 'Loop aktiv' : 'Loop aktivieren'}</button><button className="danger-button" type="button" onClick={() => setLoopConfirmation('delete')}>Loop entfernen</button></>}</div></div></div></section>}
+    {detailOpen && currentSong && <section className="song-detail"><div className="detail-topbar"><button type="button" onClick={navigateBack}>‹ Zurück</button></div><div className="detail-content"><p className="detail-label">JETZT</p><h2>{currentSong.name}</h2><div className="tag-membership-detail"><span>TAGS</span><strong>{currentSongTags.length ? currentSongTags.map((tag) => <span className="detail-tag-chip" key={tag.id}><i className="tag-dot" style={{ background: tag.color }} />{tag.name}</span>) : 'Keine Tags'}</strong></div><div className="playlist-membership"><span>IN PLAYLISTS</span><strong>{currentSongPlaylists.length ? currentSongPlaylists.map((playlist) => playlist.name).join(' · ') : 'In keiner Playlist'}</strong></div><div className="detail-progress"><input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} /><div><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div></div><div className="detail-controls detail-controls-expanded"><button className={shuffle ? 'active-control' : ''} onClick={() => setShuffle((value) => !value)} aria-label="Shuffle">⇄</button><button onClick={playPreviousFromHistory} disabled={!playHistory.length}>⏮</button><button onClick={() => skipSeconds(-seekSeconds)}>↶<small>{seekSeconds}</small></button><button className="detail-play" onClick={togglePlayback}>{isPlaying ? '❚❚' : '▶'}</button><button onClick={() => skipSeconds(seekSeconds)}>↷<small>{seekSeconds}</small></button><button onClick={() => moveSong(1)}>⏭</button><button className={repeatQueue || repeatSelectionIds.size ? 'active-control repeat-control' : 'repeat-control'} onPointerDown={beginRepeatHold} onPointerUp={endRepeatHold} onPointerCancel={endRepeatHold} onContextMenu={(event) => event.preventDefault()} onClick={handleRepeatClick} aria-label={repeatSelectionIds.size ? 'Ausgewählte Lieder wiederholen' : 'Liste wiederholen'}><span className={`repeat-symbol${repeatSelectionIds.size ? ' repeat-one-symbol' : ''}`}>↻{repeatSelectionIds.size > 0 && <b>1</b>}</span></button></div><div className="loop-panel"><div><span className="loop-panel-label">LOOP</span><h3>{currentSong.loopStart !== undefined && currentSong.loopEnd !== undefined ? `${formatTime(currentSong.loopStart)} – ${formatTime(currentSong.loopEnd)}` : 'Noch kein Loop'}</h3><p>Den Bereich legst du präzise im Loop-Editor fest.</p></div><div className="loop-actions"><button type="button" onClick={() => openLoopEditor(currentSong.id)}>{currentSong.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{currentSong.loopStart !== undefined && currentSong.loopEnd !== undefined && <><button className={currentSong.loopEnabled ? 'loop-active' : ''} type="button" onClick={() => void toggleCurrentLoop()}>{currentSong.loopEnabled ? 'Loop aktiv' : 'Loop aktivieren'}</button><button className="danger-button" type="button" onClick={() => setLoopConfirmation('delete')}>Loop entfernen</button></>}</div></div></div></section>}
 
     {loopEditorSongId && editorSong && <section className="loop-editor" aria-label="Loop bearbeiten"><div className="loop-editor-scroll"><div className="loop-editor-inner">
       <div className="loop-editor-commandbar">
@@ -1148,7 +1334,12 @@ function App() {
 
     {playlistChooserMode && <div className="playlist-chooser-backdrop" onMouseDown={() => setPlaylistChooserMode(null)}><section className="playlist-chooser" onMouseDown={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">PLAYLISTS</p><h2>{playlistChooserMode === 'bulk' ? `${selectedSongIds.size} Lieder zuordnen` : 'Alle Playlists'}</h2></div><button type="button" onClick={() => setPlaylistChooserMode(null)}>×</button></div><div className="playlist-groups">{groupedPlaylists.map(([group, items]) => <div className="playlist-group" key={group}><strong>{group}</strong><div>{items.map((playlist) => { const contains = currentSong ? playlist.songIds.includes(currentSong.id) : false; return <button key={playlist.id} type="button" onClick={() => playlistChooserMode === 'bulk' ? void assignSelectedToPlaylist(playlist) : void toggleCurrentInPlaylist(playlist)}><span>{playlist.name}</span>{playlistChooserMode === 'current' && <b>{contains ? '−' : '+'}</b>}</button> })}</div></div>)}</div></section></div>}
 
-    {overflowMenu && <><button className="menu-shield" type="button" onClick={() => setOverflowMenu(null)} /><div className="overflow-menu">{overflowMenu.kind === 'playlists' && <><button type="button" onClick={() => beginReorder('sidebar')}>Bearbeiten</button><button type="button" onClick={() => { setOverflowMenu(null); navigateTo({ view: 'playlistOverview', playlistId: activePlaylistId, detailOpen: false }) }}>Übersicht</button></>}{overflowMenu.kind === 'song' && overflowMenu.id && (() => { const song = songs.find((item) => item.id === overflowMenu.id); if (!song) return null; return <><button type="button" onClick={() => beginRename('song', song.id)}>Umbenennen</button><button type="button" onClick={() => void copySong(song.id)}>Kopieren</button><button type="button" onClick={() => void shareSong(song.id)}>Teilen</button><button type="button" onClick={() => openLoopEditor(song.id)}>{song.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{song.loopStart !== undefined && song.loopEnd !== undefined && <button type="button" onClick={() => void toggleSongLoop(song.id)}>{song.loopEnabled ? 'Loop deaktivieren' : 'Loop aktivieren'}</button>}{song.isNew && <><button className="blue-menu-action" type="button" onClick={() => void markSeen(song.id)}>Als gelesen markieren</button><button className="blue-menu-action" type="button" onClick={() => void markSeen()}>Alle als gelesen markieren</button></>}<button className="danger-menu-action" type="button" onClick={() => { setSongToDelete(song); setOverflowMenu(null) }}>Löschen</button></> })()}{overflowMenu.kind === 'playlist' && overflowMenu.id && (() => { const playlist = playlists.find((item) => item.id === overflowMenu.id); if (!playlist) return null; return <><button type="button" onClick={() => openPlaylistCoverPicker(playlist.id)}>Bild ändern</button><button type="button" onClick={() => beginRename('playlist', playlist.id)}>Umbenennen</button><button type="button" onClick={() => void copyPlaylist(playlist.id)}>Kopieren</button><button type="button" onClick={() => void sharePlaylist(playlist.id)}>Teilen</button><button className="danger-menu-action" type="button" onClick={() => { setPlaylistToDelete(playlist); setOverflowMenu(null) }}>Löschen</button></> })()}</div></>}
+    {overflowMenu && <><button className="menu-shield" type="button" onClick={() => setOverflowMenu(null)} /><div className="overflow-menu">{overflowMenu.kind === 'playlists' && <><button type="button" onClick={() => beginReorder('sidebar')}>Bearbeiten</button><button type="button" onClick={() => { setOverflowMenu(null); navigateTo({ view: 'playlistOverview', playlistId: activePlaylistId, detailOpen: false }) }}>Übersicht</button></>}{overflowMenu.kind === 'tags' && <button type="button" onClick={() => beginReorder('tags')}>Bearbeiten</button>}{overflowMenu.kind === 'tag' && overflowMenu.id && (() => { const tag = tags.find((item) => item.id === overflowMenu.id); if (!tag) return null; return <><button type="button" onClick={() => beginRename('tag', tag.id)}>Umbenennen</button><button className="danger-menu-action" type="button" onClick={() => { setTagToDelete(tag); setOverflowMenu(null) }}>Löschen</button></> })()}{overflowMenu.kind === 'song' && overflowMenu.id && (() => { const song = songs.find((item) => item.id === overflowMenu.id); if (!song) return null; return <><button type="button" onClick={() => beginRename('song', song.id)}>Umbenennen</button><button type="button" onClick={() => copySong(song.id)}>Kopieren</button><button type="button" disabled={clipboard?.kind !== 'song'} onClick={pasteFromSongMenu}>Einfügen</button><button type="button" onClick={() => openTagChooser('song', [song.id])}>Tags</button><button type="button" onClick={() => void shareSong(song.id)}>Teilen</button><button type="button" onClick={() => openLoopEditor(song.id)}>{song.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{song.loopStart !== undefined && song.loopEnd !== undefined && <button type="button" onClick={() => void toggleSongLoop(song.id)}>{song.loopEnabled ? 'Loop deaktivieren' : 'Loop aktivieren'}</button>}{song.isNew && <><button className="blue-menu-action" type="button" onClick={() => void markSeen(song.id)}>Als gelesen markieren</button><button className="blue-menu-action" type="button" onClick={() => void markSeen()}>Alle als gelesen markieren</button></>}<button className="danger-menu-action" type="button" onClick={() => { setSongToDelete(song); setOverflowMenu(null) }}>Löschen</button></> })()}{overflowMenu.kind === 'playlist' && overflowMenu.id && (() => { const playlist = playlists.find((item) => item.id === overflowMenu.id); if (!playlist) return null; return <><button type="button" onClick={() => openPlaylistCoverPicker(playlist.id)}>Bild ändern</button><button type="button" onClick={() => beginRename('playlist', playlist.id)}>Umbenennen</button><button type="button" onClick={() => copyPlaylist(playlist.id)}>Kopieren</button><button type="button" disabled={!clipboard} onClick={() => pasteFromPlaylistMenu(playlist.id)}>Einfügen</button><button type="button" onClick={() => openTagChooser('playlist', [playlist.id])}>Tags</button><button type="button" onClick={() => void sharePlaylist(playlist.id)}>Teilen</button><button className="danger-menu-action" type="button" onClick={() => { setPlaylistToDelete(playlist); setOverflowMenu(null) }}>Löschen</button></> })()}</div></>}
+
+    {tagChooserTarget && <div className="playlist-chooser-backdrop tag-chooser-backdrop" onMouseDown={() => setTagChooserTarget(null)}><section className="playlist-chooser tag-chooser" onMouseDown={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">TAGS</p><h2>{tagChooserTarget.kind === 'song' ? `${tagChooserTarget.ids.length} ${tagChooserTarget.ids.length === 1 ? 'Lied' : 'Lieder'}` : `${tagChooserTarget.ids.length} ${tagChooserTarget.ids.length === 1 ? 'Playlist' : 'Playlists'}`} taggen</h2></div><button type="button" onClick={() => setTagChooserTarget(null)}>×</button></div><div className="tag-chooser-list">{sidebarTags.map((tag) => { const ids = tagChooserTarget.kind === 'song' ? tag.songIds : tag.playlistIds; const all = tagChooserTarget.ids.every((id) => ids.includes(id)); const some = !all && tagChooserTarget.ids.some((id) => ids.includes(id)); return <button key={tag.id} type="button" onClick={() => void toggleTargetTag(tag)}><span><i className="tag-dot" style={{ background: tag.color }} /><b>{tag.name}</b></span><small>{tag.songIds.filter((id) => songs.some((song) => song.id === id)).length} Lieder</small><strong>{all ? '✓' : some ? '±' : '+'}</strong></button> })}{!sidebarTags.length && <p className="tag-empty-hint">Erstelle zuerst links unter „Tags“ einen Tag.</p>}</div></section></div>}
+
+    {duplicateConflict && <div className="modal-backdrop duplicate-conflict-backdrop" onMouseDown={cancelDuplicateConflict}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Gleicher Name bereits vorhanden</h2><p>{duplicateConflict.names.length === 1 ? `„${duplicateConflict.names[0]}“ ist am Ziel bereits vorhanden.` : `${duplicateConflict.names.length} gleichnamige Einträge sind am Ziel bereits vorhanden.`} Was soll Josi tun?</p><div className="dialog-actions duplicate-actions"><button type="button" onClick={cancelDuplicateConflict}>Abbrechen</button><button type="button" onClick={() => resolveDuplicateConflict('both')}>Beide einfügen</button><button type="button" onClick={() => resolveDuplicateConflict('replace')}>Ersetzen</button></div></div></div>}
+    {tagToDelete && <div className="modal-backdrop" onMouseDown={() => setTagToDelete(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Tag löschen?</h2><p>„{tagToDelete.name}“ wird in den Papierkorb verschoben. Songs und Playlists selbst bleiben erhalten.</p><div className="dialog-actions"><button type="button" onClick={() => setTagToDelete(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void confirmDeleteTag()}>In Papierkorb</button></div></div></div>}
 
     {loopConfirmation === 'save' && editorSong && <div className="modal-backdrop" onMouseDown={() => setLoopConfirmation(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Loop speichern?</h2><p>Der Bereich {formatPrecise(loopDraftStart)} bis {formatPrecise(loopDraftEnd)} und die aktuellen Markierungen werden gespeichert.</p><div className="dialog-actions"><button type="button" onClick={() => setLoopConfirmation(null)}>Abbrechen</button><button className="save-loop-confirm" type="button" onClick={() => void saveLoopDraft()}>Loop speichern</button></div></div></div>}
     {loopConfirmation === 'delete' && currentSong && <div className="modal-backdrop" onMouseDown={() => setLoopConfirmation(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Loop löschen?</h2><p>Der gespeicherte Loop von „{currentSong.name}“ wird in den Papierkorb verschoben. Die Audiodatei bleibt unverändert.</p><div className="dialog-actions"><button type="button" onClick={() => setLoopConfirmation(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void removeCurrentLoop()}>Loop löschen</button></div></div></div>}
