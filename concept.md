@@ -113,7 +113,7 @@ Der Editor besitzt eine eigene Scrollfläche und die App verwendet keinen selbst
 
 ## Wiederholen: Liste oder ausgewählte Songs
 
-Kurzer Druck auf den Wiederholen-Knopf schaltet die normale Listenwiederholung. **Langdruck ist hier bewusst die einzige Ausnahme zur sonst abgeschafften Langdruck-Bedienung:** Er aktiviert `↻1`. Ohne Mehrfachauswahl wiederholt Josi den aktuell gewählten Song. Werden vorher mehrere Songs mit „Auswählen“ markiert, übernimmt der Langdruck genau diese Songs als Wiederholgruppe, beendet den Auswahlmodus und markiert die Gruppe dauerhaft grün, solange der Modus aktiv ist. Die Songs laufen in Listenreihenfolge und beginnen nach dem letzten wieder beim ersten. Das Symbol bleibt `↻1`, auch wenn mehrere Songs dazugehören.
+Kurzer Druck auf den Wiederholen-Knopf schaltet die normale Listenwiederholung. **Langdruck ist hier bewusst die einzige Ausnahme zur sonst abgeschafften Langdruck-Bedienung:** Er öffnet eine Box mit `∞` oder einer frei eingebbaren Wiederholungszahl. `∞` bzw. die verbleibende Zahl wird neben dem Wiederholen-Symbol gezeigt. Bei einem aktiven Loop zählt die Zahl bei jedem Loop-Durchlauf herunter; bei 0 läuft das Lied ohne weiteren Loop weiter und kann danach zum nächsten Song wechseln. Ohne aktiven Loop zählt die Zahl vollständige Song-Wiederholungen.
 
 ## Wiedergabe nach Loop-Bearbeitung
 
@@ -158,8 +158,13 @@ Der experimentelle Ordnerimport bleibt entfernt.
 
 ## Tags und Einfügen
 
-Tags sind eine zweite Organisationsschicht neben Playlists. Jeder Tag hat einen farbigen Punkt und kann beliebig viele Songs und Playlists enthalten; Tags selbst gehören nie zu Playlists. In normalen Songzeilen werden aus Platzgründen nur die Punkte angezeigt. In der näheren Songansicht stehen Punkt und Tagname zusammen.
+Tags sind eine zweite Organisationsschicht neben Playlists. Jeder Tag hat einen farbigen Punkt und kann beliebig viele Songs und Playlists enthalten; Tags selbst gehören nie zu Playlists. Beim Erstellen und Umbenennen kann die Farbe aus einer kompakten Palette mit ungefähr 100 Farben gewählt werden. In normalen Songzeilen werden aus Platzgründen nur die Punkte angezeigt. In der näheren Songansicht stehen Punkt und Tagname zusammen.
 
-Der Tags-Bereich und der Playlists-Bereich lassen sich durch Antippen ihrer freien Überschrift ein- und ausklappen. Tags haben eine eigene gespeicherte Sortierung: Manuell, A–Z Anfang, A–Z Ende, summierte Höranzahl, Anzahl der Lieder und Chronik.
+Der Tags-Bereich und der Playlists-Bereich lassen sich durch Antippen ihrer freien Überschrift ein- und ausklappen. Die Sortiersteuerung steht nicht dauerhaft unter der Überschrift, sondern in `••• → Umbenennen → Sortieren` des jeweiligen Tags bzw. der Playlist. Tags und Playlists speichern ihren Sortiermodus und die Richtung getrennt. Für Tags stehen Manuell, A–Z Anfang, A–Z Ende, summierte Höranzahl, Anzahl der Lieder und Chronik bereit; Playlists verwenden dieselben passenden Kriterien.
 
 Beim Taggen oder Einfügen eines Objekts mit einem Namen, der am Ziel bereits vorkommt, fragt Josi nach `Ersetzen`, `Beide einfügen` oder `Abbrechen`. Nach Abbrechen kann der Redo-Pfeil denselben Versuch wiederholen und öffnet die Konfliktfrage erneut.
+
+
+## Detailansicht und kleine Bedienkorrekturen
+
+Die nähere Songansicht besitzt ein eigenes `•••` mit songbezogenen Aktionen wie Umbenennen, Kopieren/Einfügen, Tags, Teilen und Loop-Funktionen. Listenweite Aktionen wie das Sortieren von Tags oder Playlists werden dort bewusst nicht gezeigt. In der Tag-Zuordnung bedeutet `+` hinzufügen und `−` entfernen; eine teilweise Mehrfachzuordnung bleibt als `±` sichtbar. Home schließt auch aus dem Loop-Editor zuverlässig den Editor und öffnet die Bibliothek.

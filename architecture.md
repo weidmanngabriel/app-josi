@@ -31,7 +31,7 @@ Diese Trennung ist eine Datenintegritätsmaßnahme für Safari/iPadOS. Sie verhi
 
 ### Playlists und Tags
 
-Playlists enthalten ID, Name, geordnete Song-IDs, optionales Bild, Erstellungs-/Nutzungszeit und manuelle Sortierposition. Tags liegen ab IndexedDB-Version 3 in einem eigenen `tags`-Store und enthalten Name, Farbe, Song-IDs, Playlist-IDs und eine manuelle Sortierposition. Tags referenzieren ausschließlich vorhandene Objekte und duplizieren niemals Audiodateien. Ein Song oder eine Playlist kann mehrere Tags besitzen; Tags selbst können nicht Mitglied einer Playlist sein.
+Playlists enthalten ID, Name, geordnete Song-IDs, optionales Bild, Erstellungs-/Nutzungszeit und manuelle Sortierposition. Tags liegen ab IndexedDB-Version 3 in einem eigenen `tags`-Store und enthalten Name, frei wählbare Farbe, Song-IDs, Playlist-IDs und eine manuelle Sortierposition. Beim Erstellen und Umbenennen steht eine kompakte Palette mit ungefähr 100 Farbtönen bereit. Tags referenzieren ausschließlich vorhandene Objekte und duplizieren niemals Audiodateien. Ein Song oder eine Playlist kann mehrere Tags besitzen; Tags selbst können nicht Mitglied einer Playlist sein.
 
 ## Import und Speicherstabilität
 
@@ -43,7 +43,7 @@ Bereits vor der Trennung beschädigte oder verlorene Blobs können nicht rekonst
 
 ## Drei-Punkte-Menüs
 
-Langdruck wird grundsätzlich nicht für Objektaktionen verwendet. Zusatzfunktionen liegen in sichtbaren `•••`-Menüs. **Einzige bewusste Ausnahme ist der Wiederholen-Knopf im Player:** Langdruck aktiviert die Wiederholung eines einzelnen bzw. mehrerer zuvor ausgewählter Songs.
+Langdruck wird grundsätzlich nicht für Objektaktionen verwendet. Zusatzfunktionen liegen in sichtbaren `•••`-Menüs. **Einzige bewusste Ausnahme ist der Wiederholen-Knopf im Player:** Langdruck öffnet eine Wiederholungsbox mit `∞` oder einer frei wählbaren Anzahl.
 
 ### Song-Menü
 
@@ -121,7 +121,7 @@ Deshalb hängt die Objekt-URL nur noch von der **Song-ID und dem tatsächlichen 
 
 ## Player, Wiederholung und Media Session
 
-Ein kurzer Druck auf `↻` schaltet weiterhin die Wiederholung der aktuellen Liste um. Ein Langdruck auf denselben Knopf aktiviert einen Sondermodus mit `↻1`: Ohne Mehrfachauswahl wird der aktuell gewählte Song wiederholt. Mit aktiver Mehrfachauswahl werden die ausgewählten Songs als feste Wiederholgruppe übernommen und anschließend grün in den Listen markiert. Die Gruppe läuft in ihrer Reihenfolge zyklisch weiter; das Symbol bleibt auch bei mehreren Songs `↻1`. Ein normaler kurzer Druck beendet den Sondermodus zunächst vollständig; ein weiterer kurzer Druck kann danach wieder die normale Listenwiederholung einschalten.
+Ein kurzer Druck auf `↻` schaltet weiterhin die Wiederholung der aktuellen Liste um. Ein Langdruck öffnet stattdessen eine Box mit zwei Sonderoptionen: `∞` oder eine frei eingegebene Anzahl. Das aktive Sonderziel wird als `∞` bzw. als verbleibende Zahl direkt am Wiederholen-Symbol gezeigt. Bei einem aktivierten gespeicherten Loop wird die Zahl nach jedem Loop-Durchlauf heruntergezählt; bei 0 wird der Loop für diese Wiedergabe nicht mehr zurückgesetzt und der Song kann normal bis zum nächsten Lied weiterlaufen. Bei Songs ohne aktiven Loop gilt dieselbe Sonderzahl für vollständige Song-Wiederholungen. Die Einstellung ist nur Wiedergabezustand und wird nicht in Song-Metadaten gespeichert.
 
 Für normale Wiedergabe bleibt ein HTML-Audio-Element der aktive Player. Bei einem gespeicherten Loop steht ein zweites unsichtbares Audio-Element mit derselben lokalen Quelle bereit. Kurz vor dem Loop-Ende startet der zweite Kanal bereits am Loop-Anfang; beide laufen ungefähr 0,18 Sekunden gleichzeitig. Wenn der Browser Lautstärkeänderungen erlaubt, werden sie dabei gegeneinander überblendet. Danach wird der neue Kanal zum aktiven Player und der bisherige pausiert. So muss der hörbare Ton beim Zurückspringen nicht vollständig abreißen.
 
@@ -147,3 +147,8 @@ IndexedDB und Web Share werden vom Browser/iPadOS kontrolliert. Verlorene lokale
 Playlists und Tags sind getrennte, einklappbare Bereiche in der Seitenleiste. Ein Klick auf die freie Überschriftsfläche klappt den Bereich ein oder aus; interaktive Knöpfe stoppen diese Aktion. Tags besitzen eine eigene in `localStorage` gespeicherte Sortierung mit denselben Modi wie Songlisten; `Dauer` heißt bei Tags `Anzahl der Lieder`, und `Anzahl des Hörens` summiert die vollständigen Wiedergaben der verknüpften Songs. Die manuelle Tag-Reihenfolge kann wie bei Playlists verschoben werden.
 
 Songzeilen zeigen Tags platzsparend nur als farbige Punkte vor der Playlist-Zuordnung. In der Song-Detailansicht erscheinen Punkt und Tagname gemeinsam. Playlists zeigen ihre Tag-Punkte ebenfalls in Navigation und Übersicht. Das Tag-`•••` bei Songs, Playlists und Mehrfachauswahl öffnet eine Mehrfachauswahl der vorhandenen Tags. Wenn innerhalb eines Tags bereits ein gleichnamiger Song bzw. eine gleichnamige Playlist existiert, gilt ebenfalls `Ersetzen`, `Beide einfügen` oder `Abbrechen`. Gelöschte Tags landen wie Songs, Playlists und Loops im Papierkorb.
+
+
+## Seitenleisten-Sortierung, Detailmenü und Navigation
+
+Die Sortierfelder für Tags und Playlists stehen nicht dauerhaft in der Seitenleiste. Bei einem einzelnen Tag bzw. einer Playlist liegt direkt unter `Umbenennen` die Aktion `Sortieren`; sie öffnet einen kompakten Dialog für Sortiermodus und Richtung. Beide Listen speichern ihre Auswahl separat. Die Song-Detailansicht besitzt ein eigenes `•••` mit nur songbezogenen Aktionen inklusive Tags; globale Listen-Sortierung erscheint dort nicht. `Home` schließt den Loop-Editor explizit, bevor zur Bibliothek navigiert wird, damit ein bereits aktiver Bibliotheks-Navigationseintrag den Editor nicht offen hält.
