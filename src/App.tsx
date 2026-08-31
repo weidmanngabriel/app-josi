@@ -59,6 +59,8 @@ type SortMode = 'manual' | 'azStart' | 'azEnd' | 'plays' | 'duration' | 'chronol
 type SortDirection = 'down' | 'up'
 type OverflowMenu = { kind: 'song' | 'playlist' | 'playlists'; id?: string } | null
 type LoopDrag = { kind: 'move' | 'start' | 'end' | 'cursor' | 'focus'; offset: number } | null
+type FocusFollowMode = 'center' | 'page' | 'off'
+type LoopEditorSnapshot = { start: number; end: number; cursor: number; focus: number; markers: number[]; zoom: number }
 type RenameTarget = { kind: 'song' | 'playlist'; id: string } | null
 type ShareNavigator = Navigator & {
   share?: (data: { title?: string; text?: string; files?: File[] }) => Promise<void>
@@ -73,8 +75,6 @@ function extensionForType(type: string) {
   if (type.includes('flac')) return 'flac'
   return 'mp3'
 }
-
-const LOOP_PLAYBACK_RATES = [0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 1, 1.5, 2] as const
 
 function App() {
   const [songs, setSongs] = useState<Song[]>([])
@@ -122,14 +122,22 @@ function App() {
   const [loopSelectionLocked, setLoopSelectionLocked] = useState(false)
   const [markersEnabled, setMarkersEnabled] = useState(true)
   const [cursorLoopEnabled, setCursorLoopEnabled] = useState(true)
-  const [focusFollowsCursor, setFocusFollowsCursor] = useState(true)
+  const [focusFollowMode, setFocusFollowMode] = useState<FocusFollowMode>('center')
   const [loopMarkers, setLoopMarkers] = useState<number[]>([])
+  const [activeMarkerIndex, setActiveMarkerIndex] = useState<number | null>(null)
   const [activeLoopEdge, setActiveLoopEdge] = useState<'start' | 'end'>('start')
-  const [previewLead, setPreviewLead] = useState('1')
+  const [previewLeadStart, setPreviewLeadStart] = useState('1')
+  const [previewLeadEnd, setPreviewLeadEnd] = useState('1')
   const [edgeStep, setEdgeStep] = useState('0,01')
+  const [focusStep, setFocusStep] = useState('1')
+  const [cursorStep, setCursorStep] = useState('5')
+  const [markerStep, setMarkerStep] = useState('1')
   const [waveform, setWaveform] = useState<number[]>([])
   const [waveformStatus, setWaveformStatus] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle')
-  const [loopPlaybackRate, setLoopPlaybackRate] = useState(1)
+  const [loopPlaybackRate, setLoopPlaybackRate] = useState('1')
+  const [loopEditorMenuOpen, setLoopEditorMenuOpen] = useState(false)
+  const [loopUndoStack, setLoopUndoStack] = useState<LoopEditorSnapshot[]>([])
+  const [loopRedoStack, setLoopRedoStack] = useState<LoopEditorSnapshot[]>([])
 
   const fileInputRef = useRef<HTMLInputElement>(null)
   const coverInputRef = useRef<HTMLInputElement>(null)
@@ -157,6 +165,7 @@ function App() {
   const activePlaylist = playlists.find((playlist) => playlist.id === activePlaylistId) ?? null
   const editorSong = songs.find((song) => song.id === loopEditorSongId) ?? null
   const editorDuration = loopEditorSongId && loopEditorSongId === currentSongId ? (duration || editorSong?.duration || 0) : (editorSong?.duration || 0)
+  const parsedLoopPlaybackRate = Math.max(.1, Math.min(2, Number.parseFloat(loopPlaybackRate.replace(',', '.')) || 1))
 
   const sidebarPlaylists = useMemo(() => [...playlists].sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) || b.lastUsedAt - a.lastUsedAt), [playlists])
   const manualQueue = useMemo(() => {
@@ -215,8 +224,8 @@ function App() {
   useEffect(() => {
     const audio = audioRef.current
     if (!audio) return
-    audio.playbackRate = loopEditorSongId ? loopPlaybackRate : 1
-  }, [loopEditorSongId, loopPlaybackRate, currentUrl])
+    audio.playbackRate = loopEditorSongId ? parsedLoopPlaybackRate : 1
+  }, [loopEditorSongId, parsedLoopPlaybackRate, currentUrl])
 
   useEffect(() => {
     if (!editorSong || !editorDuration) return
@@ -237,13 +246,20 @@ function App() {
     }
     setLoopCursor(initialCursor)
     setLoopFocus(initialCursor)
-    setLoopMarkers((editorSong.loopMarkers ?? []).filter((value) => value >= 0 && value <= editorDuration))
+    const initialMarkers = (editorSong.loopMarkers ?? []).filter((value) => value >= 0 && value <= editorDuration)
+    setLoopMarkers(initialMarkers)
+    setActiveMarkerIndex(initialMarkers.length ? 0 : null)
     setLoopZoom(1)
     setLoopSelectionLocked(false)
     setMarkersEnabled(true)
     setCursorLoopEnabled(true)
-    setFocusFollowsCursor(true)
-    setLoopPlaybackRate(1)
+    setFocusFollowMode('center')
+    setLoopPlaybackRate('1')
+    setPreviewLeadStart('1')
+    setPreviewLeadEnd('1')
+    setLoopEditorMenuOpen(false)
+    setLoopUndoStack([])
+    setLoopRedoStack([])
     setActiveLoopEdge('start')
   }, [loopEditorSongId, editorDuration])
 
@@ -286,17 +302,27 @@ function App() {
   }, [loopEditorSongId, editorSong?.id, editorSong?.file])
 
   useEffect(() => {
-    if (!loopEditorSongId || !editorDuration || !focusFollowsCursor) return
+    if (!loopEditorSongId || !editorDuration || focusFollowMode === 'off') return
     setLoopFocus(loopCursor)
     const frame = requestAnimationFrame(() => {
       const scroller = loopTimelineScrollRef.current
       const timeline = loopTimelineRef.current
       if (!scroller || !timeline) return
-      const target = (loopCursor / editorDuration) * timeline.offsetWidth - scroller.clientWidth / 2
-      scroller.scrollLeft = Math.max(0, Math.min(target, scroller.scrollWidth - scroller.clientWidth))
+      const cursorX = (loopCursor / editorDuration) * timeline.offsetWidth
+      if (focusFollowMode === 'center') {
+        const target = cursorX - scroller.clientWidth / 2
+        scroller.scrollLeft = Math.max(0, Math.min(target, scroller.scrollWidth - scroller.clientWidth))
+        return
+      }
+      const left = scroller.scrollLeft + 24
+      const right = scroller.scrollLeft + scroller.clientWidth - 24
+      if (cursorX < left || cursorX > right) {
+        const pageStart = Math.floor(cursorX / Math.max(scroller.clientWidth, 1)) * scroller.clientWidth
+        scroller.scrollLeft = Math.max(0, Math.min(pageStart, scroller.scrollWidth - scroller.clientWidth))
+      }
     })
     return () => cancelAnimationFrame(frame)
-  }, [loopCursor, focusFollowsCursor, loopEditorSongId, editorDuration])
+  }, [loopCursor, focusFollowMode, loopEditorSongId, editorDuration])
 
   useEffect(() => {
     if (!loopEditorSongId || !editorDuration) return
@@ -525,7 +551,8 @@ function App() {
   const beginLoopDrag = (event: React.PointerEvent, kind: 'move' | 'start' | 'end' | 'cursor' | 'focus') => {
     if (!editorDuration) return
     if (loopSelectionLocked && kind !== 'cursor' && kind !== 'focus') return
-    if (kind === 'focus' && focusFollowsCursor) return
+    if (kind === 'focus' && focusFollowMode !== 'off') return
+    recordLoopEditorHistory()
     event.preventDefault(); event.stopPropagation(); event.currentTarget.setPointerCapture(event.pointerId)
     const time = kind === 'focus' ? focusTime(event.clientX) : timelineTime(event.clientX)
     if (kind === 'start' || kind === 'end') setActiveLoopEdge(kind)
@@ -547,26 +574,109 @@ function App() {
     setLoopDraftStart(start); setLoopDraftEnd(start + length)
   }
   const endLoopDrag = () => { loopDragRef.current = null }
-  const moveCursorTo = (value: number, play = false) => {
+  const loopEditorSnapshot = (): LoopEditorSnapshot => ({ start: loopDraftStart, end: loopDraftEnd, cursor: loopCursor, focus: loopFocus, markers: [...loopMarkers], zoom: loopZoom })
+  const applyLoopEditorSnapshot = (target: LoopEditorSnapshot) => {
+    setLoopDraftStart(target.start); setLoopDraftEnd(target.end); setLoopCursor(target.cursor); setLoopFocus(target.focus); setLoopMarkers([...target.markers]); setLoopZoom(target.zoom)
+    setActiveMarkerIndex((index) => target.markers.length ? Math.min(index ?? 0, target.markers.length - 1) : null)
+    seek(target.cursor)
+  }
+  const recordLoopEditorHistory = () => {
+    if (!loopEditorSongId) return
+    setLoopUndoStack((items) => [...items, loopEditorSnapshot()].slice(-60))
+    setLoopRedoStack([])
+  }
+  const undoLoopEditor = () => {
+    const target = loopUndoStack.at(-1)
+    if (!target) return
+    setLoopUndoStack((items) => items.slice(0, -1))
+    setLoopRedoStack((items) => [...items, loopEditorSnapshot()].slice(-60))
+    applyLoopEditorSnapshot(target)
+  }
+  const redoLoopEditor = () => {
+    const target = loopRedoStack.at(-1)
+    if (!target) return
+    setLoopRedoStack((items) => items.slice(0, -1))
+    setLoopUndoStack((items) => [...items, loopEditorSnapshot()].slice(-60))
+    applyLoopEditorSnapshot(target)
+  }
+  const moveCursorTo = (value: number, play = false, remember = false) => {
+    if (remember) recordLoopEditorHistory()
     const next = Math.max(0, Math.min(editorDuration || 0, value))
     setLoopCursor(next); seek(next)
     if (play) void audioRef.current?.play().catch(() => setMessage('Die Vorschau konnte nicht gestartet werden.'))
   }
-  const parsedEdgeStep = () => Math.max(.001, Math.min(60, Number.parseFloat(edgeStep.replace(',', '.')) || .01))
-  const nudgeActiveEdge = (delta: number) => {
+  const parseEditorSeconds = (value: string, fallback: number, max = 60) => Math.max(.001, Math.min(max, Number.parseFloat(value.replace(',', '.')) || fallback))
+  const parsedEdgeStep = () => parseEditorSeconds(edgeStep, .01)
+  const nudgeLoopEdge = (edge: 'start' | 'end', delta: number) => {
     if (loopSelectionLocked || !editorDuration) return
+    recordLoopEditorHistory()
     const minLength = .001
-    if (activeLoopEdge === 'start') setLoopDraftStart((value) => Math.max(0, Math.min(value + delta, loopDraftEnd - minLength)))
+    setActiveLoopEdge(edge)
+    if (edge === 'start') setLoopDraftStart((value) => Math.max(0, Math.min(value + delta, loopDraftEnd - minLength)))
     else setLoopDraftEnd((value) => Math.min(editorDuration, Math.max(value + delta, loopDraftStart + minLength)))
   }
+  const nudgeFocus = (delta: number) => {
+    if (!editorDuration) return
+    recordLoopEditorHistory()
+    setFocusFollowMode('off')
+    setLoopFocus((value) => Math.max(0, Math.min(editorDuration, value + delta)))
+  }
+  const nudgeCursor = (delta: number) => moveCursorTo(loopCursor + delta, false, true)
   const setMarker = () => {
     if (!markersEnabled || !editorDuration) return
-    setLoopMarkers((items) => [...items, loopCursor].sort((a, b) => a - b))
+    recordLoopEditorHistory()
+    const next = [...loopMarkers, loopCursor].sort((a, b) => a - b)
+    setLoopMarkers(next)
+    let nearest = 0
+    let distance = Number.POSITIVE_INFINITY
+    next.forEach((value, index) => { const currentDistance = Math.abs(value - loopCursor); if (currentDistance < distance) { distance = currentDistance; nearest = index } })
+    setActiveMarkerIndex(nearest)
+  }
+  const nudgeActiveMarker = (delta: number) => {
+    if (!markersEnabled || activeMarkerIndex === null || !editorDuration || !loopMarkers[activeMarkerIndex] && loopMarkers[activeMarkerIndex] !== 0) return
+    recordLoopEditorHistory()
+    const next = [...loopMarkers]
+    next[activeMarkerIndex] = Math.max(0, Math.min(editorDuration, next[activeMarkerIndex] + delta))
+    const selectedValue = next[activeMarkerIndex]
+    next.sort((a, b) => a - b)
+    setLoopMarkers(next)
+    setActiveMarkerIndex(next.indexOf(selectedValue))
+  }
+  const deleteActiveMarker = () => {
+    if (activeMarkerIndex === null || !loopMarkers.length) return
+    recordLoopEditorHistory()
+    const next = loopMarkers.filter((_, index) => index !== activeMarkerIndex)
+    setLoopMarkers(next)
+    setActiveMarkerIndex(next.length ? Math.min(activeMarkerIndex, next.length - 1) : null)
+    setLoopEditorMenuOpen(false)
+  }
+  const deleteAllMarkers = () => {
+    if (!loopMarkers.length) return
+    recordLoopEditorHistory()
+    setLoopMarkers([]); setActiveMarkerIndex(null); setLoopEditorMenuOpen(false)
+  }
+  const scrollTimelineTo = (time: number) => {
+    const scroller = loopTimelineScrollRef.current
+    const timeline = loopTimelineRef.current
+    if (!scroller || !timeline || !editorDuration) return
+    const target = (time / editorDuration) * timeline.offsetWidth - scroller.clientWidth / 2
+    scroller.scrollTo({ left: Math.max(0, Math.min(target, scroller.scrollWidth - scroller.clientWidth)), behavior: 'smooth' })
+  }
+  const moveMarkerTarget = (target: 'focus' | 'start' | 'end') => {
+    if (activeMarkerIndex === null || loopMarkers[activeMarkerIndex] === undefined || !editorDuration) return
+    const marker = loopMarkers[activeMarkerIndex]
+    recordLoopEditorHistory()
+    if (target === 'focus') { setFocusFollowMode('off'); setLoopFocus(marker); scrollTimelineTo(marker) }
+    if (target === 'start') { setActiveLoopEdge('start'); setLoopDraftStart(Math.max(0, Math.min(marker, loopDraftEnd - .001))) }
+    if (target === 'end') { setActiveLoopEdge('end'); setLoopDraftEnd(Math.min(editorDuration, Math.max(marker, loopDraftStart + .001))) }
+    setLoopEditorMenuOpen(false)
   }
   const previewBoundary = (boundary: 'start' | 'end') => {
-    const lead = Math.max(0, Number.parseFloat(previewLead.replace(',', '.')) || 0)
-    moveCursorTo(Math.max(0, (boundary === 'start' ? loopDraftStart : loopDraftEnd) - lead), true)
+    const source = boundary === 'start' ? previewLeadStart : previewLeadEnd
+    const lead = Math.max(0, Number.parseFloat(source.replace(',', '.')) || 0)
+    moveCursorTo(Math.max(0, (boundary === 'start' ? loopDraftStart : loopDraftEnd) - lead), true, true)
   }
+  const markerLabel = (index: number) => index < 26 ? String.fromCharCode(65 + index) : `${String.fromCharCode(65 + (index % 26))}${Math.floor(index / 26) + 1}`
   const saveLoopDraft = async () => {
     if (!editorSong || !editorDuration || loopDraftEnd <= loopDraftStart) return
     const wasPlaying = Boolean(audioRef.current && !audioRef.current.paused)
@@ -661,6 +771,10 @@ function App() {
   const cursorLeft = editorDuration ? (loopCursor / editorDuration) * 100 : 0
   const focusLeft = editorDuration ? (loopFocus / editorDuration) * 100 : 0
   const edgeStepSeconds = parsedEdgeStep()
+  const focusStepSeconds = parseEditorSeconds(focusStep, 1)
+  const cursorStepSeconds = parseEditorSeconds(cursorStep, 5)
+  const markerStepSeconds = parseEditorSeconds(markerStep, 1)
+  const activeMarker = activeMarkerIndex === null ? null : loopMarkers[activeMarkerIndex] ?? null
 
   return <div className="app-shell">
     <header className="site-header">
@@ -697,20 +811,46 @@ function App() {
 
     {detailOpen && currentSong && <section className="song-detail"><div className="detail-topbar"><button type="button" onClick={navigateBack}>‹ Zurück</button></div><div className="detail-content"><p className="detail-label">JETZT</p><h2>{currentSong.name}</h2><div className="playlist-membership"><span>IN PLAYLISTS</span><strong>{currentSongPlaylists.length ? currentSongPlaylists.map((playlist) => playlist.name).join(' · ') : 'In keiner Playlist'}</strong></div><div className="detail-progress"><input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} /><div><span>{formatTime(currentTime)}</span><span>{formatTime(duration)}</span></div></div><div className="detail-controls"><button onClick={playPreviousFromHistory} disabled={!playHistory.length}>⏮</button><button onClick={() => skipSeconds(-10)}>↶<small>10</small></button><button className="detail-play" onClick={togglePlayback}>{isPlaying ? '❚❚' : '▶'}</button><button onClick={() => skipSeconds(10)}>↷<small>10</small></button><button onClick={() => moveSong(1)}>⏭</button></div><div className="loop-panel"><div><span className="loop-panel-label">LOOP</span><h3>{currentSong.loopStart !== undefined && currentSong.loopEnd !== undefined ? `${formatTime(currentSong.loopStart)} – ${formatTime(currentSong.loopEnd)}` : 'Noch kein Loop'}</h3><p>Den Bereich legst du präzise im Loop-Editor fest.</p></div><div className="loop-actions"><button type="button" onClick={() => openLoopEditor(currentSong.id)}>{currentSong.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{currentSong.loopStart !== undefined && currentSong.loopEnd !== undefined && <><button className={currentSong.loopEnabled ? 'loop-active' : ''} type="button" onClick={() => void toggleCurrentLoop()}>{currentSong.loopEnabled ? 'Loop aktiv' : 'Loop aktivieren'}</button><button className="danger-button" type="button" onClick={() => void removeCurrentLoop()}>Loop entfernen</button></>}</div></div></div></section>}
 
-    {loopEditorSongId && editorSong && <section className="loop-editor" aria-label="Loop bearbeiten"><div className="loop-editor-inner"><div className="loop-editor-top"><button type="button" onClick={() => setLoopEditorSongId(null)}>‹ Zurück</button><h1>{editorSong.name}</h1></div><p className="loop-editor-copy">Der rote Bereich ist der Loop. Den blauen Abspielcursor verschiebst du nur noch über seinen blauen Punkt. Der grüne Fokus unter der Zeitleiste bestimmt, welcher Bereich beim Zoomen in der Mitte bleibt.</p>
-      <div className="loop-toolbar"><label>Zoom <input type="range" min="1" max="16" step="1" value={loopZoom} onChange={(event) => setLoopZoom(Number(event.target.value))} /><strong>{loopZoom}×</strong></label><button className={loopSelectionLocked ? 'toggle-on' : ''} type="button" onClick={() => setLoopSelectionLocked((value) => !value)}>Loop-Kasten {loopSelectionLocked ? 'gesperrt' : 'beweglich'}</button><button className={markersEnabled ? 'toggle-on marker-toggle' : ''} type="button" onClick={() => setMarkersEnabled((value) => !value)}>Markierungen {markersEnabled ? 'an' : 'aus'}</button><button className={cursorLoopEnabled ? 'toggle-on cursor-loop-toggle' : ''} type="button" onClick={() => setCursorLoopEnabled((value) => !value)}>Cursor-Loop {cursorLoopEnabled ? 'an' : 'aus'}</button><button className={focusFollowsCursor ? 'toggle-on focus-toggle' : ''} type="button" onClick={() => { const next = !focusFollowsCursor; setFocusFollowsCursor(next); if (next) setLoopFocus(loopCursor) }}>Fokus folgt Cursor {focusFollowsCursor ? 'an' : 'aus'}</button></div>
-      <div className="loop-timeline-wrap"><div className="waveform-status">{waveformStatus === 'loading' ? 'Wellenform wird berechnet…' : waveformStatus === 'unavailable' ? 'Wellenform für diese Datei nicht verfügbar – Wiedergabe bleibt unverändert.' : 'Wellenform: Amplitude über Zeit'}</div><div ref={loopTimelineScrollRef} className="loop-timeline-scroll"><div ref={loopTimelineRef} className="loop-timeline precision" style={{ width: `${loopZoom * 100}%` }} onPointerMove={moveLoopDrag} onPointerUp={endLoopDrag} onPointerCancel={endLoopDrag}>
-        {waveform.length > 0 && <div className="loop-waveform" aria-hidden="true">{waveform.map((height, index) => <i key={index} style={{ height: `${Math.max(4, height * 92)}%` }} />)}</div>}
-        {markersEnabled && loopMarkers.map((marker, index) => <button key={`${marker}-${index}`} className="loop-marker" type="button" style={{ left: `${editorDuration ? marker / editorDuration * 100 : 0}%` }} title={formatPrecise(marker)} onPointerDown={(event) => event.stopPropagation()} onClick={() => moveCursorTo(marker)}><span /></button>)}
-        <div className={`loop-selection${loopSelectionLocked ? ' locked' : ''}`} style={{ left: `${loopLeft}%`, width: `${loopWidth}%` }} onPointerDown={(event) => beginLoopDrag(event, 'move')}><button className={`loop-handle start${activeLoopEdge === 'start' ? ' active-edge' : ''}`} type="button" aria-label="Loop-Start verschieben" onPointerDown={(event) => beginLoopDrag(event, 'start')} /><span className="loop-window-label">LOOP</span><button className={`loop-handle end${activeLoopEdge === 'end' ? ' active-edge' : ''}`} type="button" aria-label="Loop-Ende verschieben" onPointerDown={(event) => beginLoopDrag(event, 'end')} /></div>
-        <button className="loop-cursor" type="button" style={{ left: `${cursorLeft}%` }} aria-label="Abspielposition verschieben"><span onPointerDown={(event) => beginLoopDrag(event, 'cursor')} /></button>
-      </div><div ref={loopFocusRef} className={`loop-focus-track${focusFollowsCursor ? ' follows-cursor' : ''}`} style={{ width: `${loopZoom * 100}%` }} onPointerDown={(event) => beginLoopDrag(event, 'focus')} onPointerMove={moveLoopDrag} onPointerUp={endLoopDrag} onPointerCancel={endLoopDrag}><span className="focus-line-label">ZOOM-FOKUS</span><button type="button" className="loop-focus-cursor" style={{ left: `${focusLeft}%` }} aria-label="Zoom-Fokus verschieben" onPointerDown={(event) => beginLoopDrag(event, 'focus')}><span /></button></div></div><div className="loop-time-labels"><span>0:00</span><span>{formatTime(editorDuration)}</span></div>
-      <div className="loop-editor-range"><div><span>Start</span><strong>{formatPrecise(loopDraftStart)}</strong></div><div><span>Cursor</span><strong className="cursor-time">{formatPrecise(loopCursor)}</strong></div><div><span>Fokus</span><strong className="focus-time">{formatPrecise(loopFocus)}</strong></div><div><span>Ende</span><strong>{formatPrecise(loopDraftEnd)}</strong></div></div>
-      <div className="loop-transport"><button type="button" onClick={() => moveCursorTo(loopCursor - 5)}>−5 s</button><button className="play-loop" type="button" onClick={togglePlayback}>{isPlaying ? '❚❚ Pause' : '▶ Start'}</button><button type="button" onClick={() => moveCursorTo(loopCursor + 5)}>+5 s</button></div>
-      <div className="loop-speed-box"><div className="loop-speed-heading"><span>CURSOR-GESCHWINDIGKEIT</span><strong>{Math.round(loopPlaybackRate * 100)}%</strong></div><div className="loop-speed-options">{LOOP_PLAYBACK_RATES.map((rate) => <button key={rate} className={loopPlaybackRate === rate ? 'active-speed' : ''} type="button" onClick={() => setLoopPlaybackRate(rate)}>{Math.round(rate * 100)}%</button>)}</div><small>100% ist Normalgeschwindigkeit. Die Wiedergabe läuft mit 1 × gewähltem Prozentwert.</small></div>
-      <div className="marker-controls"><button type="button" onClick={setMarker} disabled={!markersEnabled}>Markierung setzen</button><span>{loopMarkers.length} Markierungen</span>{loopMarkers.length > 0 && <button type="button" onClick={() => setLoopMarkers((items) => items.slice(0, -1))} disabled={!markersEnabled}>Letzte entfernen</button>}</div>
-      <div className="precision-controls"><div className="precision-block"><span>Zuletzt berührte rote Kante: <strong>{activeLoopEdge === 'start' ? 'Start' : 'Ende'}</strong></span><label className="step-input"><span>Sprungweite</span><input aria-label="Sprungweite der roten Kante in Sekunden" value={edgeStep} onChange={(event) => setEdgeStep(event.target.value)} inputMode="decimal" /><b>s</b></label><div><button type="button" onClick={() => nudgeActiveEdge(-edgeStepSeconds)} disabled={loopSelectionLocked}>− Schritt</button><button type="button" onClick={() => nudgeActiveEdge(edgeStepSeconds)} disabled={loopSelectionLocked}>+ Schritt</button></div><small>Beispiele: 0,01 = 10 ms · 0,1 = 100 ms · 1 = 1 Sekunde</small></div><div className="preview-block"><span>Vor einer Kante abspielen</span><div className="preview-row"><button type="button" onClick={() => previewBoundary('start')}>▶ vor Start</button><input aria-label="Sekunden vor Start oder Ende" value={previewLead} onChange={(event) => setPreviewLead(event.target.value)} inputMode="decimal" /><b>s</b></div><div className="preview-row"><button type="button" onClick={() => previewBoundary('end')}>▶ vor Ende</button><input value={previewLead} onChange={(event) => setPreviewLead(event.target.value)} inputMode="decimal" /><b>s</b></div></div></div>
-      <div className="loop-editor-actions"><button className="save-loop" type="button" onClick={() => void saveLoopDraft()} disabled={!editorDuration || loopDraftEnd <= loopDraftStart}>Loop speichern</button><button type="button" onClick={() => setLoopEditorSongId(null)}>Abbrechen</button></div></div></div></section>}
+    {loopEditorSongId && editorSong && <section className="loop-editor" aria-label="Loop bearbeiten"><div className="loop-editor-scroll"><div className="loop-editor-inner">
+      <div className="loop-editor-commandbar">
+        <div className="loop-command-history" aria-label="Editor Navigation"><button type="button" onClick={() => setLoopEditorSongId(null)} aria-label="Zurück">‹</button><button type="button" onClick={navigateForward} disabled={navigationIndex >= navigation.length - 1} aria-label="Vor">›</button><button type="button" onClick={undoLoopEditor} disabled={!loopUndoStack.length} aria-label="Rückgängig">↶</button><button type="button" onClick={redoLoopEditor} disabled={!loopRedoStack.length} aria-label="Wiederholen">↷</button></div>
+        <div className="loop-command-fields">
+          <label className="neutral-command"><span>Zoom</span><input type="number" min="1" max="16" step="0.25" value={loopZoom} onChange={(event) => setLoopZoom(Math.max(1, Math.min(16, Number(event.target.value) || 1)))} /><b>×</b></label>
+          <label className="cursor-command"><span>Cursor Geschwindigkeit</span><input inputMode="decimal" value={loopPlaybackRate} onChange={(event) => setLoopPlaybackRate(event.target.value)} onBlur={() => setLoopPlaybackRate(String(parsedLoopPlaybackRate))} /><b>×</b></label>
+          <div className="focus-command"><span>Fokus folgt Cursor</span><div className="tri-toggle" role="group" aria-label="Fokus folgt Cursor"><button className={focusFollowMode === 'center' ? 'selected' : ''} type="button" onClick={() => { setFocusFollowMode('center'); setLoopFocus(loopCursor) }} aria-label="Zentrieren">◎</button><button className={focusFollowMode === 'page' ? 'selected' : ''} type="button" onClick={() => { setFocusFollowMode('page'); setLoopFocus(loopCursor) }} aria-label="Umblättern">▣</button><button className={focusFollowMode === 'off' ? 'selected' : ''} type="button" onClick={() => setFocusFollowMode('off')} aria-label="Aus">○</button></div></div>
+        </div>
+        <div className="loop-command-toggles">
+          <label className="loop-command"><span>Loop-Kasten</span><button className={`switch-control${loopSelectionLocked ? ' is-off' : ' is-on'}`} type="button" onClick={() => setLoopSelectionLocked((value) => !value)} aria-label={loopSelectionLocked ? 'Loop-Kasten beweglich machen' : 'Loop-Kasten feststellen'}><i /></button></label>
+          <label className="cursor-command"><span>Cursor-Loop</span><button className={`switch-control${cursorLoopEnabled ? ' is-on' : ' is-off'}`} type="button" onClick={() => setCursorLoopEnabled((value) => !value)} aria-label="Cursor-Loop umschalten"><i /></button></label>
+          <label className="marker-command"><span>Markierungen</span><button className={`switch-control${markersEnabled ? ' is-on' : ' is-off'}`} type="button" onClick={() => setMarkersEnabled((value) => !value)} aria-label="Markierungen umschalten"><i /></button></label>
+          <button className="marker-clear-all" type="button" onClick={deleteAllMarkers} disabled={!loopMarkers.length}>Alle Markierungen löschen</button>
+        </div>
+      </div>
+
+      <div className="loop-editor-title"><div><p>LOOP EDITOR</p><h1>{editorSong.name}</h1></div><div className="waveform-status">{waveformStatus === 'loading' ? 'Wellenform wird berechnet…' : waveformStatus === 'unavailable' ? 'Wellenform nicht verfügbar' : 'Amplitude'}</div></div>
+
+      <div className="loop-timeline-wrap">
+        <div ref={loopTimelineScrollRef} className="loop-timeline-scroll"><div ref={loopTimelineRef} className="loop-timeline precision" style={{ width: `${loopZoom * 100}%` }} onPointerMove={moveLoopDrag} onPointerUp={endLoopDrag} onPointerCancel={endLoopDrag}>
+          {waveform.length > 0 && <div className="loop-waveform" aria-hidden="true">{waveform.map((height, index) => <i key={index} style={{ height: `${Math.max(4, height * 92)}%` }} />)}</div>}
+          <div className="timeline-guide guide-one" /><div className="timeline-guide guide-two" />
+          {markersEnabled && loopMarkers.map((marker, index) => <button key={`${marker}-${index}`} className={`loop-marker${activeMarkerIndex === index ? ' active-marker' : ''}`} type="button" style={{ left: `${editorDuration ? marker / editorDuration * 100 : 0}%` }} onPointerDown={(event) => event.stopPropagation()} onClick={() => { setActiveMarkerIndex(index); moveCursorTo(marker, false, true) }} aria-label={`Markierung ${markerLabel(index)}`}><em>{formatTime(marker)}</em><span>{markerLabel(index)}</span></button>)}
+          <div className={`loop-selection${loopSelectionLocked ? ' locked' : ''}`} style={{ left: `${loopLeft}%`, width: `${loopWidth}%` }} onPointerDown={(event) => beginLoopDrag(event, 'move')}><span className="loop-time-bubble loop-start-time">{formatTime(loopDraftStart)}</span><button className={`loop-handle start${activeLoopEdge === 'start' ? ' active-edge' : ''}`} type="button" aria-label="Loop-Start verschieben" onPointerDown={(event) => beginLoopDrag(event, 'start')} /><span className="loop-window-label">LOOP</span><button className={`loop-handle end${activeLoopEdge === 'end' ? ' active-edge' : ''}`} type="button" aria-label="Loop-Ende verschieben" onPointerDown={(event) => beginLoopDrag(event, 'end')} /><span className="loop-time-bubble loop-end-time">{formatTime(loopDraftEnd)}</span></div>
+          <button className="loop-cursor" type="button" style={{ left: `${cursorLeft}%` }} aria-label="Abspielposition verschieben"><em>{formatTime(loopCursor)}</em><span onPointerDown={(event) => beginLoopDrag(event, 'cursor')} /></button>
+        </div>
+        <div ref={loopFocusRef} className={`loop-focus-track${focusFollowMode !== 'off' ? ' follows-cursor' : ''}`} style={{ width: `${loopZoom * 100}%` }} onPointerDown={(event) => beginLoopDrag(event, 'focus')} onPointerMove={moveLoopDrag} onPointerUp={endLoopDrag} onPointerCancel={endLoopDrag}><button type="button" className="loop-focus-cursor" style={{ left: `${focusLeft}%` }} aria-label="Zoom-Fokus verschieben" onPointerDown={(event) => beginLoopDrag(event, 'focus')}><em>{formatTime(loopFocus)}</em><span /></button></div>
+        </div>
+        <div className="loop-time-labels"><span>0:00</span><span>{formatTime(editorDuration)}</span></div>
+      </div>
+
+      <div className="loop-control-grid">
+        <section className="editor-control-card focus-card"><header><span>Fokus-Standort</span><strong>{formatTime(loopFocus)}</strong></header><div className="control-step-row"><button type="button" onClick={() => nudgeFocus(-focusStepSeconds)}>◀</button><label><input inputMode="decimal" value={focusStep} onChange={(event) => setFocusStep(event.target.value)} /><b>s</b></label><button type="button" onClick={() => nudgeFocus(focusStepSeconds)}>▶</button></div></section>
+        <section className="editor-control-card cursor-card"><header><span>Cursor-Standort</span><strong>{formatTime(loopCursor)}</strong></header><div className="control-step-row cursor-step-row"><button type="button" onClick={() => nudgeCursor(-cursorStepSeconds)}>◀</button><button className="mini-play" type="button" onClick={togglePlayback}>{isPlaying ? '❚❚' : '▶'}</button><button type="button" onClick={() => nudgeCursor(cursorStepSeconds)}>▶</button><label><input inputMode="decimal" value={cursorStep} onChange={(event) => setCursorStep(event.target.value)} /><b>s</b></label></div></section>
+        <section className="editor-control-card loop-card"><header><span>Loop Start / Loop Ende-Standort</span><strong>{formatTime(loopDraftStart)} – {formatTime(loopDraftEnd)}</strong></header><div className="loop-edge-row"><div><button type="button" onClick={() => nudgeLoopEdge('start', -edgeStepSeconds)}>◀</button><span>Start</span><button type="button" onClick={() => nudgeLoopEdge('start', edgeStepSeconds)}>▶</button></div><label><input inputMode="decimal" value={edgeStep} onChange={(event) => setEdgeStep(event.target.value)} /><b>s</b></label><div><button type="button" onClick={() => nudgeLoopEdge('end', -edgeStepSeconds)}>◀</button><span>Ende</span><button type="button" onClick={() => nudgeLoopEdge('end', edgeStepSeconds)}>▶</button></div></div><div className="boundary-preview-row"><label><button type="button" onClick={() => previewBoundary('start')}>▶ Vor Start</button><input inputMode="decimal" value={previewLeadStart} onChange={(event) => setPreviewLeadStart(event.target.value)} /><b>s</b></label><label><button type="button" onClick={() => previewBoundary('end')}>▶ Vor Ende</button><input inputMode="decimal" value={previewLeadEnd} onChange={(event) => setPreviewLeadEnd(event.target.value)} /><b>s</b></label></div></section>
+        <section className="editor-control-card marker-card"><header><span>Markierungen</span><strong>{activeMarker === null ? '--:--' : formatTime(activeMarker)}</strong></header><div className="marker-tabs">{loopMarkers.map((marker, index) => <button key={`${marker}-tab-${index}`} className={activeMarkerIndex === index ? 'selected' : ''} type="button" onClick={() => { setActiveMarkerIndex(index); moveCursorTo(marker, false, true) }}>{markerLabel(index)}</button>)}<button className="add-marker" type="button" onClick={setMarker} disabled={!markersEnabled}>＋</button></div><div className="marker-location-row"><button type="button" onClick={() => nudgeActiveMarker(-markerStepSeconds)} disabled={activeMarker === null}>◀</button><label><input inputMode="decimal" value={markerStep} onChange={(event) => setMarkerStep(event.target.value)} /><b>s</b></label><button type="button" onClick={() => nudgeActiveMarker(markerStepSeconds)} disabled={activeMarker === null}>▶</button><div className="marker-more-wrap"><button className="marker-more" type="button" onClick={() => setLoopEditorMenuOpen((value) => !value)}>•••</button>{loopEditorMenuOpen && <div className="marker-more-menu"><button type="button" onClick={() => moveMarkerTarget('focus')} disabled={activeMarker === null}>Zoom hinbewegen</button><button type="button" onClick={() => moveMarkerTarget('start')} disabled={activeMarker === null}>Loop-Anfang hinbewegen</button><button type="button" onClick={() => moveMarkerTarget('end')} disabled={activeMarker === null}>Loop-Ende hinbewegen</button><button type="button" onClick={deleteActiveMarker} disabled={activeMarker === null}>Markierung löschen</button><button type="button" onClick={deleteAllMarkers} disabled={!loopMarkers.length}>Alle Markierungen löschen</button></div>}</div></div></section>
+      </div>
+
+      <div className="loop-editor-actions"><button className="save-loop" type="button" onClick={() => void saveLoopDraft()} disabled={!editorDuration || loopDraftEnd <= loopDraftStart}>Loop speichern</button><button type="button" onClick={() => setLoopEditorSongId(null)}>Abbrechen</button></div>
+    </div></div></section>}
 
     {playlistChooserMode && <div className="playlist-chooser-backdrop" onMouseDown={() => setPlaylistChooserMode(null)}><section className="playlist-chooser" onMouseDown={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">PLAYLISTS</p><h2>{playlistChooserMode === 'bulk' ? `${selectedSongIds.size} Lieder zuordnen` : 'Alle Playlists'}</h2></div><button type="button" onClick={() => setPlaylistChooserMode(null)}>×</button></div><div className="playlist-groups">{groupedPlaylists.map(([group, items]) => <div className="playlist-group" key={group}><strong>{group}</strong><div>{items.map((playlist) => { const contains = currentSong ? playlist.songIds.includes(currentSong.id) : false; return <button key={playlist.id} type="button" onClick={() => playlistChooserMode === 'bulk' ? void assignSelectedToPlaylist(playlist) : void toggleCurrentInPlaylist(playlist)}><span>{playlist.name}</span>{playlistChooserMode === 'current' && <b>{contains ? '−' : '+'}</b>}</button> })}</div></div>)}</div></section></div>}
 
