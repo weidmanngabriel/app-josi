@@ -13,6 +13,7 @@ export type Song = {
   loopStart?: number
   loopEnd?: number
   loopEnabled?: boolean
+  loopTailEnabled?: boolean
   loopConfidence?: number
   loopMarkers?: number[]
 }
