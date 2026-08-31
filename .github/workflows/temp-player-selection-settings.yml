@@ -1,0 +1,37 @@
+name: Temporary Player Selection Settings
+
+on:
+  push:
+    branches: [codex/player-selection-loop-settings-20260831]
+
+permissions:
+  contents: write
+
+jobs:
+  apply-build-commit:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: codex/player-selection-loop-settings-20260831
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply player selection settings prototype
+        run: python .github/scripts/apply-player-selection-settings.py
+      - name: Install dependencies
+        run: npm install
+      - name: Build
+        run: npm run build
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+      - name: Commit checked product changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/App.tsx src/musicDb.ts src/enhancements.css architecture.md concept.md
+          git commit -m "Add selection actions player settings and smoother loops"
+          git push origin HEAD:codex/player-selection-loop-settings-20260831
