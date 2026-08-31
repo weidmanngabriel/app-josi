@@ -160,7 +160,7 @@ Der experimentelle Ordnerimport bleibt entfernt.
 
 Tags sind eine zweite Organisationsschicht neben Playlists. Jeder Tag hat einen farbigen Punkt und kann beliebig viele Songs und Playlists enthalten; Tags selbst gehören nie zu Playlists. Beim Erstellen und Umbenennen kann die Farbe aus einer kompakten Palette mit ungefähr 100 Farben gewählt werden. In normalen Songzeilen werden aus Platzgründen nur die Punkte angezeigt. In der näheren Songansicht stehen Punkt und Tagname zusammen.
 
-Der Tags-Bereich und der Playlists-Bereich lassen sich durch Antippen ihrer freien Überschrift ein- und ausklappen. Die Sortiersteuerung steht nicht dauerhaft unter der Überschrift, sondern in `••• → Umbenennen → Sortieren` des jeweiligen Tags bzw. der Playlist. Tags und Playlists speichern ihren Sortiermodus und die Richtung getrennt. Für Tags stehen Manuell, A–Z Anfang, A–Z Ende, summierte Höranzahl, Anzahl der Lieder und Chronik bereit; Playlists verwenden dieselben passenden Kriterien.
+Der Tags-Bereich und der Playlists-Bereich lassen sich durch Antippen ihrer freien Überschrift ein- und ausklappen. Die Sortiersteuerung steht nicht dauerhaft unter der Überschrift, sondern im `•••` des jeweiligen Tags bzw. der Playlist als **Sortieren** direkt unter **Umbenennen**. Tags und Playlists speichern ihren Sortiermodus und die Richtung getrennt. Für Tags stehen Manuell, A–Z Anfang, A–Z Ende, summierte Höranzahl, Anzahl der Lieder und Chronik bereit; Playlists verwenden dieselben passenden Kriterien.
 
 Beim Taggen oder Einfügen eines Objekts mit einem Namen, der am Ziel bereits vorkommt, fragt Josi nach `Ersetzen`, `Beide einfügen` oder `Abbrechen`. Nach Abbrechen kann der Redo-Pfeil denselben Versuch wiederholen und öffnet die Konfliktfrage erneut.
 
