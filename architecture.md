@@ -43,7 +43,7 @@ Bereits vor der Trennung beschädigte oder verlorene Blobs können nicht rekonst
 
 ## Drei-Punkte-Menüs
 
-Langdruck wird nicht verwendet. Zusatzfunktionen liegen in sichtbaren `•••`-Menüs.
+Langdruck wird grundsätzlich nicht für Objektaktionen verwendet. Zusatzfunktionen liegen in sichtbaren `•••`-Menüs. **Einzige bewusste Ausnahme ist der Wiederholen-Knopf im Player:** Langdruck aktiviert die Wiederholung eines einzelnen bzw. mehrerer zuvor ausgewählter Songs.
 
 ### Song-Menü
 
@@ -53,9 +53,10 @@ In dieser Reihenfolge:
 2. Kopieren
 3. Teilen
 4. Loop erstellen bzw. Loop bearbeiten
-5. Nur bei blau markierten Songs: „Als gelesen markieren“ in Blau
-6. Nur bei blau markierten Songs: „Alle als gelesen markieren“ in Blau
-7. Löschen in Rot
+5. Bei vorhandenem Loop: Loop aktivieren bzw. Loop deaktivieren
+6. Nur bei blau markierten Songs: „Als gelesen markieren“ in Blau
+7. Nur bei blau markierten Songs: „Alle als gelesen markieren“ in Blau
+8. Löschen in Rot
 
 Beim Teilen wird aus dem gespeicherten Blob eine `File` erzeugt und über die Web Share API an die Systemfreigabe übergeben, sofern Browser/iPadOS Dateifreigabe unterstützt. Bei fehlender Unterstützung zeigt Josi eine Meldung.
 
@@ -98,6 +99,7 @@ Funktionen:
 - `Fokus folgt Cursor` koppelt den grünen Fokus an den blauen Cursor und hält den Cursor beim Abspielen automatisch im sichtbaren Bereich. Ist der Schalter aus, kann der grüne Fokus unabhängig verschoben werden.
 - `Cursor-Loop` bestimmt getrennt vom gespeicherten Song-Loop, ob die Wiedergabe im geöffneten Editor am Entwurfs-Endpunkt wieder zum Entwurfs-Start springt.
 - Transport im Editor: −5 Sekunden, Play/Pause, +5 Sekunden.
+- Eine hellblaue Geschwindigkeitsbox steuert die Vorschau mit 10%, 25%, 33%, 50%, 66%, 75%, 100%, 150% oder 200%. 100% entspricht `playbackRate = 1`; die übrigen Werte werden als Prozentfaktor davon gesetzt. Außerhalb des Loop-Editors wird immer wieder Normalgeschwindigkeit verwendet.
 - Orange Markierungen können am blauen Cursor gesetzt werden. Markierungen sind anklickbar und springen den Cursor an ihre Position. Die Markierungsfunktion kann ein-/ausgeschaltet werden; gespeicherte Markierungen bleiben im Song erhalten.
 - Ein frei eingebbarer Vorlaufwert in Sekunden (Komma oder Punkt möglich) steuert „vor Start abspielen“ und „vor Ende abspielen“.
 - „Loop speichern“ persistiert Start, Ende, Aktivstatus und Marker ausschließlich als Metadaten.
@@ -108,7 +110,9 @@ Der Player verwendet für die aktuelle Audiodatei eine Objekt-URL. Diese URL dar
 
 Deshalb hängt die Objekt-URL nur noch von der **Song-ID und dem tatsächlichen Blob** ab. Reine Metadatenänderungen lassen die Audioquelle unverändert. Zusätzlich werden diese Metadatenänderungen nun auch in IndexedDB getrennt vom Blob gespeichert.
 
-## Player und Media Session
+## Player, Wiederholung und Media Session
+
+Ein kurzer Druck auf `↻` schaltet weiterhin die Wiederholung der aktuellen Liste um. Ein Langdruck auf denselben Knopf aktiviert einen Sondermodus mit `↻1`: Ohne Mehrfachauswahl wird der aktuell gewählte Song wiederholt. Mit aktiver Mehrfachauswahl werden die ausgewählten Songs als feste Wiederholgruppe übernommen und anschließend grün in den Listen markiert. Die Gruppe läuft in ihrer Reihenfolge zyklisch weiter; das Symbol bleibt auch bei mehreren Songs `↻1`. Ein normaler kurzer Druck beendet den Sondermodus und schaltet wieder die Listenwiederholung.
 
 Ein einzelnes HTML-Audio-Element übernimmt Wiedergabe, Fortschritt, Systemsteuerung und Loop-Vorschau. Vollständig gehörte Songs werden nur beim natürlichen `ended`-Ereignis gezählt. Media Session wird genutzt, soweit Safari/iPadOS sie bereitstellt.
 

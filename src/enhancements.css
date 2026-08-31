@@ -127,3 +127,10 @@
   .playlist-group { grid-template-columns: 42px minmax(0,1fr); }
   .sort-bar select { flex: 1; min-width: 0; }
 }
+
+
+.song-row.repeat-selected-song { background:rgba(22,163,74,.17); box-shadow:inset 3px 0 0 #22c55e; }
+.song-row.repeat-selected-song:hover { background:rgba(22,163,74,.23); }
+.repeat-control { touch-action:manipulation; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+.repeat-symbol { position:relative; display:grid; place-items:center; min-width:22px; min-height:22px; font-size:21px; line-height:1; }
+.repeat-symbol b { position:absolute; inset:0; display:grid; place-items:center; padding-top:1px; font-size:8px; font-weight:950; line-height:1; }
