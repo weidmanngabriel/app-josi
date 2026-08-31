@@ -15,6 +15,9 @@ export type Song = {
   loopEnabled?: boolean
   loopConfidence?: number
   loopMarkers?: number[]
+  trashedAt?: number
+  trashPlaylistIds?: string[]
+  trashedLoop?: { deletedAt: number; start: number; end: number; enabled: boolean; markers?: number[] }
 }
 
 export type Playlist = {
@@ -25,6 +28,7 @@ export type Playlist = {
   lastUsedAt: number
   cover?: Blob
   sortOrder?: number
+  trashedAt?: number
 }
 
 type SongMetadata = Omit<Song, 'file'>
@@ -105,7 +109,7 @@ async function putSongMetadataSafely(songs: Song[]): Promise<void> {
   db.close()
 }
 
-export async function getSongs(): Promise<Song[]> {
+async function getAllSongs(): Promise<Song[]> {
   const db = await openDb()
   try {
     const tx = db.transaction([SONGS, SONG_METADATA], 'readonly')
@@ -117,10 +121,11 @@ export async function getSongs(): Promise<Song[]> {
     return baseSongs
       .map((song) => ({ ...song, ...(metadataById.get(song.id) ?? {}), file: song.file }))
       .sort((a, b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt))
-  } finally {
-    db.close()
-  }
+  } finally { db.close() }
 }
+
+export async function getSongs(): Promise<Song[]> { return (await getAllSongs()).filter((song) => !song.trashedAt) }
+export async function getTrashedSongs(): Promise<Song[]> { return (await getAllSongs()).filter((song) => Boolean(song.trashedAt)).sort((a, b) => (b.trashedAt ?? 0) - (a.trashedAt ?? 0)) }
 
 export async function saveSongs(files: File[], importBatchId = crypto.randomUUID()): Promise<Song[]> {
   const now = Date.now()
@@ -160,15 +165,16 @@ export async function deleteSong(id: string): Promise<void> {
   db.close()
 }
 
-export async function getPlaylists(): Promise<Playlist[]> {
+async function getAllPlaylists(): Promise<Playlist[]> {
   const db = await openDb()
   try {
     const tx = db.transaction(PLAYLISTS, 'readonly')
     return await requestResult(tx.objectStore(PLAYLISTS).getAll() as IDBRequest<Playlist[]>)
-  } finally {
-    db.close()
-  }
+  } finally { db.close() }
 }
+
+export async function getPlaylists(): Promise<Playlist[]> { return (await getAllPlaylists()).filter((playlist) => !playlist.trashedAt) }
+export async function getTrashedPlaylists(): Promise<Playlist[]> { return (await getAllPlaylists()).filter((playlist) => Boolean(playlist.trashedAt)).sort((a, b) => (b.trashedAt ?? 0) - (a.trashedAt ?? 0)) }
 
 export async function savePlaylist(playlist: Playlist): Promise<void> {
   const db = await openDb()

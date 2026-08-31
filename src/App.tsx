@@ -4,6 +4,8 @@ import {
   deleteSong,
   getPlaylists,
   getSongs,
+  getTrashedPlaylists,
+  getTrashedSongs,
   savePlaylist,
   saveSong,
   saveSongOrder,
@@ -49,7 +51,7 @@ function groupPlaylists(playlists: Playlist[]) {
   return [...groups.entries()].sort((a, b) => order(a[0]) - order(b[0]) || a[0].localeCompare(b[0], 'de'))
 }
 
-type View = 'library' | 'history' | 'loops' | 'playlistOverview'
+type View = 'library' | 'history' | 'loops' | 'trash' | 'playlistOverview'
 type NavigationEntry = { view: View; playlistId: string | null; detailOpen: boolean }
 type ReorderScope = 'library' | 'playlist' | 'sidebar' | null
 type MoveCandidate = { kind: 'song' | 'playlist'; id: string; targetIndex: number | null } | null
@@ -90,6 +92,8 @@ const AUTO_LOOP_SEARCH_RADIUS_SECONDS = .6
 function App() {
   const [songs, setSongs] = useState<Song[]>([])
   const [playlists, setPlaylists] = useState<Playlist[]>([])
+  const [trashedSongs, setTrashedSongs] = useState<Song[]>([])
+  const [trashedPlaylists, setTrashedPlaylists] = useState<Playlist[]>([])
   const [activePlaylistId, setActivePlaylistId] = useState<string | null>(null)
   const [view, setView] = useState<View>('library')
   const [detailOpen, setDetailOpen] = useState(false)
@@ -130,6 +134,9 @@ function App() {
   const [selectionMenuOpen, setSelectionMenuOpen] = useState(false)
   const [bulkMoveMode, setBulkMoveMode] = useState(false)
   const [selectionConfirmation, setSelectionConfirmation] = useState<SelectionConfirmation>(null)
+  const [trashConfirmation, setTrashConfirmation] = useState(false)
+  const [sortMenuOpen, setSortMenuOpen] = useState(false)
+  const [sortConfirmation, setSortConfirmation] = useState(false)
 
   const [loopEditorSongId, setLoopEditorSongId] = useState<string | null>(null)
   const [loopDraftStart, setLoopDraftStart] = useState(0)
@@ -243,9 +250,11 @@ function App() {
   }
 
   useEffect(() => {
-    Promise.all([getSongs(), getPlaylists()]).then(([storedSongs, storedPlaylists]) => {
+    Promise.all([getSongs(), getPlaylists(), getTrashedSongs(), getTrashedPlaylists()]).then(([storedSongs, storedPlaylists, storedTrashedSongs, storedTrashedPlaylists]) => {
       setSongs(storedSongs)
       setPlaylists(storedPlaylists)
+      setTrashedSongs(storedTrashedSongs)
+      setTrashedPlaylists(storedTrashedPlaylists)
       if (storedSongs.some((song) => !song.file || song.file.size === 0)) setMessage('Mindestens eine lokal gespeicherte Audiodatei ist nicht mehr verfügbar. Diese Lieder müssen neu importiert werden.')
     }).catch(() => setMessage('Lokale Musikdaten konnten nicht geladen werden.'))
   }, [])
@@ -268,7 +277,7 @@ function App() {
   }, [activePlaylist, songs])
 
   const baseVisibleSongs = useMemo(() => {
-    if (view === 'history') return songs.filter((song) => song.isNew)
+    if (view === 'history') return [...songs]
     if (view === 'loops') return songs.filter((song) => song.loopStart !== undefined && song.loopEnd !== undefined)
     return manualQueue
   }, [view, songs, manualQueue])
@@ -281,7 +290,6 @@ function App() {
 
   const visibleSongs = useMemo(() => {
     const items = [...searchedVisibleSongs]
-    if (sortMode === 'manual') return items
     const direction = sortDirection === 'down' ? 1 : -1
     const compare = (a: Song, b: Song) => {
       if (sortMode === 'azStart') return a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' })
@@ -290,7 +298,10 @@ function App() {
       if (sortMode === 'duration') return (a.duration ?? Number.MAX_SAFE_INTEGER) - (b.duration ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name, 'de')
       return a.addedAt - b.addedAt
     }
-    return items.sort((a, b) => compare(a, b) * direction)
+    const ordered = sortMode === 'manual' ? items : items.sort((a, b) => compare(a, b) * direction)
+    const fresh = ordered.filter((song) => song.isNew)
+    const normal = ordered.filter((song) => !song.isNew)
+    return [...fresh, ...normal]
   }, [searchedVisibleSongs, sortMode, sortDirection])
 
   const playerQueue = activePlaylist ? manualQueue : [...songs].sort((a, b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt))
@@ -641,7 +652,7 @@ function App() {
     if (!song?.file || song.file.size === 0) { setMessage('Diese Datei kann nicht kopiert werden, weil der lokale Audioblob fehlt.'); setOverflowMenu(null); return }
     recordHistory()
     const now = Date.now()
-    const copy: Song = { ...song, id: crypto.randomUUID(), name: `${song.name} Kopie`, addedAt: now, libraryOrder: now, importBatchId: crypto.randomUUID(), isNew: false, completedPlays: 0, loopMarkers: song.loopMarkers ? [...song.loopMarkers] : undefined }
+    const copy: Song = { ...song, id: crypto.randomUUID(), name: `${song.name} Kopie`, addedAt: now, libraryOrder: now, importBatchId: crypto.randomUUID(), isNew: false, completedPlays: 0, loopMarkers: song.loopMarkers ? [...song.loopMarkers] : undefined, trashedAt: undefined, trashPlaylistIds: undefined, trashedLoop: undefined }
     await saveSong(copy)
     setSongs((items) => [...items, copy])
     setOverflowMenu(null)
@@ -683,12 +694,14 @@ function App() {
 
   const confirmDeleteSong = async () => {
     if (!songToDelete) return
-    recordHistory()
-    await deleteSong(songToDelete.id)
+    const playlistIds = playlists.filter((playlist) => playlist.songIds.includes(songToDelete.id)).map((playlist) => playlist.id)
+    const trashedSong = { ...songToDelete, trashedAt: Date.now(), trashPlaylistIds: playlistIds }
+    await saveSong(trashedSong)
     const affected = playlists.filter((playlist) => playlist.songIds.includes(songToDelete.id)).map((playlist) => ({ ...playlist, songIds: playlist.songIds.filter((id) => id !== songToDelete.id) }))
     if (affected.length) await Promise.all(affected.map(savePlaylist))
     setPlaylists((items) => items.map((playlist) => affected.find((changed) => changed.id === playlist.id) ?? playlist))
     setSongs((items) => items.filter((song) => song.id !== songToDelete.id))
+    setTrashedSongs((items) => [trashedSong, ...items.filter((song) => song.id !== trashedSong.id)])
     if (currentSongId === songToDelete.id) { audioRef.current?.pause(); overlapAudioRef.current?.pause(); setCurrentSongId(null); setCurrentUrl(null); setCurrentTime(0); setDuration(0) }
     if (loopEditorSongId === songToDelete.id) setLoopEditorSongId(null)
     setSelectedSongIds((items) => { const next = new Set(items); next.delete(songToDelete.id); return next })
@@ -866,7 +879,7 @@ function App() {
   const savePlaylistName = async (event: React.FormEvent) => { event.preventDefault(); if (!activePlaylist || !editingName.trim()) return; await updatePlaylist({ ...activePlaylist, name: editingName.trim(), lastUsedAt: Date.now() }, true); setIsEditingPlaylist(false) }
   const openPlaylistCoverPicker = (id: string) => { setPlaylistCoverTargetId(id); setOverflowMenu(null); requestAnimationFrame(() => { if (!coverInputRef.current) return; coverInputRef.current.value = ''; coverInputRef.current.click() }) }
   const changePlaylistCover = async (files: FileList | null) => { const playlist = playlists.find((item) => item.id === playlistCoverTargetId); if (!playlist || !files?.[0] || !files[0].type.startsWith('image/')) return; await updatePlaylist({ ...playlist, cover: files[0], lastUsedAt: Date.now() }, true); setPlaylistCoverTargetId(null); if (coverInputRef.current) coverInputRef.current.value = '' }
-  const confirmDeletePlaylist = async () => { if (!playlistToDelete) return; recordHistory(); await deletePlaylist(playlistToDelete.id); setPlaylists((items) => items.filter((playlist) => playlist.id !== playlistToDelete.id)); if (activePlaylistId === playlistToDelete.id) navigateTo({ view: 'library', playlistId: null, detailOpen: false }); setPlaylistToDelete(null) }
+  const confirmDeletePlaylist = async () => { if (!playlistToDelete) return; const trashed = { ...playlistToDelete, trashedAt: Date.now() }; await savePlaylist(trashed); setPlaylists((items) => items.filter((playlist) => playlist.id !== playlistToDelete.id)); setTrashedPlaylists((items) => [trashed, ...items.filter((playlist) => playlist.id !== trashed.id)]); if (activePlaylistId === playlistToDelete.id) navigateTo({ view: 'library', playlistId: null, detailOpen: false }); setPlaylistToDelete(null) }
 
   const beginReorder = (scope: Exclude<ReorderScope, null>) => { if (scope === 'library' || scope === 'playlist') setSearchQuery(''); setReorderScope(scope); setMoveCandidate(null); setOverflowMenu(null); setSortMode('manual') }
   const finishReorder = () => { setReorderScope(null); setMoveCandidate(null) }
@@ -915,12 +928,14 @@ function App() {
   const deleteSelectedSongs = async () => {
     const ids = new Set(selectedSongIds)
     if (!ids.size) return
-    recordHistory()
-    await Promise.all([...ids].map(deleteSong))
+    const deletedAt = Date.now()
+    const movingToTrash = songs.filter((song) => ids.has(song.id)).map((song) => ({ ...song, trashedAt: deletedAt, trashPlaylistIds: playlists.filter((playlist) => playlist.songIds.includes(song.id)).map((playlist) => playlist.id) }))
+    await Promise.all(movingToTrash.map(saveSong))
     const affected = playlists.filter((playlist) => playlist.songIds.some((id) => ids.has(id))).map((playlist) => ({ ...playlist, songIds: playlist.songIds.filter((id) => !ids.has(id)) }))
     if (affected.length) await Promise.all(affected.map(savePlaylist))
     setPlaylists((items) => items.map((playlist) => affected.find((changed) => changed.id === playlist.id) ?? playlist))
     setSongs((items) => items.filter((song) => !ids.has(song.id)))
+    setTrashedSongs((items) => [...movingToTrash, ...items.filter((song) => !ids.has(song.id))])
     if (currentSongId && ids.has(currentSongId)) { audioRef.current?.pause(); overlapAudioRef.current?.pause(); setCurrentSongId(null); setCurrentUrl(null); setCurrentTime(0); setDuration(0) }
     setSelectionConfirmation(null)
     stopSelection()
@@ -972,11 +987,61 @@ function App() {
   const toggleCurrentInPlaylist = async (playlist: Playlist) => { if (!currentSong) return; const contains = playlist.songIds.includes(currentSong.id); await updatePlaylist({ ...playlist, songIds: contains ? playlist.songIds.filter((id) => id !== currentSong.id) : [...playlist.songIds, currentSong.id], lastUsedAt: Date.now() }, true) }
   const toggleSongLoop = async (id: string) => { const song = songs.find((item) => item.id === id); if (!song || song.loopStart === undefined || song.loopEnd === undefined) return; if (song.loopEnabled && id === currentSongId) cancelLoopTransition(); await updateSong({ ...song, loopEnabled: !song.loopEnabled }, true); setOverflowMenu(null) }
   const toggleCurrentLoop = async () => { if (!currentSong || currentSong.loopStart === undefined || currentSong.loopEnd === undefined) return; if (currentSong.loopEnabled) cancelLoopTransition(); await updateSong({ ...currentSong, loopEnabled: !currentSong.loopEnabled }, true) }
-  const removeCurrentLoop = async () => { if (!currentSong) return; await updateSong({ ...currentSong, loopStart: undefined, loopEnd: undefined, loopConfidence: undefined, loopEnabled: false }, true); setLoopConfirmation(null) }
+  const removeCurrentLoop = async () => { if (!currentSong || currentSong.loopStart === undefined || currentSong.loopEnd === undefined) return; await updateSong({ ...currentSong, trashedLoop: { deletedAt: Date.now(), start: currentSong.loopStart, end: currentSong.loopEnd, enabled: Boolean(currentSong.loopEnabled), markers: currentSong.loopMarkers ? [...currentSong.loopMarkers] : undefined }, loopStart: undefined, loopEnd: undefined, loopConfidence: undefined, loopEnabled: false, loopMarkers: undefined }); setLoopConfirmation(null) }
+
+  const restoreTrashedSong = async (song: Song) => {
+    const wantedPlaylists = song.trashPlaylistIds ?? []
+    const activeIds = new Set(playlists.map((playlist) => playlist.id))
+    const remainingIds = wantedPlaylists.filter((id) => !activeIds.has(id))
+    const restored = { ...song, trashedAt: undefined, trashPlaylistIds: remainingIds.length ? remainingIds : undefined }
+    await saveSong(restored)
+    const changedPlaylists = playlists.map((playlist) => wantedPlaylists.includes(playlist.id) && !playlist.songIds.includes(song.id) ? { ...playlist, songIds: [...playlist.songIds, song.id] } : playlist)
+    await Promise.all(changedPlaylists.filter((playlist, index) => playlist !== playlists[index]).map(savePlaylist))
+    setPlaylists(changedPlaylists)
+    setTrashedSongs((items) => items.filter((item) => item.id !== song.id))
+    setSongs((items) => [...items, restored].sort((a, b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt)))
+  }
+  const restoreTrashedPlaylist = async (playlist: Playlist) => {
+    const waitingSongs = songs.filter((song) => song.trashPlaylistIds?.includes(playlist.id))
+    const restored = { ...playlist, trashedAt: undefined, songIds: [...playlist.songIds, ...waitingSongs.map((song) => song.id).filter((id) => !playlist.songIds.includes(id))] }
+    await savePlaylist(restored)
+    const updatedSongs = songs.map((song) => song.trashPlaylistIds?.includes(playlist.id) ? { ...song, trashPlaylistIds: (() => { const remaining = song.trashPlaylistIds.filter((id) => id !== playlist.id); return remaining.length ? remaining : undefined })() } : song)
+    await Promise.all(updatedSongs.filter((song, index) => song !== songs[index]).map(saveSong))
+    setSongs(updatedSongs)
+    setTrashedPlaylists((items) => items.filter((item) => item.id !== playlist.id))
+    setPlaylists((items) => [restored, ...items])
+  }
+  const restoreTrashedLoop = async (song: Song) => { if (!song.trashedLoop) return; const loop = song.trashedLoop; await updateSong({ ...song, loopStart: loop.start, loopEnd: loop.end, loopEnabled: loop.enabled, loopMarkers: loop.markers ? [...loop.markers] : undefined, trashedLoop: undefined }); }
+  const emptyTrash = async () => {
+    await Promise.all(trashedSongs.map((song) => deleteSong(song.id)))
+    await Promise.all(trashedPlaylists.map((playlist) => deletePlaylist(playlist.id)))
+    const loopTrashSongs = songs.filter((song) => song.trashedLoop)
+    if (loopTrashSongs.length) await Promise.all(loopTrashSongs.map((song) => saveSong({ ...song, trashedLoop: undefined })))
+    setSongs((items) => items.map((song) => song.trashedLoop ? { ...song, trashedLoop: undefined } : song))
+    setTrashedSongs([]); setTrashedPlaylists([]); setTrashConfirmation(false)
+  }
+  const applyCurrentSortAsManual = async () => {
+    if (view !== 'library' || sortMode === 'manual') { setSortConfirmation(false); return }
+    const source = activePlaylist ? [...manualQueue] : [...songs].sort((a, b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt))
+    const direction = sortDirection === 'down' ? 1 : -1
+    const compare = (a: Song, b: Song) => {
+      if (sortMode === 'azStart') return a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' })
+      if (sortMode === 'azEnd') return reverseText(a.name).localeCompare(reverseText(b.name), 'de', { numeric: true, sensitivity: 'base' })
+      if (sortMode === 'plays') return (a.completedPlays ?? 0) - (b.completedPlays ?? 0) || a.name.localeCompare(b.name, 'de')
+      if (sortMode === 'duration') return (a.duration ?? Number.MAX_SAFE_INTEGER) - (b.duration ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name, 'de')
+      return a.addedAt - b.addedAt
+    }
+    const ordered = source.sort((a, b) => compare(a, b) * direction)
+    recordHistory()
+    if (activePlaylist) await updatePlaylist({ ...activePlaylist, songIds: ordered.map((song) => song.id), lastUsedAt: Date.now() })
+    else { const updated = ordered.map((song, index) => ({ ...song, libraryOrder: index })); setSongs(updated); await saveSongOrder(updated) }
+    setSortMode('manual'); setSortConfirmation(false); setSortMenuOpen(false)
+  }
 
   const songEditMode = reorderScope === (activePlaylist ? 'playlist' : 'library') && view === 'library'
   const newImportCount = songs.filter((song) => song.isNew).length
-  const title = view === 'history' ? 'Importverlauf' : view === 'loops' ? 'Loops' : activePlaylist?.name ?? 'Bibliothek'
+  const title = view === 'history' ? 'Importverlauf' : view === 'loops' ? 'Loops' : view === 'trash' ? 'Papierkorb' : activePlaylist?.name ?? 'Bibliothek'
+  const trashCount = trashedSongs.length + trashedPlaylists.length + songs.filter((song) => song.trashedLoop).length
   const sortLabels: Record<SortMode, string> = { manual: 'Manuell', azStart: 'A–Z Anfang', azEnd: 'A–Z Ende', plays: 'Anzahl des Hörens', duration: 'Dauer', chronology: 'Chronik' }
   const loopLeft = editorDuration ? (loopDraftStart / editorDuration) * 100 : 0
   const loopWidth = editorDuration ? Math.max(0, ((loopDraftEnd - loopDraftStart) / editorDuration) * 100) : 0
@@ -1006,8 +1071,9 @@ function App() {
 
     {view !== 'playlistOverview' && <main className="music-layout"><aside className="sidebar">
       <button className={`nav-item${view === 'library' && !activePlaylistId ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'library', playlistId: null, detailOpen: false })}><span>Bibliothek</span><strong>{songs.length}</strong></button>
-      <button className={`nav-item history-nav${view === 'history' ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'history', playlistId: null, detailOpen: false })}><span>Importverlauf</span><strong>{newImportCount}/{songs.length}</strong></button>
+      <button className={`nav-item history-nav${view === 'history' ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'history', playlistId: null, detailOpen: false })}><span>Importverlauf</span><strong><span className="new-count-blue">{newImportCount}</span>/{songs.length}</strong></button>
       <button className={`nav-item history-nav${view === 'loops' ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'loops', playlistId: null, detailOpen: false })}><span>Loops</span><strong>{songs.filter((song) => song.loopStart !== undefined && song.loopEnd !== undefined).length}</strong></button>
+      <button className={`nav-item history-nav${view === 'trash' ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'trash', playlistId: null, detailOpen: false })}><span>Papierkorb</span><strong>{trashCount}</strong></button>
       <div className="sidebar-heading"><span className="heading-label">Playlists</span><button className="overflow-button small-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlists' })}>•••</button>{reorderScope === 'sidebar' && <button className="finish-inline" type="button" onClick={finishReorder}>Fertig</button>}</div>
       <div className="playlist-nav">{renderDropZone(0, 'playlist')}{sidebarPlaylists.map((playlist, index) => <div className="playlist-nav-row" key={playlist.id}>{reorderScope === 'sidebar' && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'playlist', id: playlist.id, targetIndex: null })}>↕</button>}<button className={`nav-item${activePlaylistId === playlist.id && view === 'library' ? ' active' : ''}`} type="button" onClick={() => void openPlaylist(playlist.id)} disabled={reorderScope === 'sidebar'}><span className="playlist-nav-name">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span className="playlist-mini-cover">♫</span>}<span>{playlist.name}</span></span><strong>{playlist.songIds.length}</strong></button><button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id })}>•••</button>{renderDropZone(index + 1, 'playlist')}</div>)}</div>
       <form className="new-playlist" onSubmit={createPlaylist}><input value={playlistName} onChange={(event) => setPlaylistName(event.target.value)} placeholder="Neue Playlist" /><button type="submit" disabled={!playlistName.trim()}>+</button></form>
@@ -1015,13 +1081,18 @@ function App() {
 
     <section className="library-panel"><div className={`library-heading${activePlaylist ? ' playlist-heading' : ''}`}>
       {activePlaylist && view === 'library' && <button className="playlist-cover" type="button" onClick={() => openPlaylistCoverPicker(activePlaylist.id)}>{coverUrls[activePlaylist.id] ? <img src={coverUrls[activePlaylist.id]} alt="" /> : <span>+ Bild</span>}</button>}
-      <div className="library-title"><p className="eyebrow">{view === 'history' ? 'IMPORTVERLAUF' : view === 'loops' ? 'GESPEICHERTE LOOPS' : activePlaylist ? 'PLAYLIST' : 'DEINE MUSIK'}</p>{activePlaylist && view === 'library' && isEditingPlaylist ? <form className="rename-playlist" onSubmit={savePlaylistName}><input value={editingName} onChange={(event) => setEditingName(event.target.value)} autoFocus /><button type="submit">Speichern</button><button type="button" onClick={() => setIsEditingPlaylist(false)}>Abbrechen</button></form> : <h1>{title}</h1>}<p>{view === 'history' ? `${newImportCount}/${songs.length} neue Importe` : `${visibleSongs.length} ${visibleSongs.length === 1 ? 'Lied' : 'Lieder'}`}</p></div>
-      <div className="playlist-actions">{!selectionMode && <button type="button" onClick={startSelection}>Auswählen</button>}{selectionMode && <><button type="button" onClick={selectAllVisible}>Alle</button><button type="button" onClick={stopSelection}>Abbrechen</button></>}{activePlaylist && view === 'library' && !selectionMode && <><button type="button" onClick={startEditingPlaylist}>Name ändern</button><button type="button" onClick={() => openPlaylistCoverPicker(activePlaylist.id)}>Bild ändern</button><button type="button" onClick={() => reorderScope === 'playlist' ? finishReorder() : beginReorder('playlist')}>{reorderScope === 'playlist' ? 'Fertig' : 'Reihenfolge ändern'}</button></>}{!activePlaylist && view === 'library' && !selectionMode && <button type="button" onClick={() => reorderScope === 'library' ? finishReorder() : beginReorder('library')}>{reorderScope === 'library' ? 'Fertig' : 'Reihenfolge ändern'}</button>}</div>
+      <div className="library-title"><p className="eyebrow">{view === 'history' ? 'IMPORTVERLAUF' : view === 'loops' ? 'GESPEICHERTE LOOPS' : view === 'trash' ? 'PAPIERKORB' : activePlaylist ? 'PLAYLIST' : 'DEINE MUSIK'}</p>{activePlaylist && view === 'library' && isEditingPlaylist ? <form className="rename-playlist" onSubmit={savePlaylistName}><input value={editingName} onChange={(event) => setEditingName(event.target.value)} autoFocus /><button type="submit">Speichern</button><button type="button" onClick={() => setIsEditingPlaylist(false)}>Abbrechen</button></form> : <h1>{title}</h1>}<p>{view === 'history' ? <><span className="new-count-blue">{newImportCount}</span>/{songs.length} neue Importe</> : view === 'trash' ? `${trashCount} ${trashCount === 1 ? 'Eintrag' : 'Einträge'}` : `${visibleSongs.length} ${visibleSongs.length === 1 ? 'Lied' : 'Lieder'}`}</p></div>
+      <div className="playlist-actions">{!selectionMode && view !== 'trash' && <button type="button" onClick={startSelection}>Auswählen</button>}{view === 'trash' && <button className="danger-button" type="button" onClick={() => setTrashConfirmation(true)} disabled={!trashCount}>Papierkorb leeren</button>}{selectionMode && <><button type="button" onClick={selectAllVisible}>Alle</button><button type="button" onClick={stopSelection}>Abbrechen</button></>}{activePlaylist && view === 'library' && !selectionMode && <><button type="button" onClick={startEditingPlaylist}>Name ändern</button><button type="button" onClick={() => openPlaylistCoverPicker(activePlaylist.id)}>Bild ändern</button><button type="button" onClick={() => reorderScope === 'playlist' ? finishReorder() : beginReorder('playlist')}>{reorderScope === 'playlist' ? 'Fertig' : 'Reihenfolge ändern'}</button></>}{!activePlaylist && view === 'library' && !selectionMode && <button type="button" onClick={() => reorderScope === 'library' ? finishReorder() : beginReorder('library')}>{reorderScope === 'library' ? 'Fertig' : 'Reihenfolge ändern'}</button>}</div>
     </div>
     {view === 'library' && <div className="search-bar"><span aria-hidden="true">⌕</span><input type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={activePlaylist ? 'Playlist durchsuchen' : 'Bibliothek durchsuchen'} aria-label={activePlaylist ? 'Playlist durchsuchen' : 'Bibliothek durchsuchen'} />{searchQuery && <button type="button" onClick={() => setSearchQuery('')} aria-label="Suche leeren">×</button>}</div>}
-    <div className="sort-bar"><span>Sortierung</span><select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>{(Object.keys(sortLabels) as SortMode[]).map((mode) => <option key={mode} value={mode}>{sortLabels[mode]}</option>)}</select><button type="button" className="sort-direction" disabled={sortMode === 'manual'} onClick={() => setSortDirection((value) => value === 'down' ? 'up' : 'down')}>{sortMode === 'manual' ? '—' : sortDirection === 'down' ? '↓' : '↑'}</button></div>
+    {view !== 'trash' && <div className="sort-bar"><span>Sortierung</span><select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>{(Object.keys(sortLabels) as SortMode[]).map((mode) => <option key={mode} value={mode}>{sortLabels[mode]}</option>)}</select><button type="button" className="sort-direction" disabled={sortMode === 'manual'} onClick={() => setSortDirection((value) => value === 'down' ? 'up' : 'down')}>{sortMode === 'manual' ? '—' : sortDirection === 'down' ? '↓' : '↑'}</button><div className="sort-more-wrap"><button className="sort-more-button" type="button" onClick={() => setSortMenuOpen((value) => !value)} aria-label="Weitere Sortieraktionen">•••</button>{sortMenuOpen && <div className="sort-action-menu"><button type="button" disabled={sortMode === 'manual' || view !== 'library'} onClick={() => { setSortMenuOpen(false); setSortConfirmation(true) }}>Aktuelle Sortierung als Manuell übernehmen</button></div>}</div></div>}
     {message && <div className="message">{message}</div>}{selectionMode && <div className="selection-hint">{bulkMoveMode ? 'Zielposition in der Liste antippen.' : `${selectedSongIds.size} ausgewählt. Playlists und weitere Aktionen findest du unten rechts.`}</div>}
-    {visibleSongs.length ? <div className="song-list">{bulkMoveMode ? renderBulkMoveDropZone(0) : renderDropZone(0, 'song')}{visibleSongs.map((song, index) => <div key={song.id} className={`song-row${song.isNew ? ' new-import' : ''}${selectedSongIds.has(song.id) ? ' selected-song' : ''}${repeatSelectionIds.has(song.id) ? ' repeat-selected-song' : ''}`}>{songEditMode && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'song', id: song.id, targetIndex: null })}>↕</button>}{selectionMode && <button className="selection-check" type="button" onClick={() => toggleSelected(song.id)}>{selectedSongIds.has(song.id) ? '✓' : ''}</button>}<button className="song-main" type="button" onClick={() => playSong(song.id)} disabled={songEditMode}><span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span><span className="song-copy"><strong>{song.name}</strong><small>{view === 'history' ? formatDate(song.addedAt) : membershipText(song.id)}</small></span><span className="song-meta"><small>{!song.file || song.file.size === 0 ? 'FEHLT' : formatTime(song.duration)}</small>{song.loopStart !== undefined && song.loopEnd !== undefined && <span className="loop-badge">↻</span>}</span></button><button className="overflow-button song-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'song', id: song.id })}>•••</button>{activePlaylist && view === 'library' && !selectionMode && !songEditMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActivePlaylist(song.id)}>Entfernen</button>}{bulkMoveMode ? renderBulkMoveDropZone(index + 1) : renderDropZone(index + 1, 'song')}</div>)}</div> : <div className="empty-state"><div className="empty-icon">♫</div><h2>{view === 'library' && searchQuery.trim() ? 'Keine Treffer.' : view === 'loops' ? 'Noch keine Loops gespeichert.' : view === 'history' ? 'Keine neuen Importe.' : 'Noch keine Musik hier.'}</h2></div>}
+    {view === 'trash' ? <div className="trash-list">
+      {trashedSongs.map((song) => <article className="trash-item" key={`trash-song-${song.id}`}><div><small>LIED</small><strong>{song.name}</strong><span>{song.trashedAt ? formatDate(song.trashedAt) : ''}</span></div><button type="button" onClick={() => void restoreTrashedSong(song)}>Wiederherstellen</button></article>)}
+      {trashedPlaylists.map((playlist) => <article className="trash-item" key={`trash-playlist-${playlist.id}`}><div><small>PLAYLIST</small><strong>{playlist.name}</strong><span>{playlist.trashedAt ? formatDate(playlist.trashedAt) : ''}</span></div><button type="button" onClick={() => void restoreTrashedPlaylist(playlist)}>Wiederherstellen</button></article>)}
+      {songs.filter((song) => song.trashedLoop).map((song) => <article className="trash-item" key={`trash-loop-${song.id}`}><div><small>LOOP</small><strong>{song.name}</strong><span>{song.trashedLoop ? `${formatPrecise(song.trashedLoop.start)} – ${formatPrecise(song.trashedLoop.end)}` : ''}</span></div><button type="button" onClick={() => void restoreTrashedLoop(song)}>Wiederherstellen</button></article>)}
+      {!trashCount && <div className="empty-state trash-empty"><div className="empty-icon">⌫</div><h2>Der Papierkorb ist leer.</h2></div>}
+    </div> : visibleSongs.length ? <div className="song-list">{bulkMoveMode ? renderBulkMoveDropZone(0) : renderDropZone(0, 'song')}{visibleSongs.map((song, index) => <div key={song.id} className={`song-row${song.isNew ? ' new-import' : ''}${index > 0 && !song.isNew && visibleSongs[index - 1]?.isNew ? ' new-group-break' : ''}${selectedSongIds.has(song.id) ? ' selected-song' : ''}${repeatSelectionIds.has(song.id) ? ' repeat-selected-song' : ''}`}>{songEditMode && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'song', id: song.id, targetIndex: null })}>↕</button>}{selectionMode && <button className="selection-check" type="button" onClick={() => toggleSelected(song.id)}>{selectedSongIds.has(song.id) ? '✓' : ''}</button>}<button className="song-main" type="button" onClick={() => playSong(song.id)} disabled={songEditMode}><span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span><span className="song-copy"><strong>{song.name}</strong><small>{view === 'history' ? formatDate(song.addedAt) : membershipText(song.id)}</small></span><span className="song-meta"><small>{!song.file || song.file.size === 0 ? 'FEHLT' : formatTime(song.duration)}</small>{song.loopStart !== undefined && song.loopEnd !== undefined && <span className="loop-badge">↻</span>}</span></button><button className="overflow-button song-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'song', id: song.id })}>•••</button>{activePlaylist && view === 'library' && !selectionMode && !songEditMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActivePlaylist(song.id)}>Entfernen</button>}{bulkMoveMode ? renderBulkMoveDropZone(index + 1) : renderDropZone(index + 1, 'song')}</div>)}</div> : <div className="empty-state"><div className="empty-icon">♫</div><h2>{view === 'library' && searchQuery.trim() ? 'Keine Treffer.' : view === 'loops' ? 'Noch keine Loops gespeichert.' : view === 'history' ? 'Keine neuen Importe.' : 'Noch keine Musik hier.'}</h2></div>}
     </section></main>}
 
     {view === 'playlistOverview' && <section className="playlist-overview"><div className="playlist-overview-heading"><p className="eyebrow">DEINE MUSIK</p><h1>Playlists</h1><p>{playlists.length} Playlists</p></div><div className="playlist-grid">{sidebarPlaylists.map((playlist) => <div className="playlist-card-wrap" key={playlist.id}><button className="playlist-card" type="button" onClick={() => void openPlaylist(playlist.id)}><span className="playlist-card-cover">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : '♫'}</span><strong>{playlist.name}</strong><small>{playlist.songIds.length} {playlist.songIds.length === 1 ? 'Lied' : 'Lieder'}</small></button><button className="overflow-button card-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id })}>•••</button></div>)}</div></section>}
@@ -1069,7 +1140,7 @@ function App() {
         <section className="editor-control-card focus-card"><header><span>Fokus-Standort <strong>{formatPrecise(loopFocus)}</strong></span></header><div className="control-step-row"><button type="button" onClick={() => nudgeFocus(-focusStepSeconds)}>◀</button><label className="step-select"><select value={focusStep} onChange={(event) => setFocusStep(event.target.value)}>{LOOP_STEP_OPTIONS.map((step) => <option key={step} value={String(step)}>{String(step).replace('.', ',')} s</option>)}</select></label><button type="button" onClick={() => nudgeFocus(focusStepSeconds)}>▶</button></div></section>
         <section className="editor-control-card cursor-card"><header><span>Cursor-Standort <strong>{formatPrecise(loopCursor)}</strong></span></header><div className="control-step-row cursor-step-row"><button type="button" onClick={() => nudgeCursor(-cursorStepSeconds)}>◀</button><button className="mini-play" type="button" onClick={togglePlayback}>{isPlaying ? '❚❚' : '▶'}</button><button type="button" onClick={() => nudgeCursor(cursorStepSeconds)}>▶</button><label className="step-select"><select value={cursorStep} onChange={(event) => setCursorStep(event.target.value)}>{CURSOR_STEP_OPTIONS.map((step) => <option key={step} value={String(step)}>{String(step).replace('.', ',')} s</option>)}</select></label></div></section>
         <section className="editor-control-card loop-card"><header><span>Loop-Standort <strong>Start {formatPrecise(loopDraftStart)} · Ende {formatPrecise(loopDraftEnd)}</strong></span></header><div className="loop-edge-row"><div><button type="button" onClick={() => nudgeLoopEdge('start', -edgeStepSeconds)}>◀</button><span>Start</span><button type="button" onClick={() => nudgeLoopEdge('start', edgeStepSeconds)}>▶</button></div><label className="step-select"><select value={edgeStep} onChange={(event) => setEdgeStep(event.target.value)}>{LOOP_STEP_OPTIONS.map((step) => <option key={step} value={String(step)}>{String(step).replace('.', ',')} s</option>)}</select></label><div><button type="button" onClick={() => nudgeLoopEdge('end', -edgeStepSeconds)}>◀</button><span>Ende</span><button type="button" onClick={() => nudgeLoopEdge('end', edgeStepSeconds)}>▶</button></div></div><div className="boundary-preview-row"><label><button type="button" onClick={() => previewBoundary('start')}>▶ Vor Start</button><select value={previewLeadStart} onChange={(event) => setPreviewLeadStart(event.target.value)}>{LOOP_PREVIEW_OPTIONS.map((lead) => <option key={lead} value={String(lead)}>{String(lead).replace('.', ',')} s</option>)}</select></label><label><button type="button" onClick={() => previewBoundary('end')}>▶ Vor Ende</button><select value={previewLeadEnd} onChange={(event) => setPreviewLeadEnd(event.target.value)}>{LOOP_PREVIEW_OPTIONS.map((lead) => <option key={lead} value={String(lead)}>{String(lead).replace('.', ',')} s</option>)}</select></label></div></section>
-        <section className="editor-control-card marker-card"><header><span>Markierung-Standort <strong>{activeMarker === null ? '--:--.---' : formatPrecise(activeMarker)}</strong></span></header><div className="marker-tabs">{loopMarkers.map((marker, index) => <button key={`${marker}-tab-${index}`} className={activeMarkerIndex === index ? 'selected' : ''} type="button" onClick={() => { setActiveMarkerIndex(index); moveCursorTo(marker, false, true) }}>{markerLabel(index)}</button>)}<button className="add-marker" type="button" onClick={setMarker} disabled={!markersEnabled}>＋</button></div><div className="marker-location-row"><button type="button" onClick={() => nudgeActiveMarker(-markerStepSeconds)} disabled={activeMarker === null}>◀</button><label className="step-select"><select value={markerStep} onChange={(event) => setMarkerStep(event.target.value)}>{LOOP_STEP_OPTIONS.map((step) => <option key={step} value={String(step)}>{String(step).replace('.', ',')} s</option>)}</select></label><button type="button" onClick={() => nudgeActiveMarker(markerStepSeconds)} disabled={activeMarker === null}>▶</button><div className="marker-more-wrap"><button className="marker-more" type="button" onClick={() => setLoopEditorMenuOpen((value) => !value)}>•••</button>{loopEditorMenuOpen && <div className="marker-more-menu"><button type="button" onClick={() => moveMarkerTarget('focus')} disabled={activeMarker === null}>Zoom hinbewegen</button><button type="button" onClick={() => moveMarkerTarget('start')} disabled={activeMarker === null}>Loop-Anfang hinbewegen</button><button type="button" onClick={() => moveMarkerTarget('end')} disabled={activeMarker === null}>Loop-Ende hinbewegen</button><button type="button" onClick={deleteActiveMarker} disabled={activeMarker === null}>Markierung löschen</button><button type="button" onClick={() => { setLoopEditorMenuOpen(false); setLoopConfirmation('deleteMarkers') }} disabled={!loopMarkers.length}>Alle Markierungen löschen</button></div>}</div></div></section>
+        <section className="editor-control-card marker-card"><header><span>Markierung-Standort <strong>{activeMarker === null ? '--:--.---' : formatPrecise(activeMarker)}</strong></span></header><div className="marker-tabs">{loopMarkers.map((marker, index) => <button key={`${marker}-tab-${index}`} className={activeMarkerIndex === index ? 'selected' : ''} type="button" onClick={() => { setActiveMarkerIndex(index); moveCursorTo(marker, false, true) }}>{markerLabel(index)}</button>)}<button className="add-marker" type="button" onClick={setMarker} disabled={!markersEnabled}>＋</button></div><div className="marker-location-row"><button type="button" onClick={() => nudgeActiveMarker(-markerStepSeconds)} disabled={activeMarker === null}>◀</button><label className="step-select"><select value={markerStep} onChange={(event) => setMarkerStep(event.target.value)}>{LOOP_STEP_OPTIONS.map((step) => <option key={step} value={String(step)}>{String(step).replace('.', ',')} s</option>)}</select></label><button type="button" onClick={() => nudgeActiveMarker(markerStepSeconds)} disabled={activeMarker === null}>▶</button><div className="marker-more-wrap"><button className="marker-more" type="button" onClick={() => setLoopEditorMenuOpen((value) => !value)}>•••</button>{loopEditorMenuOpen && <div className="marker-more-menu"><button type="button" onClick={() => { if (activeMarker !== null) moveCursorTo(activeMarker, false, true); setLoopEditorMenuOpen(false) }} disabled={activeMarker === null}>Cursor hinbewegen</button><button type="button" onClick={() => moveMarkerTarget('focus')} disabled={activeMarker === null}>Zoom hinbewegen</button><button type="button" onClick={() => moveMarkerTarget('start')} disabled={activeMarker === null}>Loop-Anfang hinbewegen</button><button type="button" onClick={() => moveMarkerTarget('end')} disabled={activeMarker === null}>Loop-Ende hinbewegen</button><button type="button" onClick={deleteActiveMarker} disabled={activeMarker === null}>Markierung löschen</button><button type="button" onClick={() => { setLoopEditorMenuOpen(false); setLoopConfirmation('deleteMarkers') }} disabled={!loopMarkers.length}>Alle Markierungen löschen</button></div>}</div></div></section>
       </div>
 
       <div className="loop-editor-actions"><button className="save-loop" type="button" onClick={() => setLoopConfirmation('save')} disabled={!editorDuration || loopDraftEnd <= loopDraftStart}>Loop speichern</button><button type="button" onClick={() => setLoopEditorSongId(null)}>Abbrechen</button></div>
@@ -1080,15 +1151,17 @@ function App() {
     {overflowMenu && <><button className="menu-shield" type="button" onClick={() => setOverflowMenu(null)} /><div className="overflow-menu">{overflowMenu.kind === 'playlists' && <><button type="button" onClick={() => beginReorder('sidebar')}>Bearbeiten</button><button type="button" onClick={() => { setOverflowMenu(null); navigateTo({ view: 'playlistOverview', playlistId: activePlaylistId, detailOpen: false }) }}>Übersicht</button></>}{overflowMenu.kind === 'song' && overflowMenu.id && (() => { const song = songs.find((item) => item.id === overflowMenu.id); if (!song) return null; return <><button type="button" onClick={() => beginRename('song', song.id)}>Umbenennen</button><button type="button" onClick={() => void copySong(song.id)}>Kopieren</button><button type="button" onClick={() => void shareSong(song.id)}>Teilen</button><button type="button" onClick={() => openLoopEditor(song.id)}>{song.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{song.loopStart !== undefined && song.loopEnd !== undefined && <button type="button" onClick={() => void toggleSongLoop(song.id)}>{song.loopEnabled ? 'Loop deaktivieren' : 'Loop aktivieren'}</button>}{song.isNew && <><button className="blue-menu-action" type="button" onClick={() => void markSeen(song.id)}>Als gelesen markieren</button><button className="blue-menu-action" type="button" onClick={() => void markSeen()}>Alle als gelesen markieren</button></>}<button className="danger-menu-action" type="button" onClick={() => { setSongToDelete(song); setOverflowMenu(null) }}>Löschen</button></> })()}{overflowMenu.kind === 'playlist' && overflowMenu.id && (() => { const playlist = playlists.find((item) => item.id === overflowMenu.id); if (!playlist) return null; return <><button type="button" onClick={() => openPlaylistCoverPicker(playlist.id)}>Bild ändern</button><button type="button" onClick={() => beginRename('playlist', playlist.id)}>Umbenennen</button><button type="button" onClick={() => void copyPlaylist(playlist.id)}>Kopieren</button><button type="button" onClick={() => void sharePlaylist(playlist.id)}>Teilen</button><button className="danger-menu-action" type="button" onClick={() => { setPlaylistToDelete(playlist); setOverflowMenu(null) }}>Löschen</button></> })()}</div></>}
 
     {loopConfirmation === 'save' && editorSong && <div className="modal-backdrop" onMouseDown={() => setLoopConfirmation(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Loop speichern?</h2><p>Der Bereich {formatPrecise(loopDraftStart)} bis {formatPrecise(loopDraftEnd)} und die aktuellen Markierungen werden gespeichert.</p><div className="dialog-actions"><button type="button" onClick={() => setLoopConfirmation(null)}>Abbrechen</button><button className="save-loop-confirm" type="button" onClick={() => void saveLoopDraft()}>Loop speichern</button></div></div></div>}
-    {loopConfirmation === 'delete' && currentSong && <div className="modal-backdrop" onMouseDown={() => setLoopConfirmation(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Loop löschen?</h2><p>Der gespeicherte Loop von „{currentSong.name}“ wird entfernt. Die Audiodatei bleibt unverändert.</p><div className="dialog-actions"><button type="button" onClick={() => setLoopConfirmation(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void removeCurrentLoop()}>Loop löschen</button></div></div></div>}
+    {loopConfirmation === 'delete' && currentSong && <div className="modal-backdrop" onMouseDown={() => setLoopConfirmation(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Loop löschen?</h2><p>Der gespeicherte Loop von „{currentSong.name}“ wird in den Papierkorb verschoben. Die Audiodatei bleibt unverändert.</p><div className="dialog-actions"><button type="button" onClick={() => setLoopConfirmation(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void removeCurrentLoop()}>Loop löschen</button></div></div></div>}
     {loopConfirmation === 'deleteMarkers' && <div className="modal-backdrop" onMouseDown={() => setLoopConfirmation(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Alle Markierungen löschen?</h2><p>Alle orangefarbenen Markierungen dieses Loop-Entwurfs werden entfernt.</p><div className="dialog-actions"><button type="button" onClick={() => setLoopConfirmation(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={deleteAllMarkers}>Alle löschen</button></div></div></div>}
 
+    {trashConfirmation && <div className="modal-backdrop" onMouseDown={() => setTrashConfirmation(false)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Papierkorb endgültig leeren?</h2><p>{trashCount} {trashCount === 1 ? 'Eintrag wird' : 'Einträge werden'} dauerhaft gelöscht. Audiodateien im Papierkorb können danach nicht wiederhergestellt werden.</p><div className="dialog-actions"><button type="button" onClick={() => setTrashConfirmation(false)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void emptyTrash()}>Endgültig leeren</button></div></div></div>}
+    {sortConfirmation && <div className="modal-backdrop" onMouseDown={() => setSortConfirmation(false)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Sortierung einmalig übernehmen?</h2><p>Die aktuelle Sortierung „{sortLabels[sortMode]}“ mit der Richtung {sortDirection === 'down' ? '↓' : '↑'} wird als neue manuelle Reihenfolge gespeichert. Danach ändert sie sich nicht automatisch weiter.</p><div className="dialog-actions"><button type="button" onClick={() => setSortConfirmation(false)}>Abbrechen</button><button type="button" onClick={() => void applyCurrentSortAsManual()}>Übernehmen</button></div></div></div>}
     {settingsOpen && <div className="modal-backdrop settings-backdrop" onMouseDown={() => setSettingsOpen(false)}><div className="confirm-dialog settings-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Einstellungen</h2><div className="settings-row"><div><strong>Spulweite</strong><small>Für ⏪/⏩ und die Detailansicht.</small></div><select value={seekSeconds} onChange={(event) => setSeekSeconds(Number(event.target.value))}>{SEEK_SECOND_OPTIONS.map((value) => <option key={value} value={value}>{value} Sekunden</option>)}</select></div><div className="settings-row settings-info-row"><div><strong>Loop-Übergang</strong><small>Josi überlappt Loop-Ende und Loop-Anfang kurz. Falls der zweite Wiedergabekanal technisch nicht startet, wird lokal nach einem ähnlichen Verbindungspunkt gesucht.</small></div><span className="settings-info-value">Automatisch</span></div><div className="dialog-actions"><button type="button" onClick={() => setSettingsOpen(false)}>Fertig</button></div></div></div>}
     {selectionConfirmation === 'switchManual' && <div className="modal-backdrop selection-confirm-backdrop" onMouseDown={() => setSelectionConfirmation(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Auf „Manuell“ umschalten?</h2><p>Ausgewählte Lieder können nur innerhalb der gespeicherten manuellen Reihenfolge bewegt werden.</p><div className="dialog-actions"><button type="button" onClick={() => setSelectionConfirmation(null)}>Nein</button><button type="button" onClick={() => { setSortMode('manual'); setSelectionConfirmation(null); setBulkMoveMode(true) }}>Ja, umschalten</button></div></div></div>}
-    {selectionConfirmation === 'deleteSelected' && <div className="modal-backdrop selection-confirm-backdrop" onMouseDown={() => setSelectionConfirmation(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>{selectedSongIds.size} ausgewählte Lieder löschen?</h2><p>Die lokalen Audiodateien werden gelöscht und aus allen Playlists entfernt.</p><div className="dialog-actions"><button type="button" onClick={() => setSelectionConfirmation(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void deleteSelectedSongs()}>Alle löschen</button></div></div></div>}
+    {selectionConfirmation === 'deleteSelected' && <div className="modal-backdrop selection-confirm-backdrop" onMouseDown={() => setSelectionConfirmation(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>{selectedSongIds.size} ausgewählte Lieder löschen?</h2><p>Die ausgewählten Lieder werden in den Papierkorb verschoben und aus allen Playlists entfernt.</p><div className="dialog-actions"><button type="button" onClick={() => setSelectionConfirmation(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void deleteSelectedSongs()}>In Papierkorb</button></div></div></div>}
     {renameTarget && <div className="modal-backdrop" onMouseDown={() => setRenameTarget(null)}><form className="confirm-dialog rename-dialog" onSubmit={confirmRename} onMouseDown={(event) => event.stopPropagation()}><h2>Umbenennen</h2><input value={renameValue} onChange={(event) => setRenameValue(event.target.value)} autoFocus /><div className="dialog-actions"><button type="button" onClick={() => setRenameTarget(null)}>Abbrechen</button><button type="submit" disabled={!renameValue.trim()}>Speichern</button></div></form></div>}
-    {songToDelete && <div className="modal-backdrop" onMouseDown={() => setSongToDelete(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Lied löschen?</h2><p>„{songToDelete.name}“ und seine lokal gespeicherte Audiodatei werden gelöscht. Der Song wird außerdem aus allen Playlists entfernt.</p><div className="dialog-actions"><button type="button" onClick={() => setSongToDelete(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void confirmDeleteSong()}>Lied löschen</button></div></div></div>}
-    {playlistToDelete && <div className="modal-backdrop" onMouseDown={() => setPlaylistToDelete(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Playlist löschen?</h2><p>„{playlistToDelete.name}“ wird gelöscht. Die Musikdateien bleiben erhalten.</p><div className="dialog-actions"><button type="button" onClick={() => setPlaylistToDelete(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void confirmDeletePlaylist()}>Playlist löschen</button></div></div></div>}
+    {songToDelete && <div className="modal-backdrop" onMouseDown={() => setSongToDelete(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Lied löschen?</h2><p>„{songToDelete.name}“ wird in den Papierkorb verschoben und aus allen Playlists entfernt. Die Audiodatei bleibt bis zum Leeren des Papierkorbs wiederherstellbar.</p><div className="dialog-actions"><button type="button" onClick={() => setSongToDelete(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void confirmDeleteSong()}>In Papierkorb</button></div></div></div>}
+    {playlistToDelete && <div className="modal-backdrop" onMouseDown={() => setPlaylistToDelete(null)}><div className="confirm-dialog" onMouseDown={(event) => event.stopPropagation()}><h2>Playlist löschen?</h2><p>„{playlistToDelete.name}“ wird in den Papierkorb verschoben. Die Musikdateien bleiben erhalten.</p><div className="dialog-actions"><button type="button" onClick={() => setPlaylistToDelete(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void confirmDeletePlaylist()}>In Papierkorb</button></div></div></div>}
   </div>
 }
 
