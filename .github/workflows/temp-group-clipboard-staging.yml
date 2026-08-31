@@ -1,0 +1,39 @@
+name: Temporary Group Clipboard Staging
+
+on:
+  push:
+    branches:
+      - codex/group-clipboard-staged-add-20260831
+
+permissions:
+  contents: write
+
+jobs:
+  apply-build-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: codex/group-clipboard-staged-add-20260831
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Apply product changes
+        run: python .github/scripts/apply-group-clipboard-staging.py
+      - name: Install dependencies
+        run: npm install
+      - name: Build
+        run: npm run build
+      - name: Commit checked product changes
+        run: |
+          git config user.name "Josi Build Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/App.tsx architecture.md concept.md
+          if git diff --cached --quiet; then
+            echo "No product changes to commit"
+          else
+            git commit -m "Refine group clipboard and staged additions"
+            git push origin codex/group-clipboard-staged-add-20260831
+          fi
