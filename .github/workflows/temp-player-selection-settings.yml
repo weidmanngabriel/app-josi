@@ -21,7 +21,7 @@ jobs:
         with:
           node-version: 22
       - name: Apply player selection settings prototype
-        run: python .github/scripts/apply-player-selection-settings.py
+        run: python .github/scripts/run-player-selection-settings.py
       - name: Install dependencies
         run: npm install
       - name: Build
