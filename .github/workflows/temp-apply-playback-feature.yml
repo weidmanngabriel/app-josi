@@ -1,0 +1,258 @@
+name: Temporary Feature Patch Check
+
+on:
+  push:
+    branches: [codex/playback-speed-repeat-selection-20260831]
+
+permissions:
+  contents: write
+
+jobs:
+  patch-and-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: codex/playback-speed-repeat-selection-20260831
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Apply feature changes
+        shell: bash
+        run: |
+          python <<'PY'
+          from pathlib import Path
+
+          def replace_once(text, old, new, label):
+              if text.count(old) != 1:
+                  raise SystemExit(f'{label}: expected exactly one match, found {text.count(old)}')
+              return text.replace(old, new, 1)
+
+          app_path = Path('src/App.tsx')
+          app = app_path.read_text()
+
+          app = replace_once(app,
+          "function App() {",
+          "const LOOP_PLAYBACK_RATES = [0.1, 0.25, 0.33, 0.5, 0.66, 0.75, 1, 1.5, 2] as const\n\nfunction App() {",
+          'playback rates constant')
+
+          app = replace_once(app,
+          "  const [repeatQueue, setRepeatQueue] = useState(false)\n  const [shuffle, setShuffle] = useState(false)",
+          "  const [repeatQueue, setRepeatQueue] = useState(false)\n  const [repeatSelectionIds, setRepeatSelectionIds] = useState<Set<string>>(new Set())\n  const [shuffle, setShuffle] = useState(false)",
+          'repeat selection state')
+
+          app = replace_once(app,
+          "  const [waveform, setWaveform] = useState<number[]>([])\n  const [waveformStatus, setWaveformStatus] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle')",
+          "  const [waveform, setWaveform] = useState<number[]>([])\n  const [waveformStatus, setWaveformStatus] = useState<'idle' | 'loading' | 'ready' | 'unavailable'>('idle')\n  const [loopPlaybackRate, setLoopPlaybackRate] = useState(1)",
+          'loop playback state')
+
+          app = replace_once(app,
+          "  const loopTimelineScrollRef = useRef<HTMLDivElement>(null)\n  const loopDragRef = useRef<LoopDrag>(null)",
+          "  const loopTimelineScrollRef = useRef<HTMLDivElement>(null)\n  const loopDragRef = useRef<LoopDrag>(null)\n  const repeatHoldTimerRef = useRef<number | null>(null)\n  const repeatHoldTriggeredRef = useRef(false)",
+          'repeat hold refs')
+
+          app = replace_once(app,
+          "  const playerQueue = activePlaylist ? manualQueue : [...songs].sort((a, b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt))\n  const currentSongPlaylists",
+          "  const playerQueue = activePlaylist ? manualQueue : [...songs].sort((a, b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt))\n  const repeatSelectionQueue = repeatSelectionIds.size ? playerQueue.filter((song) => repeatSelectionIds.has(song.id)) : []\n  const currentSongPlaylists",
+          'repeat selection queue')
+
+          app = replace_once(app,
+          "  useEffect(() => {\n    const audio = audioRef.current\n    if (!audio || !currentUrl) return\n    audio.load()\n    if (shouldAutoPlayRef.current) void audio.play().catch(() => setIsPlaying(false))\n  }, [currentUrl])",
+          "  useEffect(() => {\n    const audio = audioRef.current\n    if (!audio || !currentUrl) return\n    audio.load()\n    if (shouldAutoPlayRef.current) void audio.play().catch(() => setIsPlaying(false))\n  }, [currentUrl])\n\n  useEffect(() => {\n    const audio = audioRef.current\n    if (!audio) return\n    audio.playbackRate = loopEditorSongId ? loopPlaybackRate : 1\n  }, [loopEditorSongId, loopPlaybackRate, currentUrl])",
+          'playback rate effect')
+
+          app = replace_once(app,
+          "    setCursorLoopEnabled(true)\n    setFocusFollowsCursor(true)\n    setActiveLoopEdge('start')",
+          "    setCursorLoopEnabled(true)\n    setFocusFollowsCursor(true)\n    setLoopPlaybackRate(1)\n    setActiveLoopEdge('start')",
+          'reset loop playback rate')
+
+          old_move = """  const moveSong = (direction: 1 | -1) => {
+    if (!playerQueue.length) return
+    const currentIndex = playerQueue.findIndex((song) => song.id === currentSongId)
+    if (shuffle && direction === 1 && playerQueue.length > 1) {
+      const options = playerQueue.filter((song) => song.id !== currentSongId && song.file?.size)
+      if (options.length) return playSong(options[Math.floor(Math.random() * options.length)].id)
+    }
+    const nextIndex = currentIndex < 0 ? (direction === 1 ? 0 : playerQueue.length - 1) : currentIndex + direction
+    if (nextIndex >= 0 && nextIndex < playerQueue.length) return playSong(playerQueue[nextIndex].id)
+    if (repeatQueue) return playSong(playerQueue[direction === 1 ? 0 : playerQueue.length - 1].id)
+    shouldAutoPlayRef.current = false; setIsPlaying(false)
+  }
+"""
+          new_move = """  const playQueueSong = (song: Song) => {
+    if (song.id === currentSongId && audioRef.current) {
+      audioRef.current.currentTime = 0
+      setCurrentTime(0)
+      void audioRef.current.play().catch(() => setMessage(`„${song.name}“ konnte nicht erneut gestartet werden.`))
+      return
+    }
+    playSong(song.id)
+  }
+  const moveSong = (direction: 1 | -1) => {
+    if (!playerQueue.length) return
+    const queue = repeatSelectionQueue.length ? repeatSelectionQueue : playerQueue
+    const currentIndex = queue.findIndex((song) => song.id === currentSongId)
+    if (!repeatSelectionQueue.length && shuffle && direction === 1 && playerQueue.length > 1) {
+      const options = playerQueue.filter((song) => song.id !== currentSongId && song.file?.size)
+      if (options.length) return playSong(options[Math.floor(Math.random() * options.length)].id)
+    }
+    const nextIndex = currentIndex < 0 ? (direction === 1 ? 0 : queue.length - 1) : currentIndex + direction
+    if (nextIndex >= 0 && nextIndex < queue.length) return playQueueSong(queue[nextIndex])
+    if (repeatSelectionQueue.length) return playQueueSong(queue[direction === 1 ? 0 : queue.length - 1])
+    if (repeatQueue) return playSong(playerQueue[direction === 1 ? 0 : playerQueue.length - 1].id)
+    shouldAutoPlayRef.current = false; setIsPlaying(false)
+  }
+"""
+          app = replace_once(app, old_move, new_move, 'repeat queue movement')
+
+          app = replace_once(app,
+          "  const startSelection = () => { setSelectionMode(true); setSelectedSongIds(new Set()) }\n  const stopSelection = () => { setSelectionMode(false); setSelectedSongIds(new Set()); setPlaylistChooserMode(null) }",
+          """  const startSelection = () => { setSelectionMode(true); setSelectedSongIds(new Set()) }
+  const stopSelection = () => { setSelectionMode(false); setSelectedSongIds(new Set()); setPlaylistChooserMode(null) }
+  const clearRepeatHold = () => {
+    if (repeatHoldTimerRef.current !== null) window.clearTimeout(repeatHoldTimerRef.current)
+    repeatHoldTimerRef.current = null
+  }
+  const activateRepeatSelection = () => {
+    const chosen = selectionMode && selectedSongIds.size
+      ? playerQueue.filter((song) => selectedSongIds.has(song.id)).map((song) => song.id)
+      : currentSongId ? [currentSongId] : []
+    if (!chosen.length) return
+    const sameSelection = chosen.length === repeatSelectionIds.size && chosen.every((id) => repeatSelectionIds.has(id))
+    setRepeatSelectionIds(sameSelection ? new Set() : new Set(chosen))
+    if (!sameSelection) setRepeatQueue(false)
+    if (selectionMode) {
+      setSelectionMode(false)
+      setSelectedSongIds(new Set())
+      setPlaylistChooserMode(null)
+    }
+  }
+  const beginRepeatHold = (event: React.PointerEvent<HTMLButtonElement>) => {
+    event.currentTarget.setPointerCapture(event.pointerId)
+    clearRepeatHold()
+    repeatHoldTriggeredRef.current = false
+    repeatHoldTimerRef.current = window.setTimeout(() => {
+      repeatHoldTriggeredRef.current = true
+      repeatHoldTimerRef.current = null
+      activateRepeatSelection()
+    }, 650)
+  }
+  const endRepeatHold = () => clearRepeatHold()
+  const handleRepeatClick = () => {
+    if (repeatHoldTriggeredRef.current) {
+      repeatHoldTriggeredRef.current = false
+      return
+    }
+    clearRepeatHold()
+    setRepeatSelectionIds(new Set())
+    setRepeatQueue((value) => !value)
+  }""",
+          'repeat hold handlers')
+
+          app = replace_once(app,
+          "  const toggleCurrentLoop = async () => { if (!currentSong || currentSong.loopStart === undefined || currentSong.loopEnd === undefined) return; await updateSong({ ...currentSong, loopEnabled: !currentSong.loopEnabled }, true) }",
+          "  const toggleSongLoop = async (id: string) => { const song = songs.find((item) => item.id === id); if (!song || song.loopStart === undefined || song.loopEnd === undefined) return; await updateSong({ ...song, loopEnabled: !song.loopEnabled }, true); setOverflowMenu(null) }\n  const toggleCurrentLoop = async () => { if (!currentSong || currentSong.loopStart === undefined || currentSong.loopEnd === undefined) return; await updateSong({ ...currentSong, loopEnabled: !currentSong.loopEnabled }, true) }",
+          'song loop toggle helper')
+
+          app = replace_once(app,
+          "className={`song-row${song.isNew ? ' new-import' : ''}${selectedSongIds.has(song.id) ? ' selected-song' : ''}`}",
+          "className={`song-row${song.isNew ? ' new-import' : ''}${selectedSongIds.has(song.id) ? ' selected-song' : ''}${repeatSelectionIds.has(song.id) ? ' repeat-selected-song' : ''}`}",
+          'repeat song highlight class')
+
+          app = replace_once(app,
+          "<button className={repeatQueue ? 'active-control' : ''} onClick={() => setRepeatQueue((value) => !value)}>↻</button>",
+          "<button className={repeatQueue || repeatSelectionIds.size ? 'active-control repeat-control' : 'repeat-control'} onPointerDown={beginRepeatHold} onPointerUp={endRepeatHold} onPointerCancel={endRepeatHold} onContextMenu={(event) => event.preventDefault()} onClick={handleRepeatClick} aria-label={repeatSelectionIds.size ? 'Ausgewählte Lieder wiederholen' : 'Liste wiederholen'}><span className={`repeat-symbol${repeatSelectionIds.size ? ' repeat-one-symbol' : ''}`}>↻{repeatSelectionIds.size > 0 && <b>1</b>}</span></button>",
+          'repeat button')
+
+          app = replace_once(app,
+          "<button type=\"button\" onClick={() => openLoopEditor(song.id)}>{song.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{song.isNew &&",
+          "<button type=\"button\" onClick={() => openLoopEditor(song.id)}>{song.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{song.loopStart !== undefined && song.loopEnd !== undefined && <button type=\"button\" onClick={() => void toggleSongLoop(song.id)}>{song.loopEnabled ? 'Loop deaktivieren' : 'Loop aktivieren'}</button>}{song.isNew &&",
+          'loop menu toggle')
+
+          app = replace_once(app,
+          "      <div className=\"loop-transport\"><button type=\"button\" onClick={() => moveCursorTo(loopCursor - 5)}>−5 s</button><button className=\"play-loop\" type=\"button\" onClick={togglePlayback}>{isPlaying ? '❚❚ Pause' : '▶ Start'}</button><button type=\"button\" onClick={() => moveCursorTo(loopCursor + 5)}>+5 s</button></div>\n      <div className=\"marker-controls\">",
+          "      <div className=\"loop-transport\"><button type=\"button\" onClick={() => moveCursorTo(loopCursor - 5)}>−5 s</button><button className=\"play-loop\" type=\"button\" onClick={togglePlayback}>{isPlaying ? '❚❚ Pause' : '▶ Start'}</button><button type=\"button\" onClick={() => moveCursorTo(loopCursor + 5)}>+5 s</button></div>\n      <div className=\"loop-speed-box\"><div className=\"loop-speed-heading\"><span>CURSOR-GESCHWINDIGKEIT</span><strong>{Math.round(loopPlaybackRate * 100)}%</strong></div><div className=\"loop-speed-options\">{LOOP_PLAYBACK_RATES.map((rate) => <button key={rate} className={loopPlaybackRate === rate ? 'active-speed' : ''} type=\"button\" onClick={() => setLoopPlaybackRate(rate)}>{Math.round(rate * 100)}%</button>)}</div><small>100% ist Normalgeschwindigkeit. Die Wiedergabe läuft mit 1 × gewähltem Prozentwert.</small></div>\n      <div className=\"marker-controls\">",
+          'speed box')
+
+          app_path.write_text(app)
+
+          loop_css_path = Path('src/loopEditor.css')
+          loop_css = loop_css_path.read_text()
+          loop_css += """
+
+.loop-speed-box { margin:16px auto 0; padding:14px 16px; border:1px solid #365a7b; border-radius:16px; background:linear-gradient(135deg,rgba(37,99,235,.15),rgba(30,64,175,.07)); }
+.loop-speed-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:10px; }
+.loop-speed-heading span { color:#93c5fd; font-size:10px; font-weight:900; letter-spacing:.1em; }
+.loop-speed-heading strong { color:#bfdbfe; font-size:17px; font-variant-numeric:tabular-nums; }
+.loop-speed-options { display:flex; flex-wrap:wrap; gap:7px; }
+.loop-speed-options button { min-height:42px; min-width:58px; padding:0 11px; border:1px solid #3b5f82; border-radius:10px; background:#101b2b; color:#bfdbfe; cursor:pointer; }
+.loop-speed-options button.active-speed { border-color:#60a5fa; background:#1d4ed8; color:#eff6ff; box-shadow:0 0 0 2px rgba(96,165,250,.15); }
+.loop-speed-box small { display:block; margin-top:9px; color:#7fa1c5; font-size:10px; line-height:1.4; }
+"""
+          loop_css_path.write_text(loop_css)
+
+          enhancements_path = Path('src/enhancements.css')
+          enhancements = enhancements_path.read_text()
+          enhancements += """
+
+.song-row.repeat-selected-song { background:rgba(22,163,74,.17); box-shadow:inset 3px 0 0 #22c55e; }
+.song-row.repeat-selected-song:hover { background:rgba(22,163,74,.23); }
+.repeat-control { touch-action:manipulation; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; }
+.repeat-symbol { position:relative; display:grid; place-items:center; min-width:22px; min-height:22px; font-size:21px; line-height:1; }
+.repeat-symbol b { position:absolute; inset:0; display:grid; place-items:center; padding-top:1px; font-size:8px; font-weight:950; line-height:1; }
+"""
+          enhancements_path.write_text(enhancements)
+
+          architecture_path = Path('architecture.md')
+          architecture = architecture_path.read_text()
+          architecture = replace_once(architecture,
+          "Langdruck wird nicht verwendet. Zusatzfunktionen liegen in sichtbaren `•••`-Menüs.",
+          "Langdruck wird grundsätzlich nicht für Objektaktionen verwendet. Zusatzfunktionen liegen in sichtbaren `•••`-Menüs. **Einzige bewusste Ausnahme ist der Wiederholen-Knopf im Player:** Langdruck aktiviert die Wiederholung eines einzelnen bzw. mehrerer zuvor ausgewählter Songs.",
+          'architecture long press exception')
+          architecture = replace_once(architecture,
+          "4. Loop erstellen bzw. Loop bearbeiten\n5. Nur bei blau markierten Songs: „Als gelesen markieren“ in Blau\n6. Nur bei blau markierten Songs: „Alle als gelesen markieren“ in Blau\n7. Löschen in Rot",
+          "4. Loop erstellen bzw. Loop bearbeiten\n5. Bei vorhandenem Loop: Loop aktivieren bzw. Loop deaktivieren\n6. Nur bei blau markierten Songs: „Als gelesen markieren“ in Blau\n7. Nur bei blau markierten Songs: „Alle als gelesen markieren“ in Blau\n8. Löschen in Rot",
+          'architecture menu list')
+          architecture = replace_once(architecture,
+          "- Transport im Editor: −5 Sekunden, Play/Pause, +5 Sekunden.\n- Orange Markierungen",
+          "- Transport im Editor: −5 Sekunden, Play/Pause, +5 Sekunden.\n- Eine hellblaue Geschwindigkeitsbox steuert die Vorschau mit 10%, 25%, 33%, 50%, 66%, 75%, 100%, 150% oder 200%. 100% entspricht `playbackRate = 1`; die übrigen Werte werden als Prozentfaktor davon gesetzt. Außerhalb des Loop-Editors wird immer wieder Normalgeschwindigkeit verwendet.\n- Orange Markierungen",
+          'architecture speed')
+          architecture = replace_once(architecture,
+          "## Player und Media Session\n\nEin einzelnes HTML-Audio-Element übernimmt Wiedergabe, Fortschritt, Systemsteuerung und Loop-Vorschau.",
+          "## Player, Wiederholung und Media Session\n\nEin kurzer Druck auf `↻` schaltet weiterhin die Wiederholung der aktuellen Liste um. Ein Langdruck auf denselben Knopf aktiviert einen Sondermodus mit `↻1`: Ohne Mehrfachauswahl wird der aktuell gewählte Song wiederholt. Mit aktiver Mehrfachauswahl werden die ausgewählten Songs als feste Wiederholgruppe übernommen und anschließend grün in den Listen markiert. Die Gruppe läuft in ihrer Reihenfolge zyklisch weiter; das Symbol bleibt auch bei mehreren Songs `↻1`. Ein normaler kurzer Druck beendet den Sondermodus und schaltet wieder die Listenwiederholung.\n\nEin einzelnes HTML-Audio-Element übernimmt Wiedergabe, Fortschritt, Systemsteuerung und Loop-Vorschau.",
+          'architecture repeat section')
+          architecture_path.write_text(architecture)
+
+          concept_path = Path('concept.md')
+          concept = concept_path.read_text()
+          concept = replace_once(concept,
+          "4. **Loop erstellen** bzw. **Loop bearbeiten**\n5. Nur bei blau markierten Songs in blauer Schrift: **Als gelesen markieren**\n6. Nur bei blau markierten Songs in blauer Schrift: **Alle als gelesen markieren**\n7. In roter Schrift: **Löschen**",
+          "4. **Loop erstellen** bzw. **Loop bearbeiten**\n5. Bei vorhandenem Loop: **Loop aktivieren** bzw. **Loop deaktivieren**\n6. Nur bei blau markierten Songs in blauer Schrift: **Als gelesen markieren**\n7. Nur bei blau markierten Songs in blauer Schrift: **Alle als gelesen markieren**\n8. In roter Schrift: **Löschen**",
+          'concept menu list')
+          concept = replace_once(concept,
+          "- **−5 s**, **Play/Pause** und **+5 s**,\n- **orange Markierungen**",
+          "- **−5 s**, **Play/Pause** und **+5 s**,\n- eine leicht bläuliche Geschwindigkeitsbox mit **10%, 25%, 33%, 50%, 66%, 75%, 100%, 150% und 200%**, wobei 100% Normalgeschwindigkeit ist,\n- **orange Markierungen**",
+          'concept speed')
+          concept = replace_once(concept,
+          "## Wiedergabe nach Loop-Bearbeitung",
+          "## Wiederholen: Liste oder ausgewählte Songs\n\nKurzer Druck auf den Wiederholen-Knopf schaltet die normale Listenwiederholung. **Langdruck ist hier bewusst die einzige Ausnahme zur sonst abgeschafften Langdruck-Bedienung:** Er aktiviert `↻1`. Ohne Mehrfachauswahl wiederholt Josi den aktuell gewählten Song. Werden vorher mehrere Songs mit „Auswählen“ markiert, übernimmt der Langdruck genau diese Songs als Wiederholgruppe, beendet den Auswahlmodus und markiert die Gruppe dauerhaft grün, solange der Modus aktiv ist. Die Songs laufen in Listenreihenfolge und beginnen nach dem letzten wieder beim ersten. Das Symbol bleibt `↻1`, auch wenn mehrere Songs dazugehören.\n\n## Wiedergabe nach Loop-Bearbeitung",
+          'concept repeat section')
+          concept_path.write_text(concept)
+          PY
+      - name: Install dependencies
+        run: npm install
+      - name: Build
+        run: npm run build
+        env:
+          VITE_GOOGLE_CLIENT_ID: ${{ vars.GOOGLE_CLIENT_ID }}
+      - name: Commit checked changes and remove temporary workflow
+        shell: bash
+        run: |
+          rm .github/workflows/temp-apply-playback-feature.yml
+          git config user.name "Josi Build Bot"
+          git config user.email "actions@users.noreply.github.com"
+          git add src/App.tsx src/loopEditor.css src/enhancements.css architecture.md concept.md .github/workflows/temp-apply-playback-feature.yml
+          git commit -m "Add playback speed and selected repeat mode"
+          git push origin HEAD:codex/playback-speed-repeat-selection-20260831
