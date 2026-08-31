@@ -1,0 +1,37 @@
+name: Temporary Trash Docs Cleanup
+
+on:
+  push:
+    branches:
+      - codex/trash-import-groups-sort-20260831
+
+permissions:
+  contents: write
+
+jobs:
+  clean-docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: codex/trash-import-groups-sort-20260831
+          fetch-depth: 0
+      - name: Update architecture wording
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('architecture.md')
+          t=p.read_text()
+          old='Song- und Playlist-Löschen verwenden Bestätigungsdialoge. Der Snapshot-Verlauf berücksichtigt fehlende Song-IDs und kann bei Undo/Redo deshalb auch kopierte oder gelöschte Songs wiederherstellen bzw. entfernen. Frisch importierte Dateien werden weiterhin nicht automatisch durch Undo gelöscht.'
+          new='Undo/Redo bleibt für normale Bearbeitungen, Kopieren und Reihenfolgeänderungen zuständig. Löschvorgänge werden dagegen über den Papierkorb wiederhergestellt und nicht zusätzlich als Undo-Schritt geführt. Frisch importierte Dateien werden weiterhin nicht automatisch durch Undo gelöscht.'
+          if old not in t:
+              raise SystemExit('stale paragraph not found')
+          p.write_text(t.replace(old,new,1))
+          PY
+      - name: Commit documentation cleanup
+        run: |
+          git config user.name "Gabriel Weidmann"
+          git config user.email "gabriel@weidmann.net"
+          git add architecture.md
+          git commit -m "Clarify trash and undo documentation"
+          git push origin HEAD:codex/trash-import-groups-sort-20260831
