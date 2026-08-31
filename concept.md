@@ -188,3 +188,10 @@ Die eingegebene Wiederholungszahl zählt auch bei unbearbeiteten Liedern zuverl�
 
 
 Bei **Objekte hinzufügen** ist die Auswahl vorläufig: Ein `+` wird nach dem Antippen zu `−`, sodass die Wahl vor dem Speichern zurückgenommen werden kann. Erst **Fertig** fügt die vorgemerkten Objekte hinzu; **Abbrechen** lässt die Gruppe unverändert.
+
+
+## Globale Loop-Regel
+
+In **Einstellungen → Loops** stehen drei Optionen: **Aktiviert**, **Deaktiviert** und **Manuell**. Standard ist **Deaktiviert**. Aktiviert/Deaktiviert gelten automatisch für alle Lieder mit vorhandenem Loop, ohne deren individuelle Schalter umzuschreiben. **Manuell** verwendet wieder die pro Lied gespeicherte Aktivierung.
+
+Versucht man in einem automatischen Modus einen einzelnen Loop in der näheren Songansicht oder im `•••` umzuschalten, fragt Josi zuerst, ob auf **Manuell** gewechselt werden soll. **Nein** bricht die Änderung ab. Dasselbe gilt bei Mehrfachauswahl. Wenn ausschließlich Songs mit vorhandenen Loops ausgewählt sind, stehen im Auswahl-`•••` direkt über **Alle löschen** die Aktionen **Alle Loops aktivieren** und **Alle Loops deaktivieren**.
