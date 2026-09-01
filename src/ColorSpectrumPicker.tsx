@@ -2,6 +2,7 @@ import { useState } from 'react'
 
 type Props = {
   initialColor: string
+  title?: string
   onDone: (color: string) => void
   onCancel: () => void
 }
@@ -36,7 +37,14 @@ function spectrumColor(x: number, y: number) {
   return `#${channelToHex(rgb[0])}${channelToHex(rgb[1])}${channelToHex(rgb[2])}`
 }
 
-export function ColorSpectrumPicker({ initialColor, onDone, onCancel }: Props) {
+const QUICK_PALETTE = [
+  { label: 'Hell', colors: ['#fecaca','#fed7aa','#fef3c7','#ecfccb','#d1fae5','#cffafe','#dbeafe','#e0e7ff','#ede9fe','#fae8ff','#fce7f3','#ffe4e6'] },
+  { label: 'Knallig', colors: ['#ef4444','#f97316','#f59e0b','#eab308','#84cc16','#22c55e','#14b8a6','#06b6d4','#3b82f6','#6366f1','#a855f7','#ec4899'] },
+  { label: 'Dunkel', colors: ['#7f1d1d','#7c2d12','#78350f','#713f12','#365314','#14532d','#134e4a','#164e63','#1e3a8a','#312e81','#581c87','#831843'] },
+  { label: 'Neutral', colors: ['#ffffff','#9ca3af','#000000'] },
+]
+
+export function ColorSpectrumPicker({ initialColor, title = 'Tag-Farbe wählen', onDone, onCancel }: Props) {
   const [draftColor, setDraftColor] = useState(initialColor)
   const [point, setPoint] = useState<{ x: number; y: number } | null>(null)
 
@@ -50,10 +58,11 @@ export function ColorSpectrumPicker({ initialColor, onDone, onCancel }: Props) {
 
   return <div className="modal-backdrop color-spectrum-backdrop" onMouseDown={onCancel}>
     <section className="confirm-dialog color-spectrum-dialog" onMouseDown={(event) => event.stopPropagation()}>
-      <h2>Tag-Farbe wählen</h2>
+      <h2>{title}</h2>
       <button className="color-spectrum-field" type="button" onPointerDown={choose} aria-label="Farbe im Farbfeld auswählen">
         {point && <span className="color-spectrum-point" style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%` }} />}
       </button>
+      <div className="color-spectrum-presets">{QUICK_PALETTE.map((section) => <div className="color-preset-section" key={section.label}><span>{section.label}</span><div>{section.colors.map((color) => <button key={color} type="button" className={draftColor.toLowerCase() === color ? 'selected' : ''} style={{ background: color }} onClick={() => { setPoint(null); setDraftColor(color) }} aria-label={`${section.label} ${color}`} />)}</div></div>)}</div>
       <div className="color-spectrum-preview"><i style={{ background: draftColor }} /><span>Ausgewählte Farbe</span></div>
       <div className="dialog-actions"><button type="button" onClick={onCancel}>Abbrechen</button><button type="button" onClick={() => onDone(draftColor)}>Fertig</button></div>
     </section>

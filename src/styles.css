@@ -22,7 +22,7 @@ button:disabled { opacity: .38; cursor: default !important; }
 .import-button, .large-import { min-height: 44px; padding: 0 16px; border: 0; border-radius: 12px; background: #7c3aed; font-weight: 750; cursor: pointer; }
 .file-input { display: none; }
 
-.music-layout { min-height: 0; display: grid; grid-template-columns: 240px minmax(0,1fr); overflow: hidden; }
+.music-layout { position: relative; min-height: 0; display: grid; grid-template-columns: 240px minmax(0,1fr); overflow: hidden; }
 .sidebar { min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: 24px 14px 30px; border-right: 1px solid #232733; background: #10131a; }
 .library-panel { min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; -webkit-overflow-scrolling: touch; padding: clamp(28px,5vw,64px); }
 .nav-item { display: flex; align-items: center; justify-content: space-between; gap: 12px; width: 100%; min-height: 44px; padding: 0 12px; border: 0; border-radius: 10px; background: transparent; color: #b8c0cf; text-align: left; cursor: pointer; }
@@ -83,7 +83,7 @@ h1 { margin: 0 0 6px; font-size: clamp(34px,5vw,64px); line-height: 1; letter-sp
 .empty-state { display: grid; justify-items: center; padding: 76px 24px; border: 1px dashed #303645; border-radius: 18px; text-align: center; color: #8d96a6; }
 .empty-icon { display: grid; place-items: center; width: 58px; height: 58px; border-radius: 18px; background: #202431; color: #a78bfa; font-size: 28px; }
 
-.player { z-index: 30; display: grid; grid-template-columns: minmax(190px,.8fr) minmax(280px,1.2fr) minmax(250px,1fr); gap: 20px; align-items: center; min-height: 164px; padding: 18px clamp(16px,3vw,36px); border-top: 1px solid #303645; background: rgba(16,19,26,.98); backdrop-filter: blur(20px); }
+.player { position: relative; z-index: 30; display: grid; grid-template-columns: minmax(190px,.8fr) minmax(280px,1.2fr) minmax(250px,1fr); gap: 20px; align-items: center; min-height: 164px; padding: 18px clamp(16px,3vw,36px); border-top: 1px solid #303645; background: rgba(16,19,26,.98); backdrop-filter: blur(20px); }
 .player audio { display: none; }
 .now-playing { display: flex; align-items: center; gap: 12px; min-width: 0; padding: 0; border: 0; background: transparent; text-align: left; cursor: pointer; }
 .cover-placeholder { display: grid; flex: 0 0 54px; place-items: center; width: 54px; height: 54px; border-radius: 14px; background: linear-gradient(135deg,#5b21b6,#312e81); font-size: 24px; }
@@ -158,3 +158,19 @@ h1 { margin: 0 0 6px; font-size: clamp(34px,5vw,64px); line-height: 1; letter-sp
   .detail-controls button { width: 50px; height: 50px; }
   .detail-controls .detail-play { width: 66px; height: 66px; }
 }
+
+
+/* Adjustable library/player layout */
+.header-right-actions { display:flex; align-items:center; gap:8px; }
+.layout-finish-button { min-height:44px; padding:0 14px; border:1px solid #2563eb; border-radius:12px; background:#172554; color:#bfdbfe; font-weight:800; cursor:pointer; }
+.library-layout-handle,.player-layout-handle { position:absolute; z-index:86; width:14px; padding:0; border:0; border-radius:999px; background:rgba(96,165,250,.28); transform:translateX(-50%); cursor:col-resize; touch-action:none; }
+.library-layout-handle { top:0; bottom:0; }
+.player-layout-handle { top:10px; bottom:10px; }
+.library-layout-handle::after,.player-layout-handle::after { content:''; position:absolute; left:6px; top:10px; bottom:10px; width:2px; border-radius:2px; background:#60a5fa; }
+.music-layout.layout-editing .sidebar,.player.layout-editing { box-shadow:inset 0 0 0 1px rgba(96,165,250,.16); }
+.sidebar,.player > * { min-width:0; }
+.playlist-nav-name,.tag-nav-name,.now-playing-copy,.quick-playlists { min-width:0; }
+.nav-item > span,.playlist-nav-name > span:last-child,.tag-nav-name > span:last-child,.now-playing-copy strong { max-width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.layout-settings-actions { display:flex; flex-wrap:wrap; justify-content:flex-end; gap:7px; }
+.layout-settings-actions button { min-height:38px; padding:0 10px; border:1px solid #3b4352; border-radius:9px; background:#171c27; cursor:pointer; }
+@media (max-width:620px) { .library-layout-handle,.player-layout-handle { width:18px; } .header-right-actions { gap:5px; } .layout-finish-button { padding:0 9px; font-size:11px; } }

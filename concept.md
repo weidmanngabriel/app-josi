@@ -68,7 +68,7 @@ Dateien, die bereits vor dieser Änderung beschädigt oder leer geworden sind, k
 
 ## Mehrfachauswahl
 
-„Auswählen“ funktioniert in Bibliothek, Playlist, Importverlauf und Loops. Rechts neben **„Alle Playlists“** erscheint ein runder `•••`-Knopf mit **Gruppieren**, **Bewegen**, **Tags** und **Alle löschen**. Playlists und Tags erhalten einen eigenen Auswahlmodus über ihre Überschrift und ebenfalls einen Drei-Punkte-Knopf unten rechts zum Gruppieren. Tags öffnet die Tag-Auswahl für alle markierten Songs. Bewegen ist nur in Bibliothek bzw. geöffneter Playlist verfügbar und verschiebt die Auswahl als zusammenhängenden Block. Bei einer nicht-manuellen Sortierung fragt Josi, ob auf Manuell umgeschaltet werden soll; Nein bricht die Aktion ab. Alle löschen verlangt eine Sicherheitsabfrage.
+„Auswählen“ funktioniert in Bibliothek, Playlist, Importverlauf und Loops. Rechts neben **„Alle Playlists“** erscheint ein runder `•••`-Knopf mit **Gruppieren**, **Bewegen**, **Tags** und **Alle löschen**. Playlists und Tags erhalten einen eigenen Auswahlmodus über ihre Überschrift und ebenfalls einen Drei-Punkte-Knopf unten rechts. Dort können ausgewählte Objekte gruppiert, als Block bewegt, kopiert oder nach Sicherheitsabfrage gelöscht werden. Tags öffnet die Tag-Auswahl für alle markierten Songs. Bewegen ist nur in Bibliothek bzw. geöffneter Playlist verfügbar und verschiebt die Auswahl als zusammenhängenden Block. Bei einer nicht-manuellen Sortierung fragt Josi, ob auf Manuell umgeschaltet werden soll; Nein bricht die Aktion ab. Alle löschen verlangt eine Sicherheitsabfrage.
 
 ## Suche
 
@@ -202,3 +202,14 @@ Versucht man in einem automatischen Modus einen einzelnen Loop in der näheren S
 Die fast weiße Kopfzeile einer Gruppe kann direkt angetippt werden. Dadurch werden alle Objekte der Gruppe eingeklappt, sodass nur Name, Anzahl, Dauer und `•••` sichtbar bleiben. Ein weiterer Klick fährt die Gruppe wieder aus. Die Bedienelemente innerhalb der Kopfzeile lösen das Einklappen nicht versehentlich aus. Dieses Verhalten gilt für Lieder sowie für Playlist- und Taggruppen direkt in der linken Spalte.
 
 **Gruppe auflösen** ist Teil des normalen Undo/Redo-Verlaufs. Direkt nach dem Auflösen stellt Undo dieselbe Gruppe mit ihren bisherigen Inhalten und Einstellungen wieder her; Redo löst sie erneut auf.
+
+
+## Farben und Bibliotheks-Layout
+
+Songs, Playlists, Tags und Gruppen besitzen im `•••` die Aktion **Farbe ändern**. Bei Gruppen färbt sie die fast weiße Kopfzeile; bei einzelnen Objekten die sichtbare Objektfläche. Die eigentliche Tag-Farbe des bunten Punkts bleibt davon getrennt.
+
+Der Farbwähler zeigt weiterhin das freie Spektrum und darunter feste Farbknöpfe für **Hell**, **Knallig**, **Dunkel** sowie **Weiß, Grau und Schwarz**. Diese Schnellpalette steht ebenfalls beim Erstellen und Umbenennen von Tags bereit.
+
+In **Einstellungen → Bibliotheks-Interface** kann ein eigener Bearbeitungsmodus gestartet werden. Dann dürfen die Trennleisten der linken Spalte und der Playerbereiche verschoben werden. Mit **Layout fertig** werden die Leisten wieder gesperrt; die gewählten Breiten bleiben gespeichert. Namen und andere Texte werden innerhalb des verfügbaren Platzes begrenzt, statt benachbarte Bereiche zu überdecken.
+
+Im `•••` der Überschriften **Playlists** und **Tags** liegt außerdem **Sortieren**. Diese Sortierung betrifft die Playlist-/Tag-Liste selbst; die Songs innerhalb einer Playlist bleiben davon unabhängig.
