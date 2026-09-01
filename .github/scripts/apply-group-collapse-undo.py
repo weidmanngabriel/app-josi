@@ -1,5 +1,4 @@
 from pathlib import Path
-import re
 
 app_path = Path('src/App.tsx')
 app = app_path.read_text()
@@ -43,9 +42,11 @@ old_dissolve = "  const dissolveGroup = (id: string) => { setObjectGroups((curre
 new_dissolve = "  const dissolveGroup = (id: string) => { recordHistory(); setObjectGroups((current) => current.filter((group) => group.id !== id)); setCollapsedGroupIds((current) => { const next = new Set(current); next.delete(id); return next }); setOverflowMenu(null); setGroupReorderId((value) => value === id ? null : value); setGroupMoveId((value) => value === id ? null : value) }"
 replace_once(old_dissolve, new_dissolve, 'undoable dissolve')
 
-pattern = re.compile(r"  const renderGroupHeader = \(group: ObjectGroup, allowed: Array<Song \| Playlist \| Tag>\) => \{\n    const items = orderedGroupItems\(group, allowed\)\n    return <div className=\\\"object-group-header\\\">.*?\n  \}\n  const renderSongRow", re.S)
-match = pattern.search(app)
-if not match:
+start_marker = "  const renderGroupHeader = (group: ObjectGroup, allowed: Array<Song | Playlist | Tag>) => {\n"
+end_marker = "  const renderSongRow = (song: Song, index: number, groupId?: string) => {\n"
+start = app.find(start_marker)
+end = app.find(end_marker, start)
+if start < 0 or end < 0:
     raise SystemExit('Missing replacement: renderGroupHeader')
 new_header = '''  const renderGroupHeader = (group: ObjectGroup, allowed: Array<Song | Playlist | Tag>) => {
     const items = orderedGroupItems(group, allowed)
@@ -53,8 +54,8 @@ new_header = '''  const renderGroupHeader = (group: ObjectGroup, allowed: Array<
     const toggleCollapsed = () => setCollapsedGroupIds((current) => { const next = new Set(current); next.has(group.id) ? next.delete(group.id) : next.add(group.id); return next })
     return <div className={`object-group-header${collapsed ? ' collapsed' : ''}`} role="button" tabIndex={0} aria-expanded={!collapsed} onClick={toggleCollapsed} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleCollapsed() } }}><div className="object-group-heading"><strong><b className="group-chevron">{collapsed ? '▸' : '▾'}</b><span className="group-name-text">{group.name}</span></strong><span>{items.length} Objekte · {formatTime(groupDuration(group, allowed))}</span></div>{groupMoveId === group.id && <div className="group-inline-tools"><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, -1) }}>↑</button><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, 1) }}>↓</button><button type="button" onClick={(event) => { event.stopPropagation(); setGroupMoveId(null) }}>Fertig</button></div>}{groupReorderId === group.id && <button className="group-finish" type="button" onClick={(event) => { event.stopPropagation(); setGroupReorderId(null) }}>Fertig</button>}<button className="overflow-button group-overflow" type="button" onClick={(event) => { event.stopPropagation(); setOverflowMenu({ kind: 'group', id: group.id }) }}>•••</button></div>
   }
-  const renderSongRow'''
-app = app[:match.start()] + new_header + app[match.end():]
+'''
+app = app[:start] + new_header + app[end:]
 
 replacements = [
     (
