@@ -78,7 +78,7 @@ Die sichere Metadaten-Speicherung prüft bei Undo, ob der Basis-Song noch existi
 
 ## Mehrfachauswahl und Playlist-Zuordnung
 
-Bibliothek, Playlists, Importverlauf und Loops verwenden denselben Song-Auswahlmodus. Rechts neben „Alle Playlists“ liegt im Auswahlmodus ein runder `•••`-Knopf. Er bietet unter anderem Gruppieren, Bewegen, Tags und Alle löschen. Playlists und Tags besitzen einen entsprechenden eigenen Auswahlmodus mit einem schwebenden `•••` unten rechts; dort kann die Auswahl gruppiert werden. Bewegen arbeitet nur in Bibliothek bzw. geöffneter Playlist und verschiebt die Auswahl als Block innerhalb der manuellen Reihenfolge. Ist eine andere Sortierung aktiv, fragt Josi vorab nach dem Wechsel auf Manuell; bei Nein wird abgebrochen. Alle löschen verlangt eine Sicherheitsabfrage und entfernt die ausgewählten lokalen Dateien aus allen Playlists.
+Bibliothek, Playlists, Importverlauf und Loops verwenden denselben Song-Auswahlmodus. Rechts neben „Alle Playlists“ liegt im Auswahlmodus ein runder `•••`-Knopf. Er bietet unter anderem Gruppieren, Bewegen, Tags und Alle löschen. Playlists und Tags besitzen einen entsprechenden eigenen Auswahlmodus mit einem schwebenden `•••` unten rechts. Dort stehen Gruppieren, Bewegen, Kopieren und Alle löschen zur Verfügung. Bewegen verlangt bei einer automatischen Sortierung zuerst den Wechsel zu Manuell; Kopieren erzeugt neue Objekte desselben Typs, Löschen verschiebt die Auswahl in den Papierkorb. Bewegen arbeitet nur in Bibliothek bzw. geöffneter Playlist und verschiebt die Auswahl als Block innerhalb der manuellen Reihenfolge. Ist eine andere Sortierung aktiv, fragt Josi vorab nach dem Wechsel auf Manuell; bei Nein wird abgebrochen. Alle löschen verlangt eine Sicherheitsabfrage und entfernt die ausgewählten lokalen Dateien aus allen Playlists.
 
 ## Suche
 
@@ -180,3 +180,14 @@ Wenn eine einzelne Loop-Aktivierung in Song-Menü oder Detailansicht bzw. eine M
 Die globale Undo/Redo-Snapshot-Struktur enthält neben Songs, Playlists und Tags auch die persistenten Objektgruppen. `Gruppe auflösen` legt vor dem Entfernen einen Snapshot an; Undo stellt die Gruppe inklusive Name, Typ, Objekt-IDs, Position und Gruppensortierung wieder her, Redo löst sie erneut auf. Audiodateien oder andere Objekte werden dabei nicht kopiert.
 
 Jede Gruppen-Kopfzeile ist selbst ein einklappbarer Bereich. Ein Klick auf die fast weiße Zeile mit Name, Objektanzahl und Dauer blendet ausschließlich die enthaltenen Objekte ein oder aus; `•••` und die Gruppen-Werkzeuge stoppen dieses Ereignis und bleiben unabhängig bedienbar. Der Einklappstatus wird lokal gespeichert und gilt für Lied-, Playlist- und Taggruppen. Playlist- und Taggruppen werden direkt in ihren Bereichen der linken Seitenleiste dargestellt und können dort genauso ein- und ausgeklappt werden wie Liedgruppen in der Hauptliste.
+
+
+## Farbflächen, Palette und anpassbares Bibliotheks-Layout
+
+Neben der inhaltlichen Tag-Farbe existiert eine reine Darstellungsfarbe für Songs, Playlists und Tags sowie eine optionale Farbe direkt an Objektgruppen. `Farbe ändern` steht im jeweiligen `•••` über Umbenennen (bei Playlists nach `Bild ändern`) und öffnet denselben lokalen Farbwähler. Diese Darstellungsfarben werden getrennt in `localStorage` gehalten und verändern weder Audio-Blobs noch Tag-Zuordnungen. Gruppenfarben liegen direkt im persistenten Gruppenobjekt. Die Undo/Redo-Snapshots enthalten Gruppen- und Darstellungsfarben.
+
+Der Farbwähler kombiniert das frei antippbare Spektrum mit festen Schnellpaletten: helle Regenbogenfarben, knallige Standardfarben, dunkle Regenbogenfarben sowie Weiß, Grau und Schwarz. Derselbe Wähler wird bei der Tag-Erstellung und beim Umbenennen verwendet.
+
+`Einstellungen → Bibliotheks-Interface → Leisten verschieben` aktiviert einen expliziten Layout-Bearbeitungsmodus. Nur in diesem Modus sind die vertikalen Trennleisten der linken Bibliotheksspalte und der drei Playerbereiche greifbar. Breiten werden lokal gespeichert; außerhalb des Modus besitzen die Trennleisten keine Interaktion. Textcontainer verwenden konsequent `min-width: 0` und Ellipsen, damit Namen auch bei engen selbst gewählten Breiten nicht aus dem Layout herauslaufen.
+
+Die Abschnitts-`•••` von Playlists und Tags enthalten zusätzlich `Sortieren`. Diese globale Sortierung verändert nicht die Liedreihenfolge innerhalb einer Playlist und überschreibt auch keine separat gewählte Gruppensortierung außer bei Gruppen im Modus `Allgemeine Sortierung`.

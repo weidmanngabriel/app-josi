@@ -330,3 +330,23 @@ html, body, #root { overscroll-behavior-y: none; }
 .group-chevron { flex: 0 0 auto; width: 12px; color: #111827; font-size: 11px; }
 .group-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .object-group-header button { cursor: pointer; }
+
+
+/* Rich color palette and custom surfaces */
+.color-spectrum-presets { display:grid; gap:9px; margin:14px 0; }
+.color-preset-section { display:grid; grid-template-columns:62px minmax(0,1fr); align-items:center; gap:8px; }
+.color-preset-section > span { color:#94a3b8; font-size:11px; font-weight:800; }
+.color-preset-section > div { display:grid; grid-template-columns:repeat(12,minmax(18px,1fr)); gap:5px; }
+.color-preset-section button { aspect-ratio:1; min-width:0; padding:0; border:2px solid transparent; border-radius:7px; cursor:pointer; box-shadow:inset 0 0 0 1px rgba(15,23,42,.24); }
+.color-preset-section button.selected { border-color:#fff; box-shadow:0 0 0 2px #7c3aed; }
+.custom-surface { background:var(--custom-surface) !important; color:var(--custom-text) !important; }
+.song-row.custom-surface .song-copy strong,.song-row.custom-surface .song-copy small,.song-row.custom-surface .song-meta,.nav-item.custom-surface,.nav-item.custom-surface > strong,.playlist-card.custom-surface,.playlist-card.custom-surface strong,.playlist-card.custom-surface small { color:var(--custom-text) !important; }
+.object-group .song-row.custom-surface,.object-group .nav-item.custom-surface { background:var(--custom-surface) !important; color:var(--custom-text) !important; }
+.object-group-header.custom-surface,.object-group-header.custom-surface:hover { background:var(--custom-surface) !important; color:var(--custom-text) !important; }
+.object-group-header.custom-surface .object-group-heading span,.object-group-header.custom-surface .group-chevron,.object-group-header.custom-surface .group-overflow { color:var(--custom-text) !important; }
+.playlist-card.custom-surface { padding:8px; border-radius:12px; }
+.sidebar-move-dialog { width:min(520px,calc(100vw - 28px)); }
+.sidebar-move-targets { display:grid; max-height:48dvh; overflow:auto; gap:4px; margin:12px 0; }
+.sidebar-move-targets button { min-height:42px; padding:0 12px; border:0; border-radius:9px; background:#171c27; text-align:left; cursor:pointer; }
+.sidebar-move-targets button:hover { background:#252a36; }
+@media (max-width:620px) { .color-preset-section { grid-template-columns:1fr; } .color-preset-section > div { grid-template-columns:repeat(6,1fr); } }
