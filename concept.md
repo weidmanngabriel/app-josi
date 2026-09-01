@@ -195,3 +195,10 @@ Bei **Objekte hinzufügen** ist die Auswahl vorläufig: Ein `+` wird nach dem An
 In **Einstellungen → Loops** stehen drei Optionen: **Aktiviert**, **Deaktiviert** und **Manuell**. Standard ist **Deaktiviert**. Aktiviert/Deaktiviert gelten automatisch für alle Lieder mit vorhandenem Loop, ohne deren individuelle Schalter umzuschreiben. **Manuell** verwendet wieder die pro Lied gespeicherte Aktivierung.
 
 Versucht man in einem automatischen Modus einen einzelnen Loop in der näheren Songansicht oder im `•••` umzuschalten, fragt Josi zuerst, ob auf **Manuell** gewechselt werden soll. **Nein** bricht die Änderung ab. Dasselbe gilt bei Mehrfachauswahl. Wenn ausschließlich Songs mit vorhandenen Loops ausgewählt sind, stehen im Auswahl-`•••` direkt über **Alle löschen** die Aktionen **Alle Loops aktivieren** und **Alle Loops deaktivieren**.
+
+
+## Gruppen einklappen und wiederherstellen
+
+Die fast weiße Kopfzeile einer Gruppe kann direkt angetippt werden. Dadurch werden alle Objekte der Gruppe eingeklappt, sodass nur Name, Anzahl, Dauer und `•••` sichtbar bleiben. Ein weiterer Klick fährt die Gruppe wieder aus. Die Bedienelemente innerhalb der Kopfzeile lösen das Einklappen nicht versehentlich aus. Dieses Verhalten gilt für Lieder sowie für Playlist- und Taggruppen direkt in der linken Spalte.
+
+**Gruppe auflösen** ist Teil des normalen Undo/Redo-Verlaufs. Direkt nach dem Auflösen stellt Undo dieselbe Gruppe mit ihren bisherigen Inhalten und Einstellungen wieder her; Redo löst sie erneut auf.

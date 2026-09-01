@@ -173,3 +173,10 @@ Beim Dialog `Objekte hinzufügen` wird eine Auswahl zunächst nur vorgemerkt: `+
 In den Einstellungen gibt es eine gespeicherte globale Loop-Regel mit drei Zuständen: `Aktiviert`, `Deaktiviert` und `Manuell`. Ohne bestehende Einstellung startet Josi mit `Deaktiviert`. Die automatischen Zustände verändern keine Song-Metadaten: `Aktiviert` behandelt jeden Song mit gesetztem Loop bei Wiedergabe und Anzeige als aktiv, `Deaktiviert` behandelt jeden vorhandenen Loop als inaktiv. Nur `Manuell` verwendet `song.loopEnabled`.
 
 Wenn eine einzelne Loop-Aktivierung in Song-Menü oder Detailansicht bzw. eine Mehrfachaktion auf ausgewählten Loop-Songs in einem automatischen Modus angefordert wird, fragt Josi vorab nach dem Wechsel zu `Manuell`. Bei Ablehnung wird die Aktion vollständig verworfen. Bei Zustimmung wechselt die globale Regel auf `Manuell` und schreibt erst danach die individuellen `loopEnabled`-Werte als Metadaten. Im Song-Auswahlmenü erscheinen `Alle Loops aktivieren` und `Alle Loops deaktivieren` nur dann, wenn sämtliche ausgewählten Songs einen gespeicherten Loop besitzen.
+
+
+## Gruppen einklappen und Undo
+
+Die globale Undo/Redo-Snapshot-Struktur enthält neben Songs, Playlists und Tags auch die persistenten Objektgruppen. `Gruppe auflösen` legt vor dem Entfernen einen Snapshot an; Undo stellt die Gruppe inklusive Name, Typ, Objekt-IDs, Position und Gruppensortierung wieder her, Redo löst sie erneut auf. Audiodateien oder andere Objekte werden dabei nicht kopiert.
+
+Jede Gruppen-Kopfzeile ist selbst ein einklappbarer Bereich. Ein Klick auf die fast weiße Zeile mit Name, Objektanzahl und Dauer blendet ausschließlich die enthaltenen Objekte ein oder aus; `•••` und die Gruppen-Werkzeuge stoppen dieses Ereignis und bleiben unabhängig bedienbar. Der Einklappstatus wird lokal gespeichert und gilt für Lied-, Playlist- und Taggruppen. Playlist- und Taggruppen werden direkt in ihren Bereichen der linken Seitenleiste dargestellt und können dort genauso ein- und ausgeklappt werden wie Liedgruppen in der Hauptliste.
