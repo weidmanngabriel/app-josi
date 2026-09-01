@@ -320,3 +320,13 @@ html, body, #root { overscroll-behavior-y: none; }
 .group-membership-list > p { padding:20px; color:#8d96a6; text-align:center; }
 .group-sort-dialog { width:min(500px,calc(100vw - 28px)); }
 @media (max-width:620px) { .sidebar-selection-dock { right:12px; bottom:322px; max-width:calc(100vw - 24px); } .object-group-heading { align-items:flex-start; flex-direction:column; } .color-spectrum-field { min-height:200px; } }
+
+
+/* Collapsible object-group headers */
+.object-group-header { cursor: pointer; user-select: none; -webkit-user-select: none; }
+.object-group-header:hover { background: #fff; }
+.object-group-header.collapsed { border-bottom: 0; }
+.object-group-heading strong { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.group-chevron { flex: 0 0 auto; width: 12px; color: #111827; font-size: 11px; }
+.group-name-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.object-group-header button { cursor: pointer; }
