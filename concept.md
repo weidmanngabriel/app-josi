@@ -176,20 +176,22 @@ Die nähere Songansicht besitzt ein eigenes `•••` mit songbezogenen Aktion
 
 Mehrere ausgewählte Lieder, Playlists oder Tags können weiterhin über **Gruppieren** zu einer Gruppe zusammengefasst werden. Neue Auswahlgruppen heißen zunächst **Unbenannt**. Songs, Playlists und Tags werden nie miteinander vermischt; ein Objekt darf aber weiterhin in mehreren Gruppen desselben Typs vorkommen. Gruppen speichern nur Verweise und verdoppeln keine Audiodateien.
 
-Neu ist, dass Gruppen desselben Typs ineinander gelegt werden können. Eine Gruppe kann dabei höchstens in einer übergeordneten Gruppe liegen. Verschachtelte Gruppen werden eingerückt angezeigt und lassen sich wie normale Gruppen über ihre Kopfzeile ein- und ausklappen. Anzahl und Dauer einer übergeordneten Gruppe berücksichtigen ihre Untergruppen. Eine Gruppe kann nicht in sich selbst oder in eine eigene Untergruppe gelegt werden.
+Bereits gruppierte Objekte können erneut gruppiert werden. Wenn die ausgewählten Objekte direkt in derselben Gruppe liegen, entsteht daraus eine Untergruppe innerhalb dieser Gruppe. Die Objekte bleiben damit in ihrer bisherigen Obergruppe, statt auf die oberste Ebene verschoben zu werden. Andere vorhandene Gruppenzuordnungen bleiben bestehen.
+
+Untergruppen stehen standardmäßig oberhalb der direkten Lieder, Playlists oder Tags ihrer Obergruppe. Mit **Gruppe bewegen** kann eine Untergruppe manuell verschoben und auch unter die direkten Objekte gesetzt werden.
 
 Im Drei-Punkte-Menü einer Gruppe stehen nach **Gruppe bewegen**:
 1. **Gruppe gruppieren** – erstellt eine neue übergeordnete Gruppe und legt die aktuelle Gruppe hinein.
 2. **Gruppe hinzufügen** – zeigt passende vorhandene Gruppen. Ganz oben steht **Neue leere Gruppe**, direkt darunter **Einfügen**. Einfügen ist grau und nicht bedienbar, solange keine passende Gruppe kopiert wurde. Nach **Kopieren** wird die Gruppe samt ihrer Untergruppen als neue Kopie eingefügt.
 3. **Gruppe entfernen** – entfernt Untergruppen wieder aus der aktuellen Gruppe beziehungsweise die aktuelle Gruppe aus ihrer übergeordneten Gruppe.
 
-Leere Gruppen können außerdem direkt erstellt werden. Bei Liedlisten steht **Leere Gruppe erstellen** als oberste Option im Drei-Punkte-Menü neben der Sortierung. Bei Playlists und Tags steht dieselbe Option oben im Drei-Punkte-Menü ihrer Überschrift. Leere Gruppen bleiben erhalten, auch wenn sie keine Objekte enthalten; das Entfernen des letzten Songs, der letzten Playlist oder des letzten Tags löst die Gruppe nicht automatisch auf.
+Leere Gruppen können direkt erstellt werden und bleiben auch leer bestehen. **Alle Lieder entfernen** beziehungsweise **Alle Objekte entfernen** leert die ausgewählte Gruppe inklusive ihrer Untergruppen, löscht aber keine Gruppenhülle. Eine Gruppe verschwindet nur über **Gruppe auflösen** oder **Gruppe löschen**.
 
-Die bisherigen Gruppenfunktionen bleiben erhalten: Gruppe abspielen bei Liedgruppen, umbenennen, Farbe ändern, Sortieren, Reihenfolge ändern, Kopieren, Gruppe bewegen, Objekte hinzufügen/entfernen und Gruppe auflösen. **Allgemeine Sortierung** übernimmt weiterhin automatisch die Sortierung der Gesamtliste. Playlists und Tags können weiterhin über ihren Auswahlmodus gruppiert werden.
+**Gruppe auflösen** behält die enthaltenen Objekte und verschiebt Untergruppen eine Ebene nach oben. **Gruppe löschen** steht direkt darunter und verlangt eine Bestätigung. Danach werden die Gruppe, ihre Untergruppen und die enthaltenen Objekte in den Papierkorb verschoben. Bei Playlist-Gruppen bleiben die Musikdateien der Playlists erhalten.
 
 Bei Liedgruppen gilt **Gruppe abspielen** als abgeschlossene Wiedergabe: Shuffle, Listen-Wiederholung und das Ende der Wiedergabe bleiben innerhalb der ausgewählten Gruppe samt Untergruppen. Über **Weitere Gruppen abspielen** direkt unter **Leere Gruppe erstellen** im Drei-Punkte-Menü neben der Sortierung können mehrere Gruppen ausgewählt und in eine eigene Reihenfolge gebracht werden. Eine Untergruppe darf dabei zusätzlich separat ausgewählt sein; sie wird dann zuerst separat und später innerhalb ihrer Obergruppe erneut abgespielt.
 
-**Gruppe auflösen** bleibt Teil von Undo/Redo. Beim Auflösen werden enthaltene Untergruppen nicht gelöscht, sondern eine Ebene nach oben verschoben; Undo stellt die vorherige Gruppenstruktur wieder her.
+Im Playlist-Auswahlmodus steht neben dem Drei-Punkte-Knopf der Überschrift **Alle auswählen**. Dabei werden auch Playlists markiert, die bereits in Gruppen oder Untergruppen liegen.
 
 ## Freie Tag-Farbe
 
