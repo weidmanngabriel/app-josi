@@ -172,11 +172,19 @@ Die nähere Songansicht besitzt ein eigenes `•••` mit songbezogenen Aktion
 
 ## Gruppen
 
-Mehrere ausgewählte Lieder, Playlists oder Tags können über `••• → Gruppieren` zu einer eigenen Gruppe zusammengefasst werden. Die drei Typen werden nie vermischt. Ein Objekt darf in mehreren Gruppen desselben Typs vorkommen; Gruppen speichern dabei nur Verweise und duplizieren keine Audiodateien. Neue Gruppen heißen zunächst **Unbenannt**. Gruppen stehen vor allen ungruppierten Objekten; untereinander folgen sie der Sortierung der Gesamtliste.
+Mehrere ausgewählte Lieder, Playlists oder Tags können weiterhin über **Gruppieren** zu einer Gruppe zusammengefasst werden. Neu ist, dass Gruppen desselben Typs auch ineinander gelegt werden können. Songs, Playlists und Tags werden dabei nie miteinander vermischt.
 
-Die fast weiße Gruppenzeile zeigt Gruppenname, Objektanzahl und Gesamtdauer. Die enthaltenen Objekte liegen auf einem hellgrauen Hintergrund. Das `•••` der Gruppe bietet bei Liedern **Gruppe abspielen** sowie für alle Typen **Gruppe umbenennen**, **Sortieren**, **Reihenfolge ändern**, **Kopieren**, **Einfügen**, **Gruppe bewegen**, **Objekte hinzufügen**, **Objekte entfernen** und **Gruppe auflösen**. Kopieren/Einfügen überträgt ausschließlich Gruppeninhalte zwischen Gruppen desselben Typs; Lied-, Playlist- und Taggruppen können nicht ineinander eingefügt werden. Die interne Sortierung besitzt zusätzlich **Allgemeine Sortierung**, wodurch die Gruppe automatisch die Sortierung der gesamten Liste übernimmt.
+Im Drei-Punkte-Menü einer Gruppe stehen nach **Gruppe bewegen**:
+1. **Gruppe Gruppieren** – erstellt eine neue übergeordnete Gruppe und legt die aktuelle Gruppe hinein.
+2. **Gruppe hinzufügen** – zeigt passende vorhandene Gruppen. Ganz oben steht **Neue leere Gruppe**, direkt darunter **Einfügen**. Einfügen ist grau und nicht bedienbar, solange keine passende Gruppe kopiert wurde. Nach **Kopieren** wird die Gruppe samt ihrer Untergruppen als neue Kopie eingefügt.
+3. **Gruppe entfernen** – entfernt Untergruppen wieder aus der aktuellen Gruppe beziehungsweise die aktuelle Gruppe aus ihrer übergeordneten Gruppe.
 
-Playlists und Tags erhalten über das `•••` ihrer Überschrift einen Auswahlmodus. Während dieser Auswahl erscheint wie bei Liedern ein eigener Drei-Punkte-Knopf unten rechts, über den gruppiert werden kann.
+Leere Gruppen können außerdem direkt erstellt werden. Bei Liedlisten steht **Leere Gruppe erstellen** als oberste Option im Drei-Punkte-Menü neben der Sortierung. Bei Playlists und Tags steht dieselbe Option oben im Drei-Punkte-Menü ihrer Überschrift.
+
+Leere Gruppen bleiben erhalten, auch wenn sie keine Objekte enthalten. Entfernt man den letzten Song, die letzte Playlist oder den letzten Tag aus einer Gruppe, wird die Gruppe also nicht automatisch aufgelöst.
+
+Verschachtelte Gruppen werden eingerückt angezeigt und lassen sich wie normale Gruppen ein- und ausklappen. Anzahl und Dauer einer übergeordneten Gruppe berücksichtigen ihre Untergruppen. Eine Gruppe kann nicht in sich selbst oder in eine eigene Untergruppe gelegt werden.
+
 
 ## Freie Tag-Farbe
 
