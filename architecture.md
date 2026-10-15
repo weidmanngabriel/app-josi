@@ -82,7 +82,9 @@ Bibliothek, Playlists, Importverlauf und Loops verwenden denselben Song-Auswahlm
 
 ## Suche
 
-Bibliothek und geöffnete Playlists besitzen eine lokale Textsuche. Sie arbeitet nur mit der tatsächlich eingegebenen Zeichenfolge im Songnamen: Groß-/Kleinschreibung wird ignoriert, es gibt aber keine semantische oder unscharfe Suche. Eine aktive Suche verändert weder manuelle Reihenfolge noch Songdaten.
+Bibliothek und geöffnete Playlists besitzen eine lokale Textsuche. Die Suche ist tolerant gegenüber Groß-/Kleinschreibung, Leerzeichen, Trennzeichen und einfachen unvollständigen Eingaben. Dadurch findet zum Beispiel „Miniboss“ auch „Mini Boss“. Eine aktive Suche verändert weder manuelle Reihenfolge noch Songdaten.
+
+Auswahlfenster für Songs, Playlists, Tags und Gruppen besitzen ebenfalls eine Suchleiste. Ihre Listen übernehmen soweit möglich dieselbe Reihenfolge wie die jeweilige Hauptliste: Songs die aktuelle Bibliothekssortierung, Playlists und Tags ihre aktuelle Seitensortierung und Gruppen die aktuelle Gruppenreihenfolge.
 
 ## Importverlauf
 
@@ -182,13 +184,15 @@ Gruppen sind eine zusätzliche lokale Organisationsschicht für Songs, Playlists
 Eine normale Gruppe entsteht weiterhin aus mindestens zwei ausgewählten Objekten und heißt zunächst **Unbenannt**. Zusätzlich darf eine Gruppe leer sein. Leere Gruppen können direkt über das Drei-Punkte-Menü neben der jeweiligen Sortierung bzw. bei Playlists und Tags über deren Überschriftsmenü erstellt werden und bleiben auch dann bestehen, wenn ihr letzter direkter Inhalt entfernt wird.
 
 Das Gruppenmenü enthält neben den bisherigen Funktionen nach „Gruppe bewegen“:
-- **Gruppe Gruppieren**: legt die aktuelle Gruppe in eine neu erzeugte übergeordnete Gruppe.
+- **Gruppe gruppieren**: legt die aktuelle Gruppe in eine neu erzeugte übergeordnete Gruppe.
 - **Gruppe hinzufügen**: öffnet eine Liste vorhandener passender Gruppen. Ganz oben steht **Neue leere Gruppe**, darunter **Einfügen**. Einfügen ist nur aktiv, wenn zuvor eine Gruppe desselben Typs kopiert wurde. Die kopierte Gruppe wird inklusive ihrer verschachtelten Untergruppen als neue Kopie eingefügt.
 - **Gruppe entfernen**: entfernt eine verschachtelte Gruppe wieder aus ihrer übergeordneten Gruppe bzw. löst direkte Untergruppen aus der aktuellen Gruppe heraus.
 
 „Kopieren“ im Gruppenmenü kopiert die Gruppe selbst samt Untergruppenstruktur in die Josi-Zwischenablage und nicht mehr nur ihre direkten Objekt-IDs. Beim Einfügen werden neue Gruppen-IDs erzeugt. Kreisbeziehungen werden verhindert: Eine Gruppe kann nicht in sich selbst oder in eine eigene Untergruppe verschoben werden. Jede Gruppe hat höchstens eine übergeordnete Gruppe.
 
 Die Darstellung erfolgt rekursiv. Untergruppen werden eingerückt unter ihrer übergeordneten Gruppe angezeigt. Die Gruppen-Kopfzeile bleibt direkt ein- und ausklappbar; der Einklappstatus wird lokal gespeichert. Objektanzahl und Dauer einer Gruppe berücksichtigen auch enthaltene Untergruppen. Die interne Gruppensortierung unterstützt weiterhin **Allgemeine Sortierung** sowie die objektspezifischen Sortiermodi.
+
+Song-Gruppen können einzeln oder als frei zusammengestellte Gruppen-Queue abgespielt werden. **Gruppe abspielen** setzt eine abgeschlossene Queue aus dieser Gruppe inklusive Untergruppen. Shuffle, Listen-Wiederholung und das natürliche Ende beziehen sich dann ausschließlich auf diese Queue. Über das Drei-Punkte-Menü neben der Song-Sortierung öffnet **Weitere Gruppen abspielen** eine Mehrfachauswahl mit eigener Reihenfolge. Wird eine Untergruppe separat und zusätzlich über eine ausgewählte Obergruppe erreicht, wird sie bewusst erneut abgespielt; doppelte Songs werden nicht automatisch entfernt.
 
 `Gruppe auflösen` bleibt Teil des normalen Undo/Redo-Verlaufs. Beim Auflösen bleiben direkte Untergruppen erhalten und rücken auf die Ebene der aufgelösten Gruppe. Die globale Snapshot-Struktur enthält weiterhin die vollständigen Gruppen einschließlich Verschachtelung, sodass Undo die vorherige Struktur wiederherstellt.
 
