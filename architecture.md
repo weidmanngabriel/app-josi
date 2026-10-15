@@ -177,19 +177,20 @@ Wenn eine einzelne Loop-Aktivierung in Song-Menü oder Detailansicht bzw. eine M
 
 ## Gruppen
 
-Gruppen sind eine zusätzliche lokale Organisationsschicht für Songs, Playlists oder Tags. Die drei Typen werden weiterhin nicht vermischt. Eine Gruppe speichert direkte Objekt-IDs sowie optional eine übergeordnete Gruppen-ID. Dadurch können Gruppen desselben Typs beliebig ineinander verschachtelt werden, ohne Audiodateien oder Playlists zu duplizieren.
+Gruppen sind eine zusätzliche lokale Organisationsschicht für Songs, Playlists oder Tags. Die drei Typen werden weiterhin nicht vermischt. Gruppen speichern nur Verweise und duplizieren keine Audiodateien. Ein Objekt darf weiterhin in mehreren Gruppen desselben Typs vorkommen. Eine Gruppe speichert direkte Objekt-IDs sowie optional eine übergeordnete Gruppen-ID; dadurch können Gruppen desselben Typs ineinander verschachtelt werden.
 
-Eine Gruppe darf leer sein. Leere Gruppen können direkt über das Drei-Punkte-Menü neben der jeweiligen Sortierung bzw. bei Playlists und Tags über deren Überschriftsmenü erstellt werden und bleiben auch dann bestehen, wenn ihr letzter direkter Inhalt entfernt wird.
+Eine normale Gruppe entsteht weiterhin aus mindestens zwei ausgewählten Objekten und heißt zunächst **Unbenannt**. Zusätzlich darf eine Gruppe leer sein. Leere Gruppen können direkt über das Drei-Punkte-Menü neben der jeweiligen Sortierung bzw. bei Playlists und Tags über deren Überschriftsmenü erstellt werden und bleiben auch dann bestehen, wenn ihr letzter direkter Inhalt entfernt wird.
 
 Das Gruppenmenü enthält neben den bisherigen Funktionen nach „Gruppe bewegen“:
 - **Gruppe Gruppieren**: legt die aktuelle Gruppe in eine neu erzeugte übergeordnete Gruppe.
 - **Gruppe hinzufügen**: öffnet eine Liste vorhandener passender Gruppen. Ganz oben steht **Neue leere Gruppe**, darunter **Einfügen**. Einfügen ist nur aktiv, wenn zuvor eine Gruppe desselben Typs kopiert wurde. Die kopierte Gruppe wird inklusive ihrer verschachtelten Untergruppen als neue Kopie eingefügt.
 - **Gruppe entfernen**: entfernt eine verschachtelte Gruppe wieder aus ihrer übergeordneten Gruppe bzw. löst direkte Untergruppen aus der aktuellen Gruppe heraus.
 
-„Kopieren“ im Gruppenmenü kopiert deshalb die Gruppe selbst samt Untergruppenstruktur in die Josi-Zwischenablage und nicht mehr nur ihre direkten Objekt-IDs. Beim Einfügen werden neue Gruppen-IDs erzeugt. Kreisbeziehungen werden verhindert: Eine Gruppe kann nicht in sich selbst oder in eine eigene Untergruppe verschoben werden.
+„Kopieren“ im Gruppenmenü kopiert die Gruppe selbst samt Untergruppenstruktur in die Josi-Zwischenablage und nicht mehr nur ihre direkten Objekt-IDs. Beim Einfügen werden neue Gruppen-IDs erzeugt. Kreisbeziehungen werden verhindert: Eine Gruppe kann nicht in sich selbst oder in eine eigene Untergruppe verschoben werden. Jede Gruppe hat höchstens eine übergeordnete Gruppe.
 
-Die Darstellung erfolgt rekursiv. Untergruppen werden eingerückt unter ihrer übergeordneten Gruppe angezeigt. Objektanzahl und Dauer einer Gruppe berücksichtigen auch enthaltene Untergruppen. Beim Auflösen einer Gruppe bleiben ihre Untergruppen erhalten und rücken eine Ebene nach oben.
+Die Darstellung erfolgt rekursiv. Untergruppen werden eingerückt unter ihrer übergeordneten Gruppe angezeigt. Die Gruppen-Kopfzeile bleibt direkt ein- und ausklappbar; der Einklappstatus wird lokal gespeichert. Objektanzahl und Dauer einer Gruppe berücksichtigen auch enthaltene Untergruppen. Die interne Gruppensortierung unterstützt weiterhin **Allgemeine Sortierung** sowie die objektspezifischen Sortiermodi.
 
+`Gruppe auflösen` bleibt Teil des normalen Undo/Redo-Verlaufs. Beim Auflösen bleiben direkte Untergruppen erhalten und rücken auf die Ebene der aufgelösten Gruppe. Die globale Snapshot-Struktur enthält weiterhin die vollständigen Gruppen einschließlich Verschachtelung, sodass Undo die vorherige Struktur wiederherstellt.
 
 ## Farbflächen, Palette und anpassbares Bibliotheks-Layout
 
