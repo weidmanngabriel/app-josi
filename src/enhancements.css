@@ -435,3 +435,18 @@ input, textarea {
   color: #8d96a6;
   font-size: 12px;
 }
+
+
+/* Playlist selection and nested group placement */
+.select-all-inline {
+  min-height: 30px;
+  margin-left: auto;
+  padding: 0 9px;
+  border: 1px solid #3b4352;
+  border-radius: 8px;
+  background: #1b202a;
+  color: #dbe3ef;
+  font-size: 11px;
+  font-weight: 750;
+  cursor: pointer;
+}
