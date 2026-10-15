@@ -350,3 +350,20 @@ html, body, #root { overscroll-behavior-y: none; }
 .sidebar-move-targets button { min-height:42px; padding:0 12px; border:0; border-radius:9px; background:#171c27; text-align:left; cursor:pointer; }
 .sidebar-move-targets button:hover { background:#252a36; }
 @media (max-width:620px) { .color-preset-section { grid-template-columns:1fr; } .color-preset-section > div { grid-template-columns:repeat(6,1fr); } }
+
+
+/* Verschachtelte Gruppen */
+.nested-object-group {
+  margin-left: 14px;
+  border-left: 2px solid rgba(127, 137, 153, .28);
+  padding-left: 8px;
+}
+.group-nesting-list button:disabled {
+  opacity: .38;
+  cursor: default;
+}
+.group-nesting-list p {
+  margin: 8px 4px;
+  color: #7f8999;
+  font-size: 12px;
+}
