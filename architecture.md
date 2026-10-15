@@ -175,11 +175,20 @@ In den Einstellungen gibt es eine gespeicherte globale Loop-Regel mit drei Zust�
 Wenn eine einzelne Loop-Aktivierung in Song-Menü oder Detailansicht bzw. eine Mehrfachaktion auf ausgewählten Loop-Songs in einem automatischen Modus angefordert wird, fragt Josi vorab nach dem Wechsel zu `Manuell`. Bei Ablehnung wird die Aktion vollständig verworfen. Bei Zustimmung wechselt die globale Regel auf `Manuell` und schreibt erst danach die individuellen `loopEnabled`-Werte als Metadaten. Im Song-Auswahlmenü erscheinen `Alle Loops aktivieren` und `Alle Loops deaktivieren` nur dann, wenn sämtliche ausgewählten Songs einen gespeicherten Loop besitzen.
 
 
-## Gruppen einklappen und Undo
+## Gruppen
 
-Die globale Undo/Redo-Snapshot-Struktur enthält neben Songs, Playlists und Tags auch die persistenten Objektgruppen. `Gruppe auflösen` legt vor dem Entfernen einen Snapshot an; Undo stellt die Gruppe inklusive Name, Typ, Objekt-IDs, Position und Gruppensortierung wieder her, Redo löst sie erneut auf. Audiodateien oder andere Objekte werden dabei nicht kopiert.
+Gruppen sind eine zusätzliche lokale Organisationsschicht für Songs, Playlists oder Tags. Die drei Typen werden weiterhin nicht vermischt. Eine Gruppe speichert direkte Objekt-IDs sowie optional eine übergeordnete Gruppen-ID. Dadurch können Gruppen desselben Typs beliebig ineinander verschachtelt werden, ohne Audiodateien oder Playlists zu duplizieren.
 
-Jede Gruppen-Kopfzeile ist selbst ein einklappbarer Bereich. Ein Klick auf die fast weiße Zeile mit Name, Objektanzahl und Dauer blendet ausschließlich die enthaltenen Objekte ein oder aus; `•••` und die Gruppen-Werkzeuge stoppen dieses Ereignis und bleiben unabhängig bedienbar. Der Einklappstatus wird lokal gespeichert und gilt für Lied-, Playlist- und Taggruppen. Playlist- und Taggruppen werden direkt in ihren Bereichen der linken Seitenleiste dargestellt und können dort genauso ein- und ausgeklappt werden wie Liedgruppen in der Hauptliste.
+Eine Gruppe darf leer sein. Leere Gruppen können direkt über das Drei-Punkte-Menü neben der jeweiligen Sortierung bzw. bei Playlists und Tags über deren Überschriftsmenü erstellt werden und bleiben auch dann bestehen, wenn ihr letzter direkter Inhalt entfernt wird.
+
+Das Gruppenmenü enthält neben den bisherigen Funktionen nach „Gruppe bewegen“:
+- **Gruppe Gruppieren**: legt die aktuelle Gruppe in eine neu erzeugte übergeordnete Gruppe.
+- **Gruppe hinzufügen**: öffnet eine Liste vorhandener passender Gruppen. Ganz oben steht **Neue leere Gruppe**, darunter **Einfügen**. Einfügen ist nur aktiv, wenn zuvor eine Gruppe desselben Typs kopiert wurde. Die kopierte Gruppe wird inklusive ihrer verschachtelten Untergruppen als neue Kopie eingefügt.
+- **Gruppe entfernen**: entfernt eine verschachtelte Gruppe wieder aus ihrer übergeordneten Gruppe bzw. löst direkte Untergruppen aus der aktuellen Gruppe heraus.
+
+„Kopieren“ im Gruppenmenü kopiert deshalb die Gruppe selbst samt Untergruppenstruktur in die Josi-Zwischenablage und nicht mehr nur ihre direkten Objekt-IDs. Beim Einfügen werden neue Gruppen-IDs erzeugt. Kreisbeziehungen werden verhindert: Eine Gruppe kann nicht in sich selbst oder in eine eigene Untergruppe verschoben werden.
+
+Die Darstellung erfolgt rekursiv. Untergruppen werden eingerückt unter ihrer übergeordneten Gruppe angezeigt. Objektanzahl und Dauer einer Gruppe berücksichtigen auch enthaltene Untergruppen. Beim Auflösen einer Gruppe bleiben ihre Untergruppen erhalten und rücken eine Ebene nach oben.
 
 
 ## Farbflächen, Palette und anpassbares Bibliotheks-Layout
