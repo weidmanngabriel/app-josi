@@ -1370,7 +1370,7 @@ function App() {
     const nextSeen = new Set(seen); nextSeen.add(groupId)
     return directChildGroups(groupId).flatMap((child) => [child.id, ...groupDescendantIds(child.id, nextSeen)])
   }
-  const deepGroupItemIds = (group: ObjectGroup, seen = new Set<string>()) => {
+  const deepGroupItemIds = (group: ObjectGroup, seen = new Set<string>()): string[] => {
     if (seen.has(group.id)) return [] as string[]
     const nextSeen = new Set(seen); nextSeen.add(group.id)
     return [...new Set([...group.itemIds, ...directChildGroups(group.id).flatMap((child) => deepGroupItemIds(child, nextSeen))])]
@@ -1555,8 +1555,8 @@ function App() {
   const removeItemFromGroup = (groupId: string, itemId: string) => setObjectGroups((current) => current.map((group) => group.id === groupId ? { ...group, itemIds: group.itemIds.filter((id) => id !== itemId) } : group))
   const playObjectGroup = (group: ObjectGroup) => {
     if (group.kind !== 'song') return
-    const ordered = orderedGroupItems(group, visibleSongs).map((item) => item.id)
-    const ids = ordered.length ? ordered : group.itemIds.filter((id) => songs.some((song) => song.id === id))
+    const visibleIds = new Set(visibleSongs.map((song) => song.id))
+    const ids = deepGroupItemIds(group).filter((id) => visibleIds.has(id) && songs.some((song) => song.id === id))
     if (!ids.length) return
     setGroupPlaybackIds(ids); playSong(ids[0], true, true); setOverflowMenu(null)
   }
@@ -1742,7 +1742,7 @@ function App() {
       if (!group) return null
       const descendants = new Set(groupDescendantIds(group.id))
       const children = directChildGroups(group.id)
-      const candidates = objectGroups.filter((item) => item.kind === group.kind && item.id !== group.id && !descendants.has(item.id) && item.parentGroupId !== group.id)
+      const candidates = objectGroups.filter((item) => item.kind === group.kind && item.id !== group.id && !descendants.has(item.id) && item.parentGroupId !== group.id && !groupDescendantIds(item.id).includes(group.id))
       return <div className="playlist-chooser-backdrop group-membership-backdrop" onMouseDown={() => setGroupNestingTarget(null)}><section className="playlist-chooser group-membership-dialog" onMouseDown={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">GRUPPE</p><h2>{groupNestingTarget.mode === 'add' ? 'Gruppe hinzufügen' : 'Gruppe entfernen'}</h2></div><button type="button" onClick={() => setGroupNestingTarget(null)}>×</button></div>{groupNestingTarget.mode === 'add' ? <div className="group-membership-list group-nesting-list"><button type="button" onClick={() => createEmptyObjectGroup(group.kind, group.id)}><span>Neue leere Gruppe</span><strong>+</strong></button><button type="button" disabled={!groupClipboard || groupClipboard.kind !== group.kind} onClick={() => pasteCopiedGroupInto(group)}><span>Einfügen</span><strong>⌘</strong></button>{candidates.map((candidate) => <button type="button" key={candidate.id} onClick={() => addGroupToGroup(group.id, candidate.id)}><span>{candidate.name}</span><strong>+</strong></button>)}{!candidates.length && <p>Keine weiteren Gruppen vorhanden.</p>}</div> : <div className="group-membership-list group-nesting-list">{group.parentGroupId && <button type="button" onClick={() => detachGroup(group.id)}><span>Diese Gruppe aus der übergeordneten Gruppe entfernen</span><strong>−</strong></button>}{children.map((child) => <button type="button" key={child.id} onClick={() => detachGroup(child.id)}><span>{child.name}</span><strong>−</strong></button>)}{!group.parentGroupId && !children.length && <p>Keine verschachtelte Gruppe vorhanden.</p>}</div>}</section></div>
     })()}
     {groupMembershipTarget && (() => { const group = objectGroups.find((item) => item.id === groupMembershipTarget.groupId); if (!group) return null; const allItems: Array<Song | Playlist | Tag> = group.kind === 'song' ? songs : group.kind === 'playlist' ? playlists : tags; const candidates = groupMembershipTarget.mode === 'add' ? allItems.filter((item) => !group.itemIds.includes(item.id)) : orderedGroupItems(group, allItems); return <div className="playlist-chooser-backdrop group-membership-backdrop" onMouseDown={() => { setGroupMembershipDraftIds(new Set()); setGroupMembershipTarget(null) }}><section className="playlist-chooser group-membership-dialog" onMouseDown={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">GRUPPE</p><h2>{groupMembershipTarget.mode === 'add' ? 'Objekte hinzufügen' : 'Objekte entfernen'}</h2></div><button type="button" onClick={() => { setGroupMembershipDraftIds(new Set()); setGroupMembershipTarget(null) }}>×</button></div><div className="group-membership-list">{candidates.map((item) => { const staged = groupMembershipDraftIds.has(item.id); return <button type="button" key={item.id} onClick={() => groupMembershipTarget.mode === 'add' ? toggleGroupMembershipDraft(item.id) : removeItemFromGroup(group.id, item.id)}><span>{item.name}</span><strong>{groupMembershipTarget.mode === 'add' ? staged ? '−' : '+' : '−'}</strong></button> })}{!candidates.length && <p>Keine passenden Objekte.</p>}</div>{groupMembershipTarget.mode === 'add' && <div className="dialog-actions"><button type="button" onClick={() => { setGroupMembershipDraftIds(new Set()); setGroupMembershipTarget(null) }}>Abbrechen</button><button type="button" onClick={applyGroupMembershipDraft} disabled={!groupMembershipDraftIds.size}>Fertig</button></div>}</section></div> })()}
