@@ -172,6 +172,14 @@ Beim Taggen oder Einfügen eines Objekts mit einem Namen, der am Ziel bereits vo
 Die nähere Songansicht besitzt ein eigenes `•••` mit songbezogenen Aktionen wie Umbenennen, Kopieren/Einfügen, Tags, Teilen und Loop-Funktionen. Listenweite Aktionen wie das Sortieren von Tags oder Playlists werden dort bewusst nicht gezeigt. In der Tag-Zuordnung bedeutet `+` hinzufügen und `−` entfernen; eine teilweise Mehrfachzuordnung bleibt als `±` sichtbar. Home schließt auch aus dem Loop-Editor zuverlässig den Editor und öffnet die Bibliothek.
 
 
+## Reihenfolge ändern und Sortierbünde
+
+Bei Playlists und Tags heißt die bisherige Aktion **Bearbeiten** jetzt **Reihenfolge ändern**. In diesem Modus können benannte Gruppen und einzelne Lieder, Playlists oder Tags auf derselben Ebene gemeinsam nach oben oder unten verschoben werden, auch innerhalb einer Obergruppe.
+
+Neben den Pfeilen hat jeder Eintrag ein Schloss. Standardmäßig ist es offen. Wird es geschlossen, erscheint es rot. Zwei oder mehr direkt benachbarte geschlossene Einträge bilden einen namenlosen Sortierbund. Der Bund wird beim Verschieben zusammen bewegt, ohne seine interne Reihenfolge zu verändern. Bei einem gültigen Bund erscheint zusätzlich ein weißer Kreis je Eintrag; der ausgewählte Kreis wird rot und legt fest, nach welchem Eintrag der Bund bei automatischer Sortierung eingeordnet wird.
+
+Sortierbünde existieren nur als Sortierhilfe und können nur in **Reihenfolge ändern** bearbeitet werden. Außerhalb dieses Modus bleibt ein kleines geschlossenes Schloss neben `•••` sichtbar und die Mitglieder erhalten eine sehr dezente helle Umrandung. Ein einzelnes geschlossenes Schloss ohne direkt benachbarten Partner wird beim Beenden des Modus automatisch aufgehoben.
+
 ## Gruppen
 
 Mehrere ausgewählte Lieder, Playlists oder Tags können weiterhin über **Gruppieren** zu einer Gruppe zusammengefasst werden. Neue Auswahlgruppen heißen zunächst **Unbenannt**. Songs, Playlists und Tags werden nie miteinander vermischt; ein Objekt darf aber weiterhin in mehreren Gruppen desselben Typs vorkommen. Gruppen speichern nur Verweise und verdoppeln keine Audiodateien.
