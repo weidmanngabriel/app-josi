@@ -66,7 +66,7 @@ Beim Teilen wird aus dem gespeicherten Blob eine `File` erzeugt und über die We
 
 Einzelne Playlists bieten Bild ändern, Umbenennen, Kopieren, Einfügen, Tags, Teilen und Löschen. „Teilen“ übergibt eine Textübersicht mit Playlistname und Liedliste an die Systemfreigabe. Der separate Löschknopf in der geöffneten Playlist wurde entfernt; die Bestätigungsabfrage bleibt erhalten.
 
-Das `•••` neben der Überschrift „Playlists“ bietet „Auswählen“, „Bearbeiten“ und „Übersicht“. Im Auswahlmodus erscheint zusätzlich der schwebende Drei-Punkte-Knopf unten rechts.
+Das `•••` neben der Überschrift „Playlists“ bietet „Auswählen“, „Reihenfolge ändern“ und „Übersicht“. Bei Tags heißt die entsprechende Aktion ebenfalls „Reihenfolge ändern“. Im Auswahlmodus erscheint zusätzlich der schwebende Drei-Punkte-Knopf unten rechts.
 
 ## Papierkorb, Löschen und Undo/Redo
 
@@ -93,6 +93,14 @@ Der frühere Tab „Verlauf“ heißt „Importverlauf“. Er zeigt alle aktiven
 ## Sortierung
 
 Alle Songlisten unterstützen `Manuell`, `A–Z Anfang`, `A–Z Ende`, `Anzahl des Hörens`, `Dauer` und `Chronik`. Die Sortieransicht verändert die manuelle Reihenfolge nicht. Die gewählte Ansicht und Richtung werden in `localStorage` gespeichert. Neben Sortierbox und Richtungspfeil liegt ein `•••`. In Bibliothek bzw. geöffneter Playlist kann die aktuelle nicht-manuelle Sortierung inklusive Pfeilrichtung nach Bestätigung einmalig als neue manuelle Reihenfolge gespeichert werden; danach wird auf Manuell gewechselt und es gibt keine automatische Nachsortierung.
+
+## Reihenfolge ändern und Sortierbünde
+
+Im Modus **Reihenfolge ändern** werden benannte Gruppen und einzelne Objekte nicht mehr getrennt behandelt. Auf derselben Ebene können Gruppen, Lieder, Playlists oder Tags gemeinsam mit Pfeilen nach oben und unten verschoben werden. Das gilt auch innerhalb einer benannten Obergruppe. Die gemischte Reihenfolge wird lokal separat gespeichert; die bestehenden Objekt- und Gruppenreihenfolgen werden soweit möglich parallel aktualisiert.
+
+Jeder Eintrag erhält im Bearbeitungsmodus zusätzlich ein Schloss. Offen bedeutet ungebunden. Geschlossene, direkt benachbarte Einträge bilden einen namenlosen **Sortierbund**. Ein solcher Bund kann aus normalen Objekten und benannten Gruppen bestehen. Er wird beim Verschieben als Einheit behandelt; die interne Reihenfolge bleibt dabei unverändert. Bei zwei oder mehr benachbarten geschlossenen Einträgen erscheint je Eintrag ein Kreis. Der rot markierte Kreis bestimmt den Sortieranker des Bundes für automatische Sortierungen. Ohne gewählten Anker dient der erste Eintrag als Anker.
+
+Sortierbünde sind keine Objektgruppen: Sie haben keinen Namen, kein Gruppenmenü und können nur im Modus **Reihenfolge ändern** bearbeitet werden. Außerhalb des Modus zeigt jedes Bund-Mitglied ein kleines geschlossenes Schloss neben `•••` und eine sehr dezente helle Umrandung. Einzelne geschlossene Schlösser ohne direkt benachbartes weiteres geschlossenes Element werden beim Klick auf **Fertig** automatisch wieder geöffnet.
 
 ## Präziser Loop-Editor
 
