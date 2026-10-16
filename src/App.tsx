@@ -63,6 +63,8 @@ type View = 'library' | 'history' | 'loops' | 'trash' | 'tag' | 'playlistOvervie
 type NavigationEntry = { view: View; playlistId: string | null; tagId?: string | null; detailOpen: boolean }
 type ReorderScope = 'library' | 'playlist' | 'sidebar' | 'tags' | null
 type MoveCandidate = { kind: 'song' | 'playlist' | 'tag'; id: string; targetIndex: number | null } | null
+type MixedOrderMap = Record<string, string[]>
+type BundleStateMap = Record<string, string[]>
 type Snapshot = { songs: Song[]; playlists: Playlist[]; tags: Tag[]; objectGroups: ObjectGroup[]; objectColors: Record<string, string> }
 type PlaylistChooserMode = 'current' | 'bulk' | null
 type SortMode = 'manual' | 'azStart' | 'azEnd' | 'plays' | 'duration' | 'chronology'
@@ -179,6 +181,9 @@ function App() {
   const [playHistory, setPlayHistory] = useState<string[]>([])
   const [reorderScope, setReorderScope] = useState<ReorderScope>(null)
   const [moveCandidate, setMoveCandidate] = useState<MoveCandidate>(null)
+  const [mixedOrders, setMixedOrders] = useState<MixedOrderMap>(() => { try { const value = JSON.parse(localStorage.getItem('josi-mixed-orders') ?? '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {} } catch { return {} } })
+  const [bundleLocks, setBundleLocks] = useState<BundleStateMap>(() => { try { const value = JSON.parse(localStorage.getItem('josi-bundle-locks') ?? '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {} } catch { return {} } })
+  const [bundleAnchors, setBundleAnchors] = useState<BundleStateMap>(() => { try { const value = JSON.parse(localStorage.getItem('josi-bundle-anchors') ?? '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {} } catch { return {} } })
   const [undoStack, setUndoStack] = useState<Snapshot[]>([])
   const [redoStack, setRedoStack] = useState<Snapshot[]>([])
   const [navigation, setNavigation] = useState<NavigationEntry[]>([{ view: 'library', playlistId: null, detailOpen: false }])
@@ -373,6 +378,10 @@ function App() {
     window.addEventListener('pointercancel', stop)
     return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop); window.removeEventListener('pointercancel', stop) }
   }, [layoutDrag, playerSplitLeft, playerSplitRight])
+
+  useEffect(() => localStorage.setItem('josi-mixed-orders', JSON.stringify(mixedOrders)), [mixedOrders])
+  useEffect(() => localStorage.setItem('josi-bundle-locks', JSON.stringify(bundleLocks)), [bundleLocks])
+  useEffect(() => localStorage.setItem('josi-bundle-anchors', JSON.stringify(bundleAnchors)), [bundleAnchors])
 
   const currentSong = songs.find((song) => song.id === currentSongId) ?? null
   const hasLoop = (song: Song | null | undefined) => Boolean(song && song.loopStart !== undefined && song.loopEnd !== undefined)
@@ -1147,7 +1156,7 @@ function App() {
   const confirmDeletePlaylist = async () => { if (!playlistToDelete) return; const trashed = { ...playlistToDelete, trashedAt: Date.now() }; await savePlaylist(trashed); setPlaylists((items) => items.filter((playlist) => playlist.id !== playlistToDelete.id)); setTrashedPlaylists((items) => [trashed, ...items.filter((playlist) => playlist.id !== trashed.id)]); if (activePlaylistId === playlistToDelete.id) navigateTo({ view: 'library', playlistId: null, detailOpen: false }); setPlaylistToDelete(null) }
 
   const beginReorder = (scope: Exclude<ReorderScope, null>) => { if (scope === 'library' || scope === 'playlist') setSearchQuery(''); if (scope === 'sidebar') { setPlaylistsCollapsed(false); setPlaylistSortMode('manual') } if (scope === 'tags') { setTagsCollapsed(false); setTagSortMode('manual') } setReorderScope(scope); setMoveCandidate(null); setOverflowMenu(null); if (scope !== 'tags' && scope !== 'sidebar') setSortMode('manual') }
-  const finishReorder = () => { setReorderScope(null); setMoveCandidate(null) }
+  const finishReorder = () => { cleanupBundleSingletons(); setReorderScope(null); setMoveCandidate(null) }
   const reorderIds = (ids: string[], sourceId: string, targetIndex: number) => { const sourceIndex = ids.indexOf(sourceId); if (sourceIndex < 0) return ids; const next = [...ids]; const [moved] = next.splice(sourceIndex, 1); next.splice(Math.max(0, Math.min(targetIndex > sourceIndex ? targetIndex - 1 : targetIndex, next.length)), 0, moved); return next }
   const confirmPendingMove = async () => {
     if (!moveCandidate || moveCandidate.targetIndex === null) return; recordHistory()
@@ -1411,6 +1420,171 @@ function App() {
   }
   const flattenedGroupsFor = (kind: GroupKind, allowed: Array<Song | Playlist | Tag>, parentGroupId: string | null = null): ObjectGroup[] =>
     sortedGroupsFor(kind, allowed, parentGroupId).flatMap((group) => [group, ...flattenedGroupsFor(kind, allowed, group.id)])
+  const itemToken = (id: string) => `i:${id}`
+  const groupToken = (id: string) => `g:${id}`
+  const tokenId = (token: string) => token.slice(2)
+  const isGroupToken = (token: string) => token.startsWith('g:')
+  const rootContainerKey = (kind: GroupKind) => kind === 'song' ? `song:root:${activePlaylistId ?? 'library'}` : `${kind}:root`
+  const groupContainerKey = (kind: GroupKind, groupId: string) => `${kind}:group:${groupId}`
+  const normalizedMixedOrder = (containerKey: string, baseTokens: string[]) => {
+    const valid = new Set(baseTokens)
+    const stored = (mixedOrders[containerKey] ?? []).filter((token) => valid.has(token))
+    const known = new Set(stored)
+    return [...stored, ...baseTokens.filter((token) => !known.has(token))]
+  }
+  const bundleRunsFor = (containerKey: string, order: string[]) => {
+    const locked = new Set(bundleLocks[containerKey] ?? [])
+    const runs: string[][] = []
+    let current: string[] = []
+    order.forEach((token) => {
+      if (locked.has(token)) current.push(token)
+      else { if (current.length) runs.push(current); current = [] }
+    })
+    if (current.length) runs.push(current)
+    return runs
+  }
+  const reorderActiveForKind = (kind: GroupKind) => kind === 'song'
+    ? view === 'library' && reorderScope === (activePlaylist ? 'playlist' : 'library')
+    : kind === 'playlist' ? reorderScope === 'sidebar' : reorderScope === 'tags'
+  const containerManualMode = (kind: GroupKind, parentGroupId?: string) => {
+    if (reorderActiveForKind(kind)) return true
+    if (parentGroupId) {
+      const parent = objectGroups.find((group) => group.id === parentGroupId)
+      const mode = parent?.sortMode === 'general' ? globalSortForKind(kind).mode : parent?.sortMode
+      return mode === 'manual'
+    }
+    return globalSortForKind(kind).mode === 'manual'
+  }
+  const orderedTokensForContainer = (containerKey: string, baseTokens: string[], manual: boolean) => {
+    const storedOrder = normalizedMixedOrder(containerKey, baseTokens)
+    if (manual) return mixedOrders[containerKey]?.length ? storedOrder : baseTokens
+    const runs = bundleRunsFor(containerKey, storedOrder).filter((run) => run.length >= 2)
+    if (!runs.length) return baseTokens
+    const rank = new Map(baseTokens.map((token, index) => [token, index]))
+    const runFor = new Map<string, string[]>()
+    runs.forEach((run) => run.forEach((token) => runFor.set(token, run)))
+    const seen = new Set<string>()
+    const anchors = new Set(bundleAnchors[containerKey] ?? [])
+    const units: Array<{ tokens: string[]; rank: number }> = []
+    baseTokens.forEach((token) => {
+      if (seen.has(token)) return
+      const run = runFor.get(token)
+      if (!run) { seen.add(token); units.push({ tokens: [token], rank: rank.get(token) ?? Number.MAX_SAFE_INTEGER }); return }
+      run.forEach((item) => seen.add(item))
+      const anchor = run.find((item) => anchors.has(item)) ?? run[0]
+      units.push({ tokens: run, rank: rank.get(anchor) ?? Number.MAX_SAFE_INTEGER })
+    })
+    return units.sort((a, b) => a.rank - b.rank).flatMap((unit) => unit.tokens)
+  }
+  const toggleBundleLock = (containerKey: string, baseTokens: string[], token: string) => {
+    const order = normalizedMixedOrder(containerKey, baseTokens)
+    setMixedOrders((current) => ({ ...current, [containerKey]: current[containerKey]?.length ? current[containerKey] : order }))
+    setBundleLocks((current) => {
+      const values = new Set(current[containerKey] ?? [])
+      values.has(token) ? values.delete(token) : values.add(token)
+      return { ...current, [containerKey]: [...values] }
+    })
+  }
+  const selectBundleAnchor = (containerKey: string, baseTokens: string[], token: string) => {
+    const order = normalizedMixedOrder(containerKey, baseTokens)
+    const run = bundleRunsFor(containerKey, order).find((items) => items.includes(token))
+    if (!run || run.length < 2) return
+    setBundleAnchors((current) => {
+      const values = new Set(current[containerKey] ?? [])
+      run.forEach((item) => values.delete(item))
+      values.add(token)
+      return { ...current, [containerKey]: [...values] }
+    })
+  }
+  const bundleInfo = (containerKey: string, baseTokens: string[], token: string) => {
+    const order = normalizedMixedOrder(containerKey, baseTokens)
+    const locked = new Set(bundleLocks[containerKey] ?? [])
+    const run = bundleRunsFor(containerKey, order).find((items) => items.includes(token)) ?? []
+    return { locked: locked.has(token), bundled: locked.has(token) && run.length >= 2, anchor: run.length >= 2 && (bundleAnchors[containerKey] ?? []).includes(token), run, order }
+  }
+  const replaceSubsetOrder = (existing: string[], subsetOrder: string[]) => {
+    const subset = new Set(subsetOrder)
+    let index = 0
+    return existing.map((id) => subset.has(id) ? subsetOrder[index++] : id)
+  }
+  const persistRelativeOrder = async (kind: GroupKind, order: string[], parentGroupId?: string) => {
+    const itemIds = order.filter((token) => !isGroupToken(token)).map(tokenId)
+    const groupIds = order.filter(isGroupToken).map(tokenId)
+    if (parentGroupId) {
+      updateObjectGroup(parentGroupId, (group) => ({ ...group, itemIds: replaceSubsetOrder(group.itemIds, itemIds), sortMode: 'manual' }))
+      const siblingIds = objectGroups.filter((group) => group.kind === kind && group.parentGroupId === parentGroupId).sort((a,b) => a.sortOrder-b.sortOrder).map((group) => group.id)
+      const nextSiblingIds = replaceSubsetOrder(siblingIds, groupIds)
+      const groupOrder = new Map(nextSiblingIds.map((id, index) => [id, index]))
+      setObjectGroups((current) => current.map((group) => group.parentGroupId === parentGroupId && group.kind === kind ? { ...group, sortOrder: groupOrder.get(group.id) ?? group.sortOrder } : group))
+      return
+    }
+    if (kind === 'playlist') {
+      const currentIds = [...sidebarPlaylists].map((playlist) => playlist.id)
+      const nextIds = replaceSubsetOrder(currentIds, itemIds)
+      const orderMap = new Map(nextIds.map((id, index) => [id, index]))
+      const updated = playlists.map((playlist) => ({ ...playlist, sortOrder: orderMap.get(playlist.id) ?? playlist.sortOrder }))
+      setPlaylists(updated); await Promise.all(updated.map(savePlaylist))
+    } else if (kind === 'tag') {
+      const currentIds = [...sidebarTags].map((tag) => tag.id)
+      const nextIds = replaceSubsetOrder(currentIds, itemIds)
+      const orderMap = new Map(nextIds.map((id, index) => [id, index]))
+      const updated = tags.map((tag) => ({ ...tag, sortOrder: orderMap.get(tag.id) ?? tag.sortOrder }))
+      setTags(updated); await Promise.all(updated.map(saveTag))
+    } else if (activePlaylist) {
+      const nextIds = replaceSubsetOrder(activePlaylist.songIds, itemIds)
+      await updatePlaylist({ ...activePlaylist, songIds: nextIds, lastUsedAt: Date.now() }, true)
+    } else {
+      const currentIds = [...songs].sort((a,b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt)).map((song) => song.id)
+      const nextIds = replaceSubsetOrder(currentIds, itemIds)
+      const orderMap = new Map(nextIds.map((id,index) => [id,index]))
+      const updated = songs.map((song) => ({ ...song, libraryOrder: orderMap.get(song.id) ?? song.libraryOrder }))
+      setSongs(updated); await saveSongOrder(updated)
+    }
+    const siblingIds = objectGroups.filter((group) => group.kind === kind && !group.parentGroupId).sort((a,b) => a.sortOrder-b.sortOrder).map((group) => group.id)
+    const nextSiblingIds = replaceSubsetOrder(siblingIds, groupIds)
+    const groupOrder = new Map(nextSiblingIds.map((id,index) => [id,index]))
+    setObjectGroups((current) => current.map((group) => group.kind === kind && !group.parentGroupId ? { ...group, sortOrder: groupOrder.get(group.id) ?? group.sortOrder } : group))
+  }
+  const moveContainerToken = async (kind: GroupKind, containerKey: string, baseTokens: string[], token: string, delta: -1 | 1, parentGroupId?: string) => {
+    const order = normalizedMixedOrder(containerKey, baseTokens)
+    const runs = bundleRunsFor(containerKey, order)
+    const units: string[][] = []
+    let index = 0
+    while (index < order.length) {
+      const run = runs.find((items) => items.length >= 2 && items[0] === order[index])
+      if (run) { units.push(run); index += run.length } else { units.push([order[index]]); index += 1 }
+    }
+    const unitIndex = units.findIndex((unit) => unit.includes(token))
+    const other = unitIndex + delta
+    if (unitIndex < 0 || other < 0 || other >= units.length) return
+    const nextUnits = [...units]; [nextUnits[unitIndex], nextUnits[other]] = [nextUnits[other], nextUnits[unitIndex]]
+    const nextOrder = nextUnits.flat()
+    setMixedOrders((current) => ({ ...current, [containerKey]: nextOrder }))
+    await persistRelativeOrder(kind, nextOrder, parentGroupId)
+  }
+  const cleanupBundleSingletons = () => {
+    const nextLocks: BundleStateMap = { ...bundleLocks }
+    const nextAnchors: BundleStateMap = { ...bundleAnchors }
+    Object.keys(nextLocks).forEach((containerKey) => {
+      const order = mixedOrders[containerKey] ?? []
+      const locked = new Set(nextLocks[containerKey] ?? [])
+      const runs: string[][] = []; let current: string[] = []
+      order.forEach((token) => { if (locked.has(token)) current.push(token); else { if (current.length) runs.push(current); current = [] } })
+      if (current.length) runs.push(current)
+      const valid = new Set(runs.filter((run) => run.length >= 2).flat())
+      nextLocks[containerKey] = (nextLocks[containerKey] ?? []).filter((token) => valid.has(token))
+      nextAnchors[containerKey] = (nextAnchors[containerKey] ?? []).filter((token) => valid.has(token))
+    })
+    setBundleLocks(nextLocks); setBundleAnchors(nextAnchors)
+  }
+  const renderOrderControls = (kind: GroupKind, containerKey: string, baseTokens: string[], token: string, parentGroupId?: string) => {
+    if (!reorderActiveForKind(kind)) return null
+    const info = bundleInfo(containerKey, baseTokens, token)
+    return <span className="order-edit-controls"><button type="button" onClick={(event) => { event.stopPropagation(); void moveContainerToken(kind, containerKey, baseTokens, token, -1, parentGroupId) }}>↑</button><button type="button" onClick={(event) => { event.stopPropagation(); void moveContainerToken(kind, containerKey, baseTokens, token, 1, parentGroupId) }}>↓</button><button className={`bundle-lock${info.locked ? ' locked' : ''}`} type="button" onClick={(event) => { event.stopPropagation(); toggleBundleLock(containerKey, baseTokens, token) }} aria-label={info.locked ? 'Bund entsperren' : 'Für Bund sperren'}><span aria-hidden="true" /></button>{info.bundled && <button className={`bundle-anchor${info.anchor ? ' active' : ''}`} type="button" onClick={(event) => { event.stopPropagation(); selectBundleAnchor(containerKey, baseTokens, token) }} aria-label="Sortieranker für Bund" />}</span>
+  }
+  const bundleDisplayClass = (containerKey: string, baseTokens: string[], token: string) => bundleInfo(containerKey, baseTokens, token).bundled ? ' bundle-member' : ''
+  const renderBundleBadge = (kind: GroupKind, containerKey: string, baseTokens: string[], token: string) => !reorderActiveForKind(kind) && bundleInfo(containerKey, baseTokens, token).bundled ? <span className="bundle-static-lock" title="Sortierbund" aria-label="Sortierbund"><span aria-hidden="true" /></span> : null
+
   const createEmptyObjectGroup = (kind: GroupKind, parentGroupId?: string) => {
     const id = crypto.randomUUID()
     recordHistory()
@@ -1663,33 +1837,87 @@ function App() {
   const groupedTagIds = new Set(objectGroups.filter((group) => group.kind === 'tag').flatMap((group) => group.itemIds))
   const ungroupedSidebarTags = sidebarTags.filter((tag) => !groupedTagIds.has(tag.id))
 
-  const renderGroupHeader = (group: ObjectGroup, allowed: Array<Song | Playlist | Tag>) => {
-    const items = orderedGroupItems(group, allowed)
+  const songRootKey = rootContainerKey('song')
+  const songRootBaseTokens = [...songGroups.map((group) => groupToken(group.id)), ...ungroupedVisibleSongs.map((song) => itemToken(song.id))]
+  const songRootOrder = orderedTokensForContainer(songRootKey, songRootBaseTokens, containerManualMode('song'))
+  const playlistRootKey = rootContainerKey('playlist')
+  const playlistRootBaseTokens = [...playlistGroups.map((group) => groupToken(group.id)), ...ungroupedSidebarPlaylists.map((playlist) => itemToken(playlist.id))]
+  const playlistRootOrder = orderedTokensForContainer(playlistRootKey, playlistRootBaseTokens, containerManualMode('playlist'))
+  const tagRootKey = rootContainerKey('tag')
+  const tagRootBaseTokens = [...tagGroups.map((group) => groupToken(group.id)), ...ungroupedSidebarTags.map((tag) => itemToken(tag.id))]
+  const tagRootOrder = orderedTokensForContainer(tagRootKey, tagRootBaseTokens, containerManualMode('tag'))
+  const songGroupMap = new Map(songGroups.map((group) => [group.id, group]))
+  const songItemMap = new Map(ungroupedVisibleSongs.map((song) => [song.id, song]))
+  const playlistGroupMap = new Map(playlistGroups.map((group) => [group.id, group]))
+  const playlistItemMap = new Map(ungroupedSidebarPlaylists.map((playlist) => [playlist.id, playlist]))
+  const tagGroupMap = new Map(tagGroups.map((group) => [group.id, group]))
+  const tagItemMap = new Map(ungroupedSidebarTags.map((tag) => [tag.id, tag]))
+
+  const renderGroupHeader = (group: ObjectGroup, allowed: Array<Song | Playlist | Tag>, containerKey?: string, baseTokens: string[] = []) => {
     const collapsed = collapsedGroupIds.has(group.id)
+    const token = groupToken(group.id)
+    const key = containerKey ?? rootContainerKey(group.kind)
+    const bundleClass = bundleDisplayClass(key, baseTokens, token)
     const toggleCollapsed = () => setCollapsedGroupIds((current) => { const next = new Set(current); next.has(group.id) ? next.delete(group.id) : next.add(group.id); return next })
-    return <div className={`object-group-header${collapsed ? ' collapsed' : ''}${group.color ? ' custom-surface' : ''}`} style={surfaceStyle(group.color)} role="button" tabIndex={0} aria-expanded={!collapsed} onClick={toggleCollapsed} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleCollapsed() } }}><div className="object-group-heading"><strong><b className="group-chevron">{collapsed ? '▸' : '▾'}</b><span className="group-name-text">{group.name}</span></strong><span>{groupObjectCount(group, allowed)} Objekte · {formatTime(groupDuration(group, allowed))}</span></div>{groupMoveId === group.id && <div className="group-inline-tools"><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, -1) }}>↑</button><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, 1) }}>↓</button><button type="button" onClick={(event) => { event.stopPropagation(); setGroupMoveId(null) }}>Fertig</button></div>}{groupReorderId === group.id && <button className="group-finish" type="button" onClick={(event) => { event.stopPropagation(); setGroupReorderId(null) }}>Fertig</button>}<button className="overflow-button group-overflow" type="button" onClick={(event) => { event.stopPropagation(); setOverflowMenu({ kind: 'group', id: group.id }) }}>•••</button></div>
+    return <div className={`object-group-header${collapsed ? ' collapsed' : ''}${group.color ? ' custom-surface' : ''}${bundleClass}`} style={surfaceStyle(group.color)} role="button" tabIndex={0} aria-expanded={!collapsed} onClick={toggleCollapsed} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleCollapsed() } }}><div className="object-group-heading"><strong><b className="group-chevron">{collapsed ? '▸' : '▾'}</b><span className="group-name-text">{group.name}</span></strong><span>{groupObjectCount(group, allowed)} Objekte · {formatTime(groupDuration(group, allowed))}</span></div>{renderOrderControls(group.kind, key, baseTokens, token, group.parentGroupId)}{groupMoveId === group.id && !reorderActiveForKind(group.kind) && <div className="group-inline-tools"><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, -1) }}>↑</button><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, 1) }}>↓</button><button type="button" onClick={(event) => { event.stopPropagation(); setGroupMoveId(null) }}>Fertig</button></div>}{groupReorderId === group.id && !reorderActiveForKind(group.kind) && <button className="group-finish" type="button" onClick={(event) => { event.stopPropagation(); setGroupReorderId(null) }}>Fertig</button>}{renderBundleBadge(group.kind, key, baseTokens, token)}<button className="overflow-button group-overflow" type="button" onClick={(event) => { event.stopPropagation(); setOverflowMenu({ kind: 'group', id: group.id }) }}>•••</button></div>
   }
-  const renderSongRow = (song: Song, index: number, groupId?: string) => {
+  const renderSongRow = (song: Song, index: number, groupId?: string, containerKey?: string, baseTokens: string[] = []) => {
     const groupReordering = groupId === groupReorderId
     const surfaceColor = objectSurfaceColor('song', song.id)
-    return <div key={song.id} className={`song-row${song.isNew ? ' new-import' : ''}${selectedSongIds.has(song.id) ? ' selected-song' : ''}${groupId ? ' grouped-object-row' : ''}${surfaceColor ? ' custom-surface' : ''}`} style={surfaceStyle(surfaceColor)}>{groupReordering && <div className="group-item-reorder"><button type="button" onClick={() => moveGroupItem(groupId!, song.id, -1)}>↑</button><button type="button" onClick={() => moveGroupItem(groupId!, song.id, 1)}>↓</button></div>}{!groupId && songEditMode && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'song', id: song.id, targetIndex: null })}>↕</button>}{selectionMode && <button className="selection-check" type="button" onClick={() => toggleSelected(song.id)}>{selectedSongIds.has(song.id) ? '✓' : ''}</button>}<button className="song-main" type="button" onClick={() => playSong(song.id)} disabled={(!groupId && songEditMode) || groupReordering}><span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span><span className="song-copy"><strong>{song.name}</strong><small className="song-subline"><span className="song-tag-dots">{songTags(song.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} title={tag.name} />)}</span><span>{view === 'history' ? formatDate(song.addedAt) : membershipText(song.id)}</span></small></span><span className="song-meta"><small>{!song.file || song.file.size === 0 ? 'FEHLT' : formatTime(song.duration)}</small>{song.loopStart !== undefined && song.loopEnd !== undefined && <span className="loop-badge">↻</span>}</span></button><button className="overflow-button song-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'song', id: song.id })}>•••</button>{activePlaylist && view === 'library' && !selectionMode && !songEditMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActivePlaylist(song.id)}>Entfernen</button>}{activeTag && view === 'tag' && !selectionMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActiveTag(song.id)}>Entfernen</button>}</div>
+    const token = itemToken(song.id)
+    const key = containerKey ?? (groupId ? groupContainerKey('song', groupId) : rootContainerKey('song'))
+    const bundleClass = bundleDisplayClass(key, baseTokens, token)
+    return <div key={song.id} className={`song-row${song.isNew ? ' new-import' : ''}${selectedSongIds.has(song.id) ? ' selected-song' : ''}${groupId ? ' grouped-object-row' : ''}${surfaceColor ? ' custom-surface' : ''}${bundleClass}`} style={surfaceStyle(surfaceColor)}>{renderOrderControls('song', key, baseTokens, token, groupId)}{groupReordering && !reorderActiveForKind('song') && <div className="group-item-reorder"><button type="button" onClick={() => moveGroupItem(groupId!, song.id, -1)}>↑</button><button type="button" onClick={() => moveGroupItem(groupId!, song.id, 1)}>↓</button></div>}{selectionMode && <button className="selection-check" type="button" onClick={() => toggleSelected(song.id)}>{selectedSongIds.has(song.id) ? '✓' : ''}</button>}<button className="song-main" type="button" onClick={() => playSong(song.id)} disabled={songEditMode || groupReordering}><span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span><span className="song-copy"><strong>{song.name}</strong><small className="song-subline"><span className="song-tag-dots">{songTags(song.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} title={tag.name} />)}</span><span>{view === 'history' ? formatDate(song.addedAt) : membershipText(song.id)}</span></small></span><span className="song-meta"><small>{!song.file || song.file.size === 0 ? 'FEHLT' : formatTime(song.duration)}</small>{song.loopStart !== undefined && song.loopEnd !== undefined && <span className="loop-badge">↻</span>}</span></button>{renderBundleBadge('song', key, baseTokens, token)}<button className="overflow-button song-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'song', id: song.id })}>•••</button>{activePlaylist && view === 'library' && !selectionMode && !songEditMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActivePlaylist(song.id)}>Entfernen</button>}{activeTag && view === 'tag' && !selectionMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActiveTag(song.id)}>Entfernen</button>}</div>
   }
-  const renderPlaylistRow = (playlist: Playlist, index: number, groupId?: string) => {
+  const renderPlaylistRow = (playlist: Playlist, index: number, groupId?: string, containerKey?: string, baseTokens: string[] = []) => {
     const groupReordering = groupId === groupReorderId
     const selected = selectedPlaylistIds.has(playlist.id)
     const surfaceColor = objectSurfaceColor('playlist', playlist.id)
-    return <div className={`playlist-nav-row${groupId ? ' grouped-object-row' : ''}`} key={playlist.id}>{groupReordering && <div className="group-item-reorder"><button type="button" onClick={() => moveGroupItem(groupId!, playlist.id, -1)}>↑</button><button type="button" onClick={() => moveGroupItem(groupId!, playlist.id, 1)}>↓</button></div>}{sidebarSelectionKind === 'playlist' && <button className="selection-check sidebar-selection-check" type="button" onClick={() => toggleSidebarSelected('playlist', playlist.id)}>{selected ? '✓' : ''}</button>}{!groupId && sidebarSelectionKind !== 'playlist' && reorderScope === 'sidebar' && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'playlist', id: playlist.id, targetIndex: null })}>↕</button>}<button className={`nav-item${activePlaylistId === playlist.id && view === 'library' ? ' active' : ''}${selected ? ' selected-sidebar-object' : ''}${surfaceColor ? ' custom-surface' : ''}`} style={surfaceStyle(surfaceColor)} type="button" onClick={() => sidebarSelectionKind === 'playlist' ? toggleSidebarSelected('playlist', playlist.id) : void openPlaylist(playlist.id)} disabled={reorderScope === 'sidebar' || groupReordering}><span className="playlist-nav-name">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span className="playlist-mini-cover">♫</span>}<span className="nav-tag-dots">{playlistTags(playlist.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} />)}</span><span>{playlist.name}</span></span><strong>{playlist.songIds.length}</strong></button>{sidebarSelectionKind !== 'playlist' && <button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id })}>•••</button>}</div>
+    const token = itemToken(playlist.id)
+    const key = containerKey ?? (groupId ? groupContainerKey('playlist', groupId) : rootContainerKey('playlist'))
+    const bundleClass = bundleDisplayClass(key, baseTokens, token)
+    return <div className={`playlist-nav-row${groupId ? ' grouped-object-row' : ''}${bundleClass}`} key={playlist.id}>{renderOrderControls('playlist', key, baseTokens, token, groupId)}{groupReordering && !reorderActiveForKind('playlist') && <div className="group-item-reorder"><button type="button" onClick={() => moveGroupItem(groupId!, playlist.id, -1)}>↑</button><button type="button" onClick={() => moveGroupItem(groupId!, playlist.id, 1)}>↓</button></div>}{sidebarSelectionKind === 'playlist' && <button className="selection-check sidebar-selection-check" type="button" onClick={() => toggleSidebarSelected('playlist', playlist.id)}>{selected ? '✓' : ''}</button>}<button className={`nav-item${activePlaylistId === playlist.id && view === 'library' ? ' active' : ''}${selected ? ' selected-sidebar-object' : ''}${surfaceColor ? ' custom-surface' : ''}`} style={surfaceStyle(surfaceColor)} type="button" onClick={() => sidebarSelectionKind === 'playlist' ? toggleSidebarSelected('playlist', playlist.id) : void openPlaylist(playlist.id)} disabled={reorderScope === 'sidebar' || groupReordering}><span className="playlist-nav-name">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span className="playlist-mini-cover">♫</span>}<span className="nav-tag-dots">{playlistTags(playlist.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} />)}</span><span>{playlist.name}</span></span><strong>{playlist.songIds.length}</strong></button>{renderBundleBadge('playlist', key, baseTokens, token)}{sidebarSelectionKind !== 'playlist' && <button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id })}>•••</button>}</div>
   }
-  const renderTagRow = (tag: Tag, index: number, groupId?: string) => {
+  const renderTagRow = (tag: Tag, index: number, groupId?: string, containerKey?: string, baseTokens: string[] = []) => {
     const groupReordering = groupId === groupReorderId
     const selected = selectedTagIds.has(tag.id)
     const surfaceColor = objectSurfaceColor('tag', tag.id)
-    return <div className={`playlist-nav-row tag-nav-row${groupId ? ' grouped-object-row' : ''}`} key={tag.id}>{groupReordering && <div className="group-item-reorder"><button type="button" onClick={() => moveGroupItem(groupId!, tag.id, -1)}>↑</button><button type="button" onClick={() => moveGroupItem(groupId!, tag.id, 1)}>↓</button></div>}{sidebarSelectionKind === 'tag' && <button className="selection-check sidebar-selection-check" type="button" onClick={() => toggleSidebarSelected('tag', tag.id)}>{selected ? '✓' : ''}</button>}{!groupId && sidebarSelectionKind !== 'tag' && tagEditMode && <button className="move-selector" type="button" onClick={() => setMoveCandidate({ kind: 'tag', id: tag.id, targetIndex: null })}>↕</button>}<button className={`nav-item${activeTagId === tag.id && view === 'tag' ? ' active' : ''}${selected ? ' selected-sidebar-object' : ''}${surfaceColor ? ' custom-surface' : ''}`} style={surfaceStyle(surfaceColor)} type="button" onClick={() => sidebarSelectionKind === 'tag' ? toggleSidebarSelected('tag', tag.id) : void openTag(tag.id)} disabled={tagEditMode || groupReordering}><span className="tag-nav-name"><i className="tag-dot" style={{ background: tag.color }} /><span>{tag.name}</span></span><strong>{tag.songIds.filter((id) => songs.some((song) => song.id === id)).length}</strong></button>{sidebarSelectionKind !== 'tag' && <button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'tag', id: tag.id })}>•••</button>}</div>
+    const token = itemToken(tag.id)
+    const key = containerKey ?? (groupId ? groupContainerKey('tag', groupId) : rootContainerKey('tag'))
+    const bundleClass = bundleDisplayClass(key, baseTokens, token)
+    return <div className={`playlist-nav-row tag-nav-row${groupId ? ' grouped-object-row' : ''}${bundleClass}`} key={tag.id}>{renderOrderControls('tag', key, baseTokens, token, groupId)}{groupReordering && !reorderActiveForKind('tag') && <div className="group-item-reorder"><button type="button" onClick={() => moveGroupItem(groupId!, tag.id, -1)}>↑</button><button type="button" onClick={() => moveGroupItem(groupId!, tag.id, 1)}>↓</button></div>}{sidebarSelectionKind === 'tag' && <button className="selection-check sidebar-selection-check" type="button" onClick={() => toggleSidebarSelected('tag', tag.id)}>{selected ? '✓' : ''}</button>}<button className={`nav-item${activeTagId === tag.id && view === 'tag' ? ' active' : ''}${selected ? ' selected-sidebar-object' : ''}${surfaceColor ? ' custom-surface' : ''}`} style={surfaceStyle(surfaceColor)} type="button" onClick={() => sidebarSelectionKind === 'tag' ? toggleSidebarSelected('tag', tag.id) : void openTag(tag.id)} disabled={tagEditMode || groupReordering}><span className="tag-nav-name"><i className="tag-dot" style={{ background: tag.color }} /><span>{tag.name}</span></span><strong>{tag.songIds.filter((id) => songs.some((song) => song.id === id)).length}</strong></button>{renderBundleBadge('tag', key, baseTokens, token)}{sidebarSelectionKind !== 'tag' && <button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'tag', id: tag.id })}>•••</button>}</div>
   }
   const renderPlaylistCard = (playlist: Playlist) => { const surfaceColor = objectSurfaceColor('playlist', playlist.id); return <div className="playlist-card-wrap" key={playlist.id}><button className={`playlist-card${surfaceColor ? ' custom-surface' : ''}`} style={surfaceStyle(surfaceColor)} type="button" onClick={() => void openPlaylist(playlist.id)}><span className="playlist-card-cover">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : '♫'}</span><strong><span className="card-tag-dots">{playlistTags(playlist.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} />)}</span>{playlist.name}</strong><small>{playlist.songIds.length} {playlist.songIds.length === 1 ? 'Lied' : 'Lieder'}</small></button><button className="overflow-button card-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id })}>•••</button></div> }
-  const renderSongGroup = (group: ObjectGroup, depth = 0): React.ReactNode => { const children = sortedGroupsFor('song', visibleSongs, group.id); return <section className={`object-group song-object-group${depth ? ' nested-object-group' : ''}`} key={group.id}>{renderGroupHeader(group, visibleSongs)}{!collapsedGroupIds.has(group.id) && <>{children.filter((child) => !child.afterItems).map((child) => renderSongGroup(child, depth + 1))}{orderedGroupItems(group, visibleSongs).map((item, index) => renderSongRow(item as Song, index, group.id))}{children.filter((child) => child.afterItems).map((child) => renderSongGroup(child, depth + 1))}</>}</section> }
-  const renderPlaylistGroup = (group: ObjectGroup, depth = 0): React.ReactNode => { const children = sortedGroupsFor('playlist', sidebarPlaylists, group.id); return <section className={`object-group sidebar-object-group${depth ? ' nested-object-group' : ''}`} key={group.id}>{renderGroupHeader(group, sidebarPlaylists)}{!collapsedGroupIds.has(group.id) && <>{children.filter((child) => !child.afterItems).map((child) => renderPlaylistGroup(child, depth + 1))}{orderedGroupItems(group, sidebarPlaylists).map((item, index) => renderPlaylistRow(item as Playlist, index, group.id))}{children.filter((child) => child.afterItems).map((child) => renderPlaylistGroup(child, depth + 1))}</>}</section> }
-  const renderTagGroup = (group: ObjectGroup, depth = 0): React.ReactNode => { const children = sortedGroupsFor('tag', sidebarTags, group.id); return <section className={`object-group sidebar-object-group${depth ? ' nested-object-group' : ''}`} key={group.id}>{renderGroupHeader(group, sidebarTags)}{!collapsedGroupIds.has(group.id) && <>{children.filter((child) => !child.afterItems).map((child) => renderTagGroup(child, depth + 1))}{orderedGroupItems(group, sidebarTags).map((item, index) => renderTagRow(item as Tag, index, group.id))}{children.filter((child) => child.afterItems).map((child) => renderTagGroup(child, depth + 1))}</>}</section> }
+  const renderSongGroup = (group: ObjectGroup, depth = 0, parentContainerKey?: string, parentBaseTokens: string[] = []): React.ReactNode => {
+    const parentBundleClass = parentContainerKey ? bundleDisplayClass(parentContainerKey, parentBaseTokens, groupToken(group.id)) : ''
+    const children = sortedGroupsFor('song', visibleSongs, group.id)
+    const items = orderedGroupItems(group, visibleSongs) as Song[]
+    const baseTokens = [...children.filter((child) => !child.afterItems).map((child) => groupToken(child.id)), ...items.map((item) => itemToken(item.id)), ...children.filter((child) => child.afterItems).map((child) => groupToken(child.id))]
+    const containerKey = groupContainerKey('song', group.id)
+    const order = orderedTokensForContainer(containerKey, baseTokens, containerManualMode('song', group.id))
+    const childMap = new Map(children.map((child) => [child.id, child])); const itemMap = new Map(items.map((item) => [item.id, item]))
+    return <section className={`object-group song-object-group${depth ? ' nested-object-group' : ''}${parentBundleClass}`} key={group.id}>{renderGroupHeader(group, visibleSongs, parentContainerKey, parentBaseTokens)}{!collapsedGroupIds.has(group.id) && order.map((token, index) => isGroupToken(token) ? renderSongGroup(childMap.get(tokenId(token))!, depth + 1, containerKey, baseTokens) : renderSongRow(itemMap.get(tokenId(token))!, index, group.id, containerKey, baseTokens))}</section>
+  }
+  const renderPlaylistGroup = (group: ObjectGroup, depth = 0, parentContainerKey?: string, parentBaseTokens: string[] = []): React.ReactNode => {
+    const parentBundleClass = parentContainerKey ? bundleDisplayClass(parentContainerKey, parentBaseTokens, groupToken(group.id)) : ''
+    const children = sortedGroupsFor('playlist', sidebarPlaylists, group.id)
+    const items = orderedGroupItems(group, sidebarPlaylists) as Playlist[]
+    const baseTokens = [...children.filter((child) => !child.afterItems).map((child) => groupToken(child.id)), ...items.map((item) => itemToken(item.id)), ...children.filter((child) => child.afterItems).map((child) => groupToken(child.id))]
+    const containerKey = groupContainerKey('playlist', group.id)
+    const order = orderedTokensForContainer(containerKey, baseTokens, containerManualMode('playlist', group.id))
+    const childMap = new Map(children.map((child) => [child.id, child])); const itemMap = new Map(items.map((item) => [item.id, item]))
+    return <section className={`object-group sidebar-object-group${depth ? ' nested-object-group' : ''}${parentBundleClass}`} key={group.id}>{renderGroupHeader(group, sidebarPlaylists, parentContainerKey, parentBaseTokens)}{!collapsedGroupIds.has(group.id) && order.map((token, index) => isGroupToken(token) ? renderPlaylistGroup(childMap.get(tokenId(token))!, depth + 1, containerKey, baseTokens) : renderPlaylistRow(itemMap.get(tokenId(token))!, index, group.id, containerKey, baseTokens))}</section>
+  }
+  const renderTagGroup = (group: ObjectGroup, depth = 0, parentContainerKey?: string, parentBaseTokens: string[] = []): React.ReactNode => {
+    const parentBundleClass = parentContainerKey ? bundleDisplayClass(parentContainerKey, parentBaseTokens, groupToken(group.id)) : ''
+    const children = sortedGroupsFor('tag', sidebarTags, group.id)
+    const items = orderedGroupItems(group, sidebarTags) as Tag[]
+    const baseTokens = [...children.filter((child) => !child.afterItems).map((child) => groupToken(child.id)), ...items.map((item) => itemToken(item.id)), ...children.filter((child) => child.afterItems).map((child) => groupToken(child.id))]
+    const containerKey = groupContainerKey('tag', group.id)
+    const order = orderedTokensForContainer(containerKey, baseTokens, containerManualMode('tag', group.id))
+    const childMap = new Map(children.map((child) => [child.id, child])); const itemMap = new Map(items.map((item) => [item.id, item]))
+    return <section className={`object-group sidebar-object-group${depth ? ' nested-object-group' : ''}${parentBundleClass}`} key={group.id}>{renderGroupHeader(group, sidebarTags, parentContainerKey, parentBaseTokens)}{!collapsedGroupIds.has(group.id) && order.map((token, index) => isGroupToken(token) ? renderTagGroup(childMap.get(tokenId(token))!, depth + 1, containerKey, baseTokens) : renderTagRow(itemMap.get(tokenId(token))!, index, group.id, containerKey, baseTokens))}</section>
+  }
   const renderPlaylistOverviewGroup = (group: ObjectGroup, depth = 0): React.ReactNode => { const children = sortedGroupsFor('playlist', sidebarPlaylists, group.id); return <section className={`object-group overview-object-group${depth ? ' nested-object-group' : ''}`} key={group.id}>{renderGroupHeader(group, sidebarPlaylists)}{!collapsedGroupIds.has(group.id) && <>{children.filter((child) => !child.afterItems).map((child) => renderPlaylistOverviewGroup(child, depth + 1))}<div className="playlist-grid">{orderedGroupItems(group, sidebarPlaylists).map((item) => renderPlaylistCard(item as Playlist))}</div>{children.filter((child) => child.afterItems).map((child) => renderPlaylistOverviewGroup(child, depth + 1))}</>}</section> }
   const repeatBadge = repeatSetting?.kind === 'infinite' ? '∞' : repeatSetting?.kind === 'count' ? String(repeatRemaining ?? repeatSetting.count) : null
 
@@ -1742,10 +1970,10 @@ function App() {
       <button className={`nav-item history-nav${view === 'loops' ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'loops', playlistId: null, detailOpen: false })}><span>Loops</span><strong>{songs.filter((song) => song.loopStart !== undefined && song.loopEnd !== undefined).length}</strong></button>
       <button className={`nav-item history-nav${view === 'trash' ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'trash', playlistId: null, detailOpen: false })}><span>Papierkorb</span><strong>{trashCount}</strong></button>
       <div className="sidebar-heading collapsible-heading" onClick={() => setPlaylistsCollapsed((value) => !value)}><span className="heading-label"><b className="section-chevron">{playlistsCollapsed ? '▸' : '▾'}</b> Playlists</span>{sidebarSelectionKind === 'playlist' && <button className="select-all-inline" type="button" onClick={(event) => { event.stopPropagation(); selectAllPlaylists() }}>Alle auswählen</button>}<button className="overflow-button small-overflow" type="button" onClick={(event) => { event.stopPropagation(); setOverflowMenu({ kind: 'playlists' }) }}>•••</button>{reorderScope === 'sidebar' && <button className="finish-inline" type="button" onClick={(event) => { event.stopPropagation(); finishReorder() }}>Fertig</button>}</div>
-      {!playlistsCollapsed && <><div className="playlist-nav grouped-sidebar-list">{playlistGroups.map((group) => renderPlaylistGroup(group))}{renderDropZone(0, 'playlist')}{ungroupedSidebarPlaylists.map((playlist, index) => <div key={playlist.id}>{renderPlaylistRow(playlist, index)}{renderDropZone(index + 1, 'playlist')}</div>)}</div>
+      {!playlistsCollapsed && <><div className="playlist-nav grouped-sidebar-list">{playlistRootOrder.map((token, index) => isGroupToken(token) ? renderPlaylistGroup(playlistGroupMap.get(tokenId(token))!, 0, playlistRootKey, playlistRootBaseTokens) : renderPlaylistRow(playlistItemMap.get(tokenId(token))!, index, undefined, playlistRootKey, playlistRootBaseTokens))}</div>
       <form className="new-playlist" onSubmit={createPlaylist}><input value={playlistName} onChange={(event) => setPlaylistName(event.target.value)} placeholder="Neue Playlist" /><button type="submit" disabled={!playlistName.trim()}>+</button></form></>}
       <div className="sidebar-heading collapsible-heading tag-heading" onClick={() => setTagsCollapsed((value) => !value)}><span className="heading-label"><b className="section-chevron">{tagsCollapsed ? '▸' : '▾'}</b> Tags</span><button className="overflow-button small-overflow" type="button" onClick={(event) => { event.stopPropagation(); setOverflowMenu({ kind: 'tags' }) }}>•••</button>{tagEditMode && <button className="finish-inline" type="button" onClick={(event) => { event.stopPropagation(); finishReorder() }}>Fertig</button>}</div>
-      {!tagsCollapsed && <><div className="tag-nav grouped-sidebar-list">{tagGroups.map((group) => renderTagGroup(group))}{renderDropZone(0, 'tag')}{ungroupedSidebarTags.map((tag, index) => <div key={tag.id}>{renderTagRow(tag, index)}{renderDropZone(index + 1, 'tag')}</div>)}</div><form className="new-playlist new-tag" onSubmit={createTag}><input value={tagName} onChange={(event) => setTagName(event.target.value)} placeholder="Neuer Tag" /><div className="tag-color-picker-wrap rainbow-ring"><button className="tag-color-trigger" type="button" style={{ background: tagColor }} onClick={() => setColorPickerTarget('create')} aria-label="Tag-Farbe wählen" /></div><button type="submit" disabled={!tagName.trim()}>+</button></form></>}
+      {!tagsCollapsed && <><div className="tag-nav grouped-sidebar-list">{tagRootOrder.map((token, index) => isGroupToken(token) ? renderTagGroup(tagGroupMap.get(tokenId(token))!, 0, tagRootKey, tagRootBaseTokens) : renderTagRow(tagItemMap.get(tokenId(token))!, index, undefined, tagRootKey, tagRootBaseTokens))}</div><form className="new-playlist new-tag" onSubmit={createTag}><input value={tagName} onChange={(event) => setTagName(event.target.value)} placeholder="Neuer Tag" /><div className="tag-color-picker-wrap rainbow-ring"><button className="tag-color-trigger" type="button" style={{ background: tagColor }} onClick={() => setColorPickerTarget('create')} aria-label="Tag-Farbe wählen" /></div><button type="submit" disabled={!tagName.trim()}>+</button></form></>}
     </aside>{layoutEditMode && <button className="library-layout-handle" style={{ left: `${sidebarWidth}px` }} type="button" aria-label="Breite der linken Spalte verändern" onPointerDown={(event) => { event.preventDefault(); setLayoutDrag('sidebar') }} />}
 
     <section className="library-panel"><div className={`library-heading${activePlaylist ? ' playlist-heading' : ''}`}>
@@ -1763,7 +1991,7 @@ function App() {
       {trashedTags.map((tag) => <article className="trash-item" key={`trash-tag-${tag.id}`}><div><small>TAG</small><strong><i className="tag-dot" style={{ background: tag.color }} /> {tag.name}</strong><span>{tag.trashedAt ? formatDate(tag.trashedAt) : ''}</span></div><button type="button" onClick={() => void restoreTrashedTag(tag)}>Wiederherstellen</button></article>)}
       {songs.filter((song) => song.trashedLoop).map((song) => <article className="trash-item" key={`trash-loop-${song.id}`}><div><small>LOOP</small><strong>{song.name}</strong><span>{song.trashedLoop ? `${formatPrecise(song.trashedLoop.start)} – ${formatPrecise(song.trashedLoop.end)}` : ''}</span></div><button type="button" onClick={() => void restoreTrashedLoop(song)}>Wiederherstellen</button></article>)}
       {!trashCount && <div className="empty-state trash-empty"><div className="empty-icon">⌫</div><h2>Der Papierkorb ist leer.</h2></div>}
-    </div> : (visibleSongs.length || songGroups.length) ? <div className="song-list grouped-song-list">{songGroups.map((group) => renderSongGroup(group))}{bulkMoveMode ? renderBulkMoveDropZone(0) : renderDropZone(0, 'song')}{ungroupedVisibleSongs.map((song, index) => <div key={song.id}>{renderSongRow(song, index)}{bulkMoveMode ? renderBulkMoveDropZone(index + 1) : renderDropZone(index + 1, 'song')}</div>)}</div> : <div className="empty-state"><div className="empty-icon">♫</div><h2>{view === 'library' && searchQuery.trim() ? 'Keine Treffer.' : view === 'loops' ? 'Noch keine Loops gespeichert.' : view === 'history' ? 'Keine neuen Importe.' : 'Noch keine Musik hier.'}</h2></div>}
+    </div> : (visibleSongs.length || songGroups.length) ? <div className="song-list grouped-song-list">{songRootOrder.map((token, index) => isGroupToken(token) ? renderSongGroup(songGroupMap.get(tokenId(token))!, 0, songRootKey, songRootBaseTokens) : renderSongRow(songItemMap.get(tokenId(token))!, index, undefined, songRootKey, songRootBaseTokens))}</div> : <div className="empty-state"><div className="empty-icon">♫</div><h2>{view === 'library' && searchQuery.trim() ? 'Keine Treffer.' : view === 'loops' ? 'Noch keine Loops gespeichert.' : view === 'history' ? 'Keine neuen Importe.' : 'Noch keine Musik hier.'}</h2></div>}
     </section></main>}
 
     {view === 'playlistOverview' && <section className="playlist-overview"><div className="playlist-overview-heading"><p className="eyebrow">DEINE MUSIK</p><h1>Playlists</h1><p>{playlists.length} Playlists</p></div>{playlistGroups.map((group) => renderPlaylistOverviewGroup(group))}<div className="playlist-grid">{ungroupedSidebarPlaylists.map(renderPlaylistCard)}</div></section>}
@@ -1819,7 +2047,7 @@ function App() {
 
     {playlistChooserMode && <div className="playlist-chooser-backdrop" onClick={() => { setPlaylistChooserMode(null); setChooserSearch('') }}><section className="playlist-chooser" onClick={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">PLAYLISTS</p><h2>{playlistChooserMode === 'bulk' ? `${selectedSongIds.size} Lieder zuordnen` : 'Alle Playlists'}</h2></div><button type="button" onClick={() => { setPlaylistChooserMode(null); setChooserSearch('') }}>×</button></div><div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Playlists suchen" /></div><div className="group-membership-list">{sidebarPlaylists.filter((playlist) => fuzzyMatch(playlist.name, chooserSearch)).map((playlist) => { const contains = currentSong ? playlist.songIds.includes(currentSong.id) : false; return <button key={playlist.id} type="button" onClick={() => playlistChooserMode === 'bulk' ? void assignSelectedToPlaylist(playlist) : void toggleCurrentInPlaylist(playlist)}><span>{playlist.name}</span>{playlistChooserMode === 'current' && <strong>{contains ? '−' : '+'}</strong>}</button> })}</div></section></div>}
 
-    {overflowMenu && <><button className="menu-shield" type="button" onClick={() => setOverflowMenu(null)} /><div className="overflow-menu">{overflowMenu.kind === 'group' && overflowMenu.id && (() => { const group = objectGroups.find((item) => item.id === overflowMenu.id); if (!group) return null; return <>{group.kind === 'song' && <button type="button" onClick={() => playObjectGroup(group)}>Gruppe abspielen</button>}<button type="button" onClick={() => openAppearanceColor('group', group.id)}>Farbe ändern</button><button type="button" onClick={() => openGroupRename(group)}>Gruppe umbenennen</button><button type="button" onClick={() => { setGroupSortId(group.id); setOverflowMenu(null) }}>Sortieren</button><button type="button" onClick={() => { setGroupReorderId(group.id); setGroupMoveId(null); setOverflowMenu(null) }}>Reihenfolge ändern</button><button type="button" onClick={() => copyGroup(group)}>Kopieren</button><button type="button" onClick={() => { setGroupMoveId(group.id); setGroupReorderId(null); setOverflowMenu(null) }}>Gruppe bewegen</button><button type="button" onClick={() => groupGroup(group)}>Gruppe gruppieren</button><button type="button" onClick={() => openGroupNesting(group.id, 'add')}>Gruppe hinzufügen</button><button type="button" disabled={!group.parentGroupId && !directChildGroups(group.id).length} onClick={() => openGroupNesting(group.id, 'remove')}>Gruppe entfernen</button><button type="button" onClick={() => openGroupMembership(group.id, 'add')}>Objekte hinzufügen</button><button type="button" onClick={() => openGroupMembership(group.id, 'remove')}>Objekte entfernen</button><button type="button" onClick={() => removeAllGroupObjects(group.id)}>{group.kind === 'song' ? 'Alle Lieder entfernen' : 'Alle Objekte entfernen'}</button><button className="danger-menu-action" type="button" onClick={() => dissolveGroup(group.id)}>Gruppe auflösen</button><button className="danger-menu-action" type="button" onClick={() => { setGroupDeleteTargetId(group.id); setOverflowMenu(null) }}>Gruppe löschen</button></> })()}{overflowMenu.kind === 'playlists' && <><button type="button" onClick={() => createEmptyObjectGroup('playlist')}>Leere Gruppe erstellen</button><button type="button" onClick={() => startSidebarSelection('playlist')}>Auswählen</button><button type="button" onClick={() => { setOverflowMenu(null); setSidebarSortTarget('playlists') }}>Sortieren</button><button type="button" onClick={() => beginReorder('sidebar')}>Bearbeiten</button><button type="button" onClick={() => { setOverflowMenu(null); navigateTo({ view: 'playlistOverview', playlistId: activePlaylistId, detailOpen: false }) }}>Übersicht</button></>}{overflowMenu.kind === 'tags' && <><button type="button" onClick={() => createEmptyObjectGroup('tag')}>Leere Gruppe erstellen</button><button type="button" onClick={() => startSidebarSelection('tag')}>Auswählen</button><button type="button" onClick={() => { setOverflowMenu(null); setSidebarSortTarget('tags') }}>Sortieren</button><button type="button" onClick={() => beginReorder('tags')}>Bearbeiten</button></>}{overflowMenu.kind === 'tag' && overflowMenu.id && (() => { const tag = tags.find((item) => item.id === overflowMenu.id); if (!tag) return null; return <><button type="button" onClick={() => openAppearanceColor('tag', tag.id)}>Farbe ändern</button><button type="button" onClick={() => beginRename('tag', tag.id)}>Umbenennen</button><button type="button" onClick={() => { setOverflowMenu(null); setSidebarSortTarget('tags') }}>Sortieren</button><button className="danger-menu-action" type="button" onClick={() => { setTagToDelete(tag); setOverflowMenu(null) }}>Löschen</button></> })()}{overflowMenu.kind === 'song' && overflowMenu.id && (() => { const song = songs.find((item) => item.id === overflowMenu.id); if (!song) return null; return <><button type="button" onClick={() => openAppearanceColor('song', song.id)}>Farbe ändern</button><button type="button" onClick={() => beginRename('song', song.id)}>Umbenennen</button><button type="button" onClick={() => copySong(song.id)}>Kopieren</button><button type="button" disabled={clipboard?.kind !== 'song'} onClick={pasteFromSongMenu}>Einfügen</button><button type="button" onClick={() => openTagChooser('song', [song.id])}>Tags</button><button type="button" onClick={() => void shareSong(song.id)}>Teilen</button><button type="button" onClick={() => openLoopEditor(song.id)}>{song.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{song.loopStart !== undefined && song.loopEnd !== undefined && <button type="button" onClick={() => void toggleSongLoop(song.id)}>{isLoopActive(song) ? 'Loop deaktivieren' : 'Loop aktivieren'}</button>}{song.isNew && <><button className="blue-menu-action" type="button" onClick={() => void markSeen(song.id)}>Als gelesen markieren</button><button className="blue-menu-action" type="button" onClick={() => void markSeen()}>Alle als gelesen markieren</button></>}<button className="danger-menu-action" type="button" onClick={() => { setSongToDelete(song); setOverflowMenu(null) }}>Löschen</button></> })()}{overflowMenu.kind === 'songDetail' && overflowMenu.id && (() => { const song = songs.find((item) => item.id === overflowMenu.id); if (!song) return null; return <><button type="button" onClick={() => openAppearanceColor('song', song.id)}>Farbe ändern</button><button type="button" onClick={() => beginRename('song', song.id)}>Umbenennen</button><button type="button" onClick={() => copySong(song.id)}>Kopieren</button><button type="button" disabled={clipboard?.kind !== 'song'} onClick={pasteFromSongMenu}>Einfügen</button><button type="button" onClick={() => openTagChooser('song', [song.id])}>Tags</button><button type="button" onClick={() => void shareSong(song.id)}>Teilen</button><button type="button" onClick={() => openLoopEditor(song.id)}>{song.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{song.loopStart !== undefined && song.loopEnd !== undefined && <button type="button" onClick={() => void toggleSongLoop(song.id)}>{isLoopActive(song) ? 'Loop deaktivieren' : 'Loop aktivieren'}</button>}<button className="danger-menu-action" type="button" onClick={() => { setSongToDelete(song); setOverflowMenu(null) }}>Löschen</button></> })()}{overflowMenu.kind === 'playlist' && overflowMenu.id && (() => { const playlist = playlists.find((item) => item.id === overflowMenu.id); if (!playlist) return null; return <><button type="button" onClick={() => openPlaylistCoverPicker(playlist.id)}>Bild ändern</button><button type="button" onClick={() => openAppearanceColor('playlist', playlist.id)}>Farbe ändern</button><button type="button" onClick={() => beginRename('playlist', playlist.id)}>Umbenennen</button><button type="button" onClick={() => { setOverflowMenu(null); setSidebarSortTarget('playlists') }}>Sortieren</button><button type="button" onClick={() => copyPlaylist(playlist.id)}>Kopieren</button><button type="button" disabled={!clipboard} onClick={() => pasteFromPlaylistMenu(playlist.id)}>Einfügen</button><button type="button" onClick={() => openTagChooser('playlist', [playlist.id])}>Tags</button><button type="button" onClick={() => void sharePlaylist(playlist.id)}>Teilen</button><button className="danger-menu-action" type="button" onClick={() => { setPlaylistToDelete(playlist); setOverflowMenu(null) }}>Löschen</button></> })()}</div></>}
+    {overflowMenu && <><button className="menu-shield" type="button" onClick={() => setOverflowMenu(null)} /><div className="overflow-menu">{overflowMenu.kind === 'group' && overflowMenu.id && (() => { const group = objectGroups.find((item) => item.id === overflowMenu.id); if (!group) return null; return <>{group.kind === 'song' && <button type="button" onClick={() => playObjectGroup(group)}>Gruppe abspielen</button>}<button type="button" onClick={() => openAppearanceColor('group', group.id)}>Farbe ändern</button><button type="button" onClick={() => openGroupRename(group)}>Gruppe umbenennen</button><button type="button" onClick={() => { setGroupSortId(group.id); setOverflowMenu(null) }}>Sortieren</button><button type="button" onClick={() => { setGroupReorderId(group.id); setGroupMoveId(null); setOverflowMenu(null) }}>Reihenfolge ändern</button><button type="button" onClick={() => copyGroup(group)}>Kopieren</button><button type="button" onClick={() => { setGroupMoveId(group.id); setGroupReorderId(null); setOverflowMenu(null) }}>Gruppe bewegen</button><button type="button" onClick={() => groupGroup(group)}>Gruppe gruppieren</button><button type="button" onClick={() => openGroupNesting(group.id, 'add')}>Gruppe hinzufügen</button><button type="button" disabled={!group.parentGroupId && !directChildGroups(group.id).length} onClick={() => openGroupNesting(group.id, 'remove')}>Gruppe entfernen</button><button type="button" onClick={() => openGroupMembership(group.id, 'add')}>Objekte hinzufügen</button><button type="button" onClick={() => openGroupMembership(group.id, 'remove')}>Objekte entfernen</button><button type="button" onClick={() => removeAllGroupObjects(group.id)}>{group.kind === 'song' ? 'Alle Lieder entfernen' : 'Alle Objekte entfernen'}</button><button className="danger-menu-action" type="button" onClick={() => dissolveGroup(group.id)}>Gruppe auflösen</button><button className="danger-menu-action" type="button" onClick={() => { setGroupDeleteTargetId(group.id); setOverflowMenu(null) }}>Gruppe löschen</button></> })()}{overflowMenu.kind === 'playlists' && <><button type="button" onClick={() => createEmptyObjectGroup('playlist')}>Leere Gruppe erstellen</button><button type="button" onClick={() => startSidebarSelection('playlist')}>Auswählen</button><button type="button" onClick={() => { setOverflowMenu(null); setSidebarSortTarget('playlists') }}>Sortieren</button><button type="button" onClick={() => beginReorder('sidebar')}>Reihenfolge ändern</button><button type="button" onClick={() => { setOverflowMenu(null); navigateTo({ view: 'playlistOverview', playlistId: activePlaylistId, detailOpen: false }) }}>Übersicht</button></>}{overflowMenu.kind === 'tags' && <><button type="button" onClick={() => createEmptyObjectGroup('tag')}>Leere Gruppe erstellen</button><button type="button" onClick={() => startSidebarSelection('tag')}>Auswählen</button><button type="button" onClick={() => { setOverflowMenu(null); setSidebarSortTarget('tags') }}>Sortieren</button><button type="button" onClick={() => beginReorder('tags')}>Reihenfolge ändern</button></>}{overflowMenu.kind === 'tag' && overflowMenu.id && (() => { const tag = tags.find((item) => item.id === overflowMenu.id); if (!tag) return null; return <><button type="button" onClick={() => openAppearanceColor('tag', tag.id)}>Farbe ändern</button><button type="button" onClick={() => beginRename('tag', tag.id)}>Umbenennen</button><button type="button" onClick={() => { setOverflowMenu(null); setSidebarSortTarget('tags') }}>Sortieren</button><button className="danger-menu-action" type="button" onClick={() => { setTagToDelete(tag); setOverflowMenu(null) }}>Löschen</button></> })()}{overflowMenu.kind === 'song' && overflowMenu.id && (() => { const song = songs.find((item) => item.id === overflowMenu.id); if (!song) return null; return <><button type="button" onClick={() => openAppearanceColor('song', song.id)}>Farbe ändern</button><button type="button" onClick={() => beginRename('song', song.id)}>Umbenennen</button><button type="button" onClick={() => copySong(song.id)}>Kopieren</button><button type="button" disabled={clipboard?.kind !== 'song'} onClick={pasteFromSongMenu}>Einfügen</button><button type="button" onClick={() => openTagChooser('song', [song.id])}>Tags</button><button type="button" onClick={() => void shareSong(song.id)}>Teilen</button><button type="button" onClick={() => openLoopEditor(song.id)}>{song.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{song.loopStart !== undefined && song.loopEnd !== undefined && <button type="button" onClick={() => void toggleSongLoop(song.id)}>{isLoopActive(song) ? 'Loop deaktivieren' : 'Loop aktivieren'}</button>}{song.isNew && <><button className="blue-menu-action" type="button" onClick={() => void markSeen(song.id)}>Als gelesen markieren</button><button className="blue-menu-action" type="button" onClick={() => void markSeen()}>Alle als gelesen markieren</button></>}<button className="danger-menu-action" type="button" onClick={() => { setSongToDelete(song); setOverflowMenu(null) }}>Löschen</button></> })()}{overflowMenu.kind === 'songDetail' && overflowMenu.id && (() => { const song = songs.find((item) => item.id === overflowMenu.id); if (!song) return null; return <><button type="button" onClick={() => openAppearanceColor('song', song.id)}>Farbe ändern</button><button type="button" onClick={() => beginRename('song', song.id)}>Umbenennen</button><button type="button" onClick={() => copySong(song.id)}>Kopieren</button><button type="button" disabled={clipboard?.kind !== 'song'} onClick={pasteFromSongMenu}>Einfügen</button><button type="button" onClick={() => openTagChooser('song', [song.id])}>Tags</button><button type="button" onClick={() => void shareSong(song.id)}>Teilen</button><button type="button" onClick={() => openLoopEditor(song.id)}>{song.loopStart !== undefined ? 'Loop bearbeiten' : 'Loop erstellen'}</button>{song.loopStart !== undefined && song.loopEnd !== undefined && <button type="button" onClick={() => void toggleSongLoop(song.id)}>{isLoopActive(song) ? 'Loop deaktivieren' : 'Loop aktivieren'}</button>}<button className="danger-menu-action" type="button" onClick={() => { setSongToDelete(song); setOverflowMenu(null) }}>Löschen</button></> })()}{overflowMenu.kind === 'playlist' && overflowMenu.id && (() => { const playlist = playlists.find((item) => item.id === overflowMenu.id); if (!playlist) return null; return <><button type="button" onClick={() => openPlaylistCoverPicker(playlist.id)}>Bild ändern</button><button type="button" onClick={() => openAppearanceColor('playlist', playlist.id)}>Farbe ändern</button><button type="button" onClick={() => beginRename('playlist', playlist.id)}>Umbenennen</button><button type="button" onClick={() => { setOverflowMenu(null); setSidebarSortTarget('playlists') }}>Sortieren</button><button type="button" onClick={() => copyPlaylist(playlist.id)}>Kopieren</button><button type="button" disabled={!clipboard} onClick={() => pasteFromPlaylistMenu(playlist.id)}>Einfügen</button><button type="button" onClick={() => openTagChooser('playlist', [playlist.id])}>Tags</button><button type="button" onClick={() => void sharePlaylist(playlist.id)}>Teilen</button><button className="danger-menu-action" type="button" onClick={() => { setPlaylistToDelete(playlist); setOverflowMenu(null) }}>Löschen</button></> })()}</div></>}
 
     {tagChooserTarget && <div className="playlist-chooser-backdrop tag-chooser-backdrop" onClick={() => { setTagChooserTarget(null); setChooserSearch('') }}><section className="playlist-chooser tag-chooser" onClick={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">TAGS</p><h2>{tagChooserTarget.kind === 'song' ? `${tagChooserTarget.ids.length} ${tagChooserTarget.ids.length === 1 ? 'Lied' : 'Lieder'}` : `${tagChooserTarget.ids.length} ${tagChooserTarget.ids.length === 1 ? 'Playlist' : 'Playlists'}`} taggen</h2></div><button type="button" onClick={() => { setTagChooserTarget(null); setChooserSearch('') }}>×</button></div><div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Tags suchen" /></div><div className="tag-chooser-list">{sidebarTags.filter((tag) => fuzzyMatch(tag.name, chooserSearch)).map((tag) => { const ids = tagChooserTarget.kind === 'song' ? tag.songIds : tag.playlistIds; const all = tagChooserTarget.ids.every((id) => ids.includes(id)); const some = !all && tagChooserTarget.ids.some((id) => ids.includes(id)); return <button key={tag.id} type="button" onClick={() => void toggleTargetTag(tag)}><span><i className="tag-dot" style={{ background: tag.color }} /><b>{tag.name}</b></span><small>{tag.songIds.filter((id) => songs.some((song) => song.id === id)).length} Lieder</small><strong>{all ? '−' : some ? '±' : '+'}</strong></button> })}{!sidebarTags.length && <p className="tag-empty-hint">Erstelle zuerst links unter „Tags“ einen Tag.</p>}</div></section></div>}
 

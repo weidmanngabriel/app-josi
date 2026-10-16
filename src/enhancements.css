@@ -450,3 +450,99 @@ input, textarea {
   font-weight: 750;
   cursor: pointer;
 }
+
+
+/* Reorder bundles */
+.order-edit-controls {
+  display: inline-flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 4px;
+  margin-right: 4px;
+}
+.order-edit-controls > button {
+  width: 28px;
+  height: 28px;
+  min-width: 28px;
+  min-height: 28px;
+  padding: 0;
+  border: 1px solid #3b4352;
+  border-radius: 7px;
+  background: #11151c;
+  color: #f8fafc;
+  cursor: pointer;
+}
+.bundle-lock,
+.bundle-static-lock {
+  position: relative;
+  display: inline-grid;
+  place-items: center;
+}
+.bundle-lock > span,
+.bundle-static-lock > span {
+  position: relative;
+  display: block;
+  width: 12px;
+  height: 9px;
+  border: 2px solid currentColor;
+  border-radius: 2px;
+}
+.bundle-lock > span::before,
+.bundle-static-lock > span::before {
+  content: '';
+  position: absolute;
+  left: 1px;
+  top: -9px;
+  width: 7px;
+  height: 7px;
+  border: 2px solid currentColor;
+  border-bottom: 0;
+  border-radius: 7px 7px 0 0;
+}
+.bundle-lock:not(.locked) {
+  color: #fff;
+}
+.bundle-lock:not(.locked) > span::before {
+  transform: translateX(4px) rotate(24deg);
+  transform-origin: left bottom;
+}
+.bundle-lock.locked {
+  border-color: #7f1d1d;
+  background: #3a1115;
+  color: #ef4444;
+}
+.bundle-anchor {
+  width: 24px !important;
+  height: 24px !important;
+  min-width: 24px !important;
+  min-height: 24px !important;
+  border: 2px solid #fff !important;
+  border-radius: 50% !important;
+  background: transparent !important;
+}
+.bundle-anchor.active {
+  border-color: #ef4444 !important;
+  background: #ef4444 !important;
+  box-shadow: inset 0 0 0 4px #11151c;
+}
+.bundle-static-lock {
+  flex: 0 0 auto;
+  width: 24px;
+  height: 24px;
+  margin-left: 4px;
+  color: #ef4444;
+  pointer-events: none;
+}
+.bundle-member {
+  outline: 1px solid rgba(255,255,255,.18);
+  outline-offset: -2px;
+}
+.bundle-member + .bundle-member {
+  margin-top: 3px;
+}
+.object-group-header.bundle-member {
+  outline-color: rgba(255,255,255,.22);
+}
+.object-group.bundle-member {
+  outline: 1px solid rgba(255,255,255,.18);
+}
