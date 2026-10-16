@@ -1420,6 +1420,171 @@ function App() {
   }
   const flattenedGroupsFor = (kind: GroupKind, allowed: Array<Song | Playlist | Tag>, parentGroupId: string | null = null): ObjectGroup[] =>
     sortedGroupsFor(kind, allowed, parentGroupId).flatMap((group) => [group, ...flattenedGroupsFor(kind, allowed, group.id)])
+  const itemToken = (id: string) => `i:${id}`
+  const groupToken = (id: string) => `g:${id}`
+  const tokenId = (token: string) => token.slice(2)
+  const isGroupToken = (token: string) => token.startsWith('g:')
+  const rootContainerKey = (kind: GroupKind) => kind === 'song' ? `song:root:${activePlaylistId ?? 'library'}` : `${kind}:root`
+  const groupContainerKey = (kind: GroupKind, groupId: string) => `${kind}:group:${groupId}`
+  const normalizedMixedOrder = (containerKey: string, baseTokens: string[]) => {
+    const valid = new Set(baseTokens)
+    const stored = (mixedOrders[containerKey] ?? []).filter((token) => valid.has(token))
+    const known = new Set(stored)
+    return [...stored, ...baseTokens.filter((token) => !known.has(token))]
+  }
+  const bundleRunsFor = (containerKey: string, order: string[]) => {
+    const locked = new Set(bundleLocks[containerKey] ?? [])
+    const runs: string[][] = []
+    let current: string[] = []
+    order.forEach((token) => {
+      if (locked.has(token)) current.push(token)
+      else { if (current.length) runs.push(current); current = [] }
+    })
+    if (current.length) runs.push(current)
+    return runs
+  }
+  const reorderActiveForKind = (kind: GroupKind) => kind === 'song'
+    ? view === 'library' && reorderScope === (activePlaylist ? 'playlist' : 'library')
+    : kind === 'playlist' ? reorderScope === 'sidebar' : reorderScope === 'tags'
+  const containerManualMode = (kind: GroupKind, parentGroupId?: string) => {
+    if (reorderActiveForKind(kind)) return true
+    if (parentGroupId) {
+      const parent = objectGroups.find((group) => group.id === parentGroupId)
+      const mode = parent?.sortMode === 'general' ? globalSortForKind(kind).mode : parent?.sortMode
+      return mode === 'manual'
+    }
+    return globalSortForKind(kind).mode === 'manual'
+  }
+  const orderedTokensForContainer = (containerKey: string, baseTokens: string[], manual: boolean) => {
+    const storedOrder = normalizedMixedOrder(containerKey, baseTokens)
+    if (manual) return mixedOrders[containerKey]?.length ? storedOrder : baseTokens
+    const runs = bundleRunsFor(containerKey, storedOrder).filter((run) => run.length >= 2)
+    if (!runs.length) return baseTokens
+    const rank = new Map(baseTokens.map((token, index) => [token, index]))
+    const runFor = new Map<string, string[]>()
+    runs.forEach((run) => run.forEach((token) => runFor.set(token, run)))
+    const seen = new Set<string>()
+    const anchors = new Set(bundleAnchors[containerKey] ?? [])
+    const units: Array<{ tokens: string[]; rank: number }> = []
+    baseTokens.forEach((token) => {
+      if (seen.has(token)) return
+      const run = runFor.get(token)
+      if (!run) { seen.add(token); units.push({ tokens: [token], rank: rank.get(token) ?? Number.MAX_SAFE_INTEGER }); return }
+      run.forEach((item) => seen.add(item))
+      const anchor = run.find((item) => anchors.has(item)) ?? run[0]
+      units.push({ tokens: run, rank: rank.get(anchor) ?? Number.MAX_SAFE_INTEGER })
+    })
+    return units.sort((a, b) => a.rank - b.rank).flatMap((unit) => unit.tokens)
+  }
+  const toggleBundleLock = (containerKey: string, baseTokens: string[], token: string) => {
+    const order = normalizedMixedOrder(containerKey, baseTokens)
+    setMixedOrders((current) => ({ ...current, [containerKey]: current[containerKey]?.length ? current[containerKey] : order }))
+    setBundleLocks((current) => {
+      const values = new Set(current[containerKey] ?? [])
+      values.has(token) ? values.delete(token) : values.add(token)
+      return { ...current, [containerKey]: [...values] }
+    })
+  }
+  const selectBundleAnchor = (containerKey: string, baseTokens: string[], token: string) => {
+    const order = normalizedMixedOrder(containerKey, baseTokens)
+    const run = bundleRunsFor(containerKey, order).find((items) => items.includes(token))
+    if (!run || run.length < 2) return
+    setBundleAnchors((current) => {
+      const values = new Set(current[containerKey] ?? [])
+      run.forEach((item) => values.delete(item))
+      values.add(token)
+      return { ...current, [containerKey]: [...values] }
+    })
+  }
+  const bundleInfo = (containerKey: string, baseTokens: string[], token: string) => {
+    const order = normalizedMixedOrder(containerKey, baseTokens)
+    const locked = new Set(bundleLocks[containerKey] ?? [])
+    const run = bundleRunsFor(containerKey, order).find((items) => items.includes(token)) ?? []
+    return { locked: locked.has(token), bundled: locked.has(token) && run.length >= 2, anchor: run.length >= 2 && (bundleAnchors[containerKey] ?? []).includes(token), run, order }
+  }
+  const replaceSubsetOrder = (existing: string[], subsetOrder: string[]) => {
+    const subset = new Set(subsetOrder)
+    let index = 0
+    return existing.map((id) => subset.has(id) ? subsetOrder[index++] : id)
+  }
+  const persistRelativeOrder = async (kind: GroupKind, order: string[], parentGroupId?: string) => {
+    const itemIds = order.filter((token) => !isGroupToken(token)).map(tokenId)
+    const groupIds = order.filter(isGroupToken).map(tokenId)
+    if (parentGroupId) {
+      updateObjectGroup(parentGroupId, (group) => ({ ...group, itemIds: replaceSubsetOrder(group.itemIds, itemIds), sortMode: 'manual' }))
+      const siblingIds = objectGroups.filter((group) => group.kind === kind && group.parentGroupId === parentGroupId).sort((a,b) => a.sortOrder-b.sortOrder).map((group) => group.id)
+      const nextSiblingIds = replaceSubsetOrder(siblingIds, groupIds)
+      const groupOrder = new Map(nextSiblingIds.map((id, index) => [id, index]))
+      setObjectGroups((current) => current.map((group) => group.parentGroupId === parentGroupId && group.kind === kind ? { ...group, sortOrder: groupOrder.get(group.id) ?? group.sortOrder } : group))
+      return
+    }
+    if (kind === 'playlist') {
+      const currentIds = [...sidebarPlaylists].map((playlist) => playlist.id)
+      const nextIds = replaceSubsetOrder(currentIds, itemIds)
+      const orderMap = new Map(nextIds.map((id, index) => [id, index]))
+      const updated = playlists.map((playlist) => ({ ...playlist, sortOrder: orderMap.get(playlist.id) ?? playlist.sortOrder }))
+      setPlaylists(updated); await Promise.all(updated.map(savePlaylist))
+    } else if (kind === 'tag') {
+      const currentIds = [...sidebarTags].map((tag) => tag.id)
+      const nextIds = replaceSubsetOrder(currentIds, itemIds)
+      const orderMap = new Map(nextIds.map((id, index) => [id, index]))
+      const updated = tags.map((tag) => ({ ...tag, sortOrder: orderMap.get(tag.id) ?? tag.sortOrder }))
+      setTags(updated); await Promise.all(updated.map(saveTag))
+    } else if (activePlaylist) {
+      const nextIds = replaceSubsetOrder(activePlaylist.songIds, itemIds)
+      await updatePlaylist({ ...activePlaylist, songIds: nextIds, lastUsedAt: Date.now() }, true)
+    } else {
+      const currentIds = [...songs].sort((a,b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt)).map((song) => song.id)
+      const nextIds = replaceSubsetOrder(currentIds, itemIds)
+      const orderMap = new Map(nextIds.map((id,index) => [id,index]))
+      const updated = songs.map((song) => ({ ...song, libraryOrder: orderMap.get(song.id) ?? song.libraryOrder }))
+      setSongs(updated); await saveSongOrder(updated)
+    }
+    const siblingIds = objectGroups.filter((group) => group.kind === kind && !group.parentGroupId).sort((a,b) => a.sortOrder-b.sortOrder).map((group) => group.id)
+    const nextSiblingIds = replaceSubsetOrder(siblingIds, groupIds)
+    const groupOrder = new Map(nextSiblingIds.map((id,index) => [id,index]))
+    setObjectGroups((current) => current.map((group) => group.kind === kind && !group.parentGroupId ? { ...group, sortOrder: groupOrder.get(group.id) ?? group.sortOrder } : group))
+  }
+  const moveContainerToken = async (kind: GroupKind, containerKey: string, baseTokens: string[], token: string, delta: -1 | 1, parentGroupId?: string) => {
+    const order = normalizedMixedOrder(containerKey, baseTokens)
+    const runs = bundleRunsFor(containerKey, order)
+    const units: string[][] = []
+    let index = 0
+    while (index < order.length) {
+      const run = runs.find((items) => items.length >= 2 && items[0] === order[index])
+      if (run) { units.push(run); index += run.length } else { units.push([order[index]]); index += 1 }
+    }
+    const unitIndex = units.findIndex((unit) => unit.includes(token))
+    const other = unitIndex + delta
+    if (unitIndex < 0 || other < 0 || other >= units.length) return
+    const nextUnits = [...units]; [nextUnits[unitIndex], nextUnits[other]] = [nextUnits[other], nextUnits[unitIndex]]
+    const nextOrder = nextUnits.flat()
+    setMixedOrders((current) => ({ ...current, [containerKey]: nextOrder }))
+    await persistRelativeOrder(kind, nextOrder, parentGroupId)
+  }
+  const cleanupBundleSingletons = () => {
+    const nextLocks: BundleStateMap = { ...bundleLocks }
+    const nextAnchors: BundleStateMap = { ...bundleAnchors }
+    Object.keys(nextLocks).forEach((containerKey) => {
+      const order = mixedOrders[containerKey] ?? []
+      const locked = new Set(nextLocks[containerKey] ?? [])
+      const runs: string[][] = []; let current: string[] = []
+      order.forEach((token) => { if (locked.has(token)) current.push(token); else { if (current.length) runs.push(current); current = [] } })
+      if (current.length) runs.push(current)
+      const valid = new Set(runs.filter((run) => run.length >= 2).flat())
+      nextLocks[containerKey] = (nextLocks[containerKey] ?? []).filter((token) => valid.has(token))
+      nextAnchors[containerKey] = (nextAnchors[containerKey] ?? []).filter((token) => valid.has(token))
+    })
+    setBundleLocks(nextLocks); setBundleAnchors(nextAnchors)
+  }
+  const renderOrderControls = (kind: GroupKind, containerKey: string, baseTokens: string[], token: string, parentGroupId?: string) => {
+    if (!reorderActiveForKind(kind)) return null
+    const info = bundleInfo(containerKey, baseTokens, token)
+    return <span className="order-edit-controls"><button type="button" onClick={(event) => { event.stopPropagation(); void moveContainerToken(kind, containerKey, baseTokens, token, -1, parentGroupId) }}>↑</button><button type="button" onClick={(event) => { event.stopPropagation(); void moveContainerToken(kind, containerKey, baseTokens, token, 1, parentGroupId) }}>↓</button><button className={`bundle-lock${info.locked ? ' locked' : ''}`} type="button" onClick={(event) => { event.stopPropagation(); toggleBundleLock(containerKey, baseTokens, token) }} aria-label={info.locked ? 'Bund entsperren' : 'Für Bund sperren'}>{info.locked ? '🔒' : '🔓'}</button>{info.bundled && <button className={`bundle-anchor${info.anchor ? ' active' : ''}`} type="button" onClick={(event) => { event.stopPropagation(); selectBundleAnchor(containerKey, baseTokens, token) }} aria-label="Sortieranker für Bund" />}</span>
+  }
+  const bundleDisplayClass = (containerKey: string, baseTokens: string[], token: string) => bundleInfo(containerKey, baseTokens, token).bundled ? ' bundle-member' : ''
+  const renderBundleBadge = (kind: GroupKind, containerKey: string, baseTokens: string[], token: string) => !reorderActiveForKind(kind) && bundleInfo(containerKey, baseTokens, token).bundled ? <span className="bundle-static-lock" title="Sortierbund">🔒</span> : null
+
   const createEmptyObjectGroup = (kind: GroupKind, parentGroupId?: string) => {
     const id = crypto.randomUUID()
     recordHistory()
