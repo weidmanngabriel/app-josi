@@ -63,6 +63,8 @@ type View = 'library' | 'history' | 'loops' | 'trash' | 'tag' | 'playlistOvervie
 type NavigationEntry = { view: View; playlistId: string | null; tagId?: string | null; detailOpen: boolean }
 type ReorderScope = 'library' | 'playlist' | 'sidebar' | 'tags' | null
 type MoveCandidate = { kind: 'song' | 'playlist' | 'tag'; id: string; targetIndex: number | null } | null
+type MixedOrderMap = Record<string, string[]>
+type BundleStateMap = Record<string, string[]>
 type Snapshot = { songs: Song[]; playlists: Playlist[]; tags: Tag[]; objectGroups: ObjectGroup[]; objectColors: Record<string, string> }
 type PlaylistChooserMode = 'current' | 'bulk' | null
 type SortMode = 'manual' | 'azStart' | 'azEnd' | 'plays' | 'duration' | 'chronology'
@@ -179,6 +181,9 @@ function App() {
   const [playHistory, setPlayHistory] = useState<string[]>([])
   const [reorderScope, setReorderScope] = useState<ReorderScope>(null)
   const [moveCandidate, setMoveCandidate] = useState<MoveCandidate>(null)
+  const [mixedOrders, setMixedOrders] = useState<MixedOrderMap>(() => { try { const value = JSON.parse(localStorage.getItem('josi-mixed-orders') ?? '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {} } catch { return {} } })
+  const [bundleLocks, setBundleLocks] = useState<BundleStateMap>(() => { try { const value = JSON.parse(localStorage.getItem('josi-bundle-locks') ?? '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {} } catch { return {} } })
+  const [bundleAnchors, setBundleAnchors] = useState<BundleStateMap>(() => { try { const value = JSON.parse(localStorage.getItem('josi-bundle-anchors') ?? '{}'); return value && typeof value === 'object' && !Array.isArray(value) ? value : {} } catch { return {} } })
   const [undoStack, setUndoStack] = useState<Snapshot[]>([])
   const [redoStack, setRedoStack] = useState<Snapshot[]>([])
   const [navigation, setNavigation] = useState<NavigationEntry[]>([{ view: 'library', playlistId: null, detailOpen: false }])
@@ -373,6 +378,10 @@ function App() {
     window.addEventListener('pointercancel', stop)
     return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop); window.removeEventListener('pointercancel', stop) }
   }, [layoutDrag, playerSplitLeft, playerSplitRight])
+
+  useEffect(() => localStorage.setItem('josi-mixed-orders', JSON.stringify(mixedOrders)), [mixedOrders])
+  useEffect(() => localStorage.setItem('josi-bundle-locks', JSON.stringify(bundleLocks)), [bundleLocks])
+  useEffect(() => localStorage.setItem('josi-bundle-anchors', JSON.stringify(bundleAnchors)), [bundleAnchors])
 
   const currentSong = songs.find((song) => song.id === currentSongId) ?? null
   const hasLoop = (song: Song | null | undefined) => Boolean(song && song.loopStart !== undefined && song.loopEnd !== undefined)
