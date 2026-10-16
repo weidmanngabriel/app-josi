@@ -1837,6 +1837,22 @@ function App() {
   const groupedTagIds = new Set(objectGroups.filter((group) => group.kind === 'tag').flatMap((group) => group.itemIds))
   const ungroupedSidebarTags = sidebarTags.filter((tag) => !groupedTagIds.has(tag.id))
 
+  const songRootKey = rootContainerKey('song')
+  const songRootBaseTokens = [...songGroups.map((group) => groupToken(group.id)), ...ungroupedVisibleSongs.map((song) => itemToken(song.id))]
+  const songRootOrder = orderedTokensForContainer(songRootKey, songRootBaseTokens, containerManualMode('song'))
+  const playlistRootKey = rootContainerKey('playlist')
+  const playlistRootBaseTokens = [...playlistGroups.map((group) => groupToken(group.id)), ...ungroupedSidebarPlaylists.map((playlist) => itemToken(playlist.id))]
+  const playlistRootOrder = orderedTokensForContainer(playlistRootKey, playlistRootBaseTokens, containerManualMode('playlist'))
+  const tagRootKey = rootContainerKey('tag')
+  const tagRootBaseTokens = [...tagGroups.map((group) => groupToken(group.id)), ...ungroupedSidebarTags.map((tag) => itemToken(tag.id))]
+  const tagRootOrder = orderedTokensForContainer(tagRootKey, tagRootBaseTokens, containerManualMode('tag'))
+  const songGroupMap = new Map(songGroups.map((group) => [group.id, group]))
+  const songItemMap = new Map(ungroupedVisibleSongs.map((song) => [song.id, song]))
+  const playlistGroupMap = new Map(playlistGroups.map((group) => [group.id, group]))
+  const playlistItemMap = new Map(ungroupedSidebarPlaylists.map((playlist) => [playlist.id, playlist]))
+  const tagGroupMap = new Map(tagGroups.map((group) => [group.id, group]))
+  const tagItemMap = new Map(ungroupedSidebarTags.map((tag) => [tag.id, tag]))
+
   const renderGroupHeader = (group: ObjectGroup, allowed: Array<Song | Playlist | Tag>) => {
     const items = orderedGroupItems(group, allowed)
     const collapsed = collapsedGroupIds.has(group.id)
