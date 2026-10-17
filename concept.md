@@ -84,7 +84,7 @@ Der frühere „Verlauf“-Tab heißt **Importverlauf** und zeigt alle aktiven S
 
 Die automatischen Sortierungen bleiben **A–Z Anfang**, **A–Z Ende**, **Anzahl des Hörens**, **Dauer** und **Chronik**. Die frühere Auswahl **Manuell** wird durch benannte **Saves** ersetzt. Eine bestehende manuelle Reihenfolge bleibt als **Save 1** erhalten.
 
-Über **Aktuelle Sortierung speichern** lässt sich die sichtbare Reihenfolge sichern. Der Save kann benannt werden; ohne Eingabe verwendet Josi die erste freie Nummer wie **Save 1**, **Save 2** usw. Automatische Sortierungen stehen zuerst, alle Saves darunter alphabetisch. Wird ein Save ausgewählt und anschließend über **Reihenfolge ändern** bearbeitet, bleibt diese neue Reihenfolge in diesem Save erhalten.
+Über **Aktuelle Sortierung speichern** lässt sich die sichtbare Reihenfolge sichern. Der Save kann benannt werden; ohne Eingabe verwendet Josi die erste freie Nummer wie **Save 1**, **Save 2** usw. Automatische Sortierungen stehen zuerst, alle Saves darunter alphabetisch. Wird ein Save ausgewählt und anschließend über **Reihenfolge ändern** bearbeitet, bleibt diese neue Reihenfolge in diesem Save erhalten. Wird ein Save in der Save-Liste gedrückt gehalten, öffnet sich ein Fenster zum Umbenennen.
 
 Playlists und Tags erhalten dieselbe Funktion in **Sortieren**. Dort steht **Aktuelle Sortierung speichern** direkt neben den Sortier-Steuerelementen.
 
@@ -169,7 +169,7 @@ Die nähere Songansicht besitzt ein eigenes `•••` mit songbezogenen Aktion
 
 ## Bildschirmfeste Bedienelemente
 
-Menüs und Dialoge dürfen nicht aus dem sichtbaren Bildschirm hinausragen. Sie passen sich zuerst an die verfügbare Größe an. Nur wenn der Inhalt trotzdem nicht vollständig hineinpasst, wird der jeweilige Kasten intern scrollbar.
+Menüs und Dialoge dürfen nicht aus dem sichtbaren Bildschirm hinausragen. Sie passen sich zuerst an die verfügbare Größe an. Nur wenn der Inhalt trotzdem nicht vollständig hineinpasst, wird der jeweilige Kasten intern scrollbar. Linker Seitenbereich und Bibliotheksbereich können unabhängig gescrollt werden. In den Einstellungen kann **Seitliche Bereiche sperren** dieses Scrollen per Ein-/Aus-Schalter abschalten.
 
 ## Reihenfolge ändern und Sortierbünde
 
@@ -178,6 +178,14 @@ Bei Playlists und Tags heißt die bisherige Aktion **Bearbeiten** jetzt **Reihen
 Neben den Pfeilen hat jeder Eintrag ein Schloss. Standardmäßig ist es offen. Wird es geschlossen, erscheint es rot. Zwei oder mehr direkt benachbarte geschlossene Einträge bilden einen namenlosen Sortierbund. Der Bund wird beim Verschieben zusammen bewegt, ohne seine interne Reihenfolge zu verändern. Bei einem gültigen Bund erscheint zusätzlich ein weißer Kreis je Eintrag; der ausgewählte Kreis wird rot und legt fest, nach welchem Eintrag der Bund bei automatischer Sortierung eingeordnet wird.
 
 Sortierbünde existieren nur als Sortierhilfe und können nur in **Reihenfolge ändern** bearbeitet werden. Außerhalb dieses Modus bleibt ein kleines geschlossenes Schloss neben `•••` sichtbar und die Mitglieder erhalten eine sehr dezente helle Umrandung. Ein einzelnes geschlossenes Schloss ohne direkt benachbarten Partner wird beim Beenden des Modus automatisch aufgehoben.
+
+## Einzelnes Bewegen und neue Objekte
+
+**Bewegen** ist eine Aktion für genau ein Lied, eine Playlist, einen Tag oder eine Gruppe. Sie steht im Drei-Punkte-Menü und bei Menüs mit **Kopieren** direkt darüber. Mehrere ausgewählte Dateien können nicht gemeinsam bewegt werden. Nach **Bewegen** erscheinen rote Zielstriche zwischen den Einträgen derselben Ebene. Ein Klick wählt den Zielstrich, ein Doppelklick verschiebt das Objekt dorthin. Eine Gruppe nimmt ihre Untergruppen und Inhalte unverändert mit; ein Objekt innerhalb einer Gruppe bleibt in dieser Obergruppe.
+
+Vor dem Erstellen einer neuen Gruppe erscheint ein Namensfeld mit **Unbenannt**. Über die drei Punkte daneben kann schon **Bewegen** ausgewählt werden. In einem Save landet eine neue Gruppe ohne diese Option zuerst ganz oben; bei automatischer Sortierung wird sie direkt passend einsortiert.
+
+Neue Playlists und Tags sowie frisch importierte Lieder können unmittelbar nach der Erstellung umbenannt und über `••• → Bewegen` positioniert werden. Mehrere importierte Lieder werden dabei nacheinander bearbeitet.
 
 ## Gruppen
 
