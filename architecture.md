@@ -35,11 +35,17 @@ Playlists enthalten ID, Name, geordnete Song-IDs, optionales Bild, Erstellungs-/
 
 ## Import und Speicherstabilität
 
-Der Import verwendet ausschließlich `<input type="file" multiple>`. Beim Import werden nur neue Dateien geschrieben. Vorherige Neu-Markierungen werden nur an den betroffenen Songs geändert; die gesamte Bibliothek wird nicht erneut gespeichert.
+Der Dateiauswahldialog verwendet weiterhin ausschließlich `<input type="file" multiple>`, schreibt die gewählten Dateien aber **nicht sofort** nach IndexedDB. Stattdessen entsteht zuerst ein Import-Arbeitsbereich im Arbeitsspeicher. Dort stehen alle ausgewählten Dateien gleichzeitig in einer Liste. Erst nach **Fertig → Importieren** werden die Blobs gespeichert. **Abbrechen → Nicht importieren** verwirft den Entwurf ohne neue Song-Datensätze. Beide Abschlüsse verlangen eine Bestätigung.
 
 Die Lieddauer wird erst beim tatsächlichen Laden im HTML-Audio-Element gespeichert. `--:--` bedeutet unbekannte Dauer, `FEHLT` bedeutet, dass der lokale Blob fehlt oder Größe 0 hat.
 
 Bereits vor der Trennung beschädigte oder verlorene Blobs können nicht rekonstruiert werden. Solche Dateien müssen erneut importiert werden. Die neue Speicherstruktur verhindert nur zukünftige unnötige Blob-Schreibvorgänge.
+
+## Import-Arbeitsbereich
+
+Bei einem Mehrfachimport bleibt die ursprüngliche Dateiauswahl als manuelle Reihenfolge erhalten: zuerst ausgewählte Datei oben, danach die weiteren Dateien. Das Importfenster besitzt zusätzlich A–Z Anfang, A–Z Ende und Auswahlreihenfolge als reine Ansichtssortierungen. Über das eigene `•••` stehen **Auswählen**, **Umbenennen**, **Reihenfolge ändern** und **Bewegen** zur Verfügung. **Auswählen** kann die Zielmenge der folgenden Aktionen auf einzelne Importdateien begrenzen. **Reihenfolge ändern** arbeitet mit Pfeilen und verändert die manuelle Importreihenfolge. **Bewegen** arbeitet mit roten Einfügelinien; der Modus bleibt nach jeder Positionierung aktiv und endet erst über **Abbrechen** oben in der Mitte.
+
+Umbenennen wird als ein Undo-Schritt vorbereitet; Positionsänderungen erzeugen jeweils eigene Import-Undo-Schritte. Undo/Redo im Importfenster arbeitet zuerst auf diesem Entwurf. Beim bestätigten Import wird zusätzlich ein normaler App-Snapshot angelegt. Ein direkt anschließendes globales Undo entfernt die importierten Songs wieder aus IndexedDB und öffnet denselben Importentwurf inklusive der noch im Arbeitsspeicher gehaltenen Dateien erneut. Weitere Undo-Schritte können anschließend die vor dem Import vorgenommenen Umbenennungen und Bewegungen rückgängig machen. Redo funktioniert entsprechend in Gegenrichtung.
 
 ## Drei-Punkte-Menüs
 
@@ -78,7 +84,7 @@ Die sichere Metadaten-Speicherung prüft bei Undo, ob der Basis-Song noch existi
 
 ## Mehrfachauswahl und Playlist-Zuordnung
 
-Bibliothek, Playlists, Importverlauf und Loops verwenden denselben Song-Auswahlmodus. Im Player-Bereich ersetzt ein großer Bibliotheks-`•••`-Knopf den früheren sichtbaren „Alle Playlists“-Knopf. Sein erster Menüpunkt ist **Alle Playlists**; er ist nur aktiv, wenn mindestens ein Lied ausgewählt ist. Direkt darunter folgen **Leere Gruppe erstellen**, **Weitere Gruppen abspielen** und **Aktuelle Sortierung speichern**. Im Song-Auswahlmodus enthält dasselbe Menü zusätzlich Gruppieren, Tags, Loop-Aktionen und Alle löschen. Playlists und Tags besitzen weiterhin ihren eigenen Auswahlmodus mit schwebendem `•••`. **Mehrfachauswahl kann nicht bewegt werden.** Bewegen ist ausschließlich eine Einzelobjekt-Aktion im jeweiligen Drei-Punkte-Menü. Kopieren erzeugt neue Objekte desselben Typs, Löschen verschiebt die Auswahl in den Papierkorb. Alle löschen verlangt eine Sicherheitsabfrage und entfernt die ausgewählten lokalen Dateien aus allen Playlists.
+Bibliothek, Playlists, Importverlauf und Loops verwenden denselben Song-Auswahlmodus. Im Player-Bereich ersetzt ein großer Bibliotheks-`•••`-Knopf den früheren sichtbaren „Alle Playlists“-Knopf. Sein erster Menüpunkt ist **Alle Playlists**; er ist nur aktiv, wenn mindestens ein Lied ausgewählt ist. Direkt darunter folgen **Leere Gruppe erstellen**, **Weitere Gruppen abspielen** und **Aktuelle Sortierung speichern**. Im Song-Auswahlmodus enthält dasselbe Menü zusätzlich Gruppieren, Tags, Loop-Aktionen und Alle löschen. Playlists und Tags besitzen weiterhin ihren eigenen Auswahlmodus mit schwebendem `•••`. In den normalen Bibliotheks-/Objektmenüs bleibt **Bewegen** eine gezielte Objekt- bzw. bereits vorhandene Auswahlaktion; der neue Import-Arbeitsbereich darf dagegen eine eingeschränkte Importauswahl als Block positionieren. Kopieren erzeugt neue Objekte desselben Typs, Löschen verschiebt die Auswahl in den Papierkorb. Alle löschen verlangt eine Sicherheitsabfrage und entfernt die ausgewählten lokalen Dateien aus allen Playlists.
 
 ## Ausgewählte Lieder im Playlist-Bereich
 
@@ -114,7 +120,7 @@ Sortierbünde sind keine Objektgruppen: Sie haben keinen Namen, kein Gruppenmen�
 
 ## Einzelobjekt-Bewegen und Erstellungsposition
 
-Lieder, Playlists, Tags und benannte Gruppen besitzen im jeweiligen Drei-Punkte-Menü die Aktion **Bewegen**; bei Menüs mit **Kopieren** steht Bewegen direkt darüber. Es kann immer nur ein Objekt gleichzeitig bewegt werden. Die Aktion wechselt für diesen Typ auf den aktiven Save und zeigt auf derselben Hierarchieebene rote Zielstriche zwischen den sichtbaren Objekten und Gruppen. Ein einfacher Klick markiert einen Zielstrich, ein Doppelklick bestätigt. Gruppen werden dabei als ein Token verschoben; Untergruppen und direkte Inhalte bleiben intern unverändert. Objekte innerhalb einer benannten Gruppe bleiben beim Bewegen in dieser Obergruppe.
+Lieder, Playlists, Tags und benannte Gruppen besitzen im jeweiligen Drei-Punkte-Menü die Aktion **Bewegen**; bei Menüs mit **Kopieren** steht Bewegen direkt darüber. Die Aktion wechselt für diesen Typ auf den aktiven Save und zeigt auf derselben Hierarchieebene rote Zielstriche zwischen den sichtbaren Objekten und Gruppen. Ein einfacher Klick markiert einen Zielstrich, ein Doppelklick bestätigt. Gruppen werden dabei als ein Token verschoben; Untergruppen und direkte Inhalte bleiben intern unverändert. Objekte innerhalb einer benannten Gruppe bleiben beim Bewegen in dieser Obergruppe. Nach einer Positionierung bleibt der Bewegen-Modus aktiv und setzt nur die Zielmarkierung zurück; erst **Abbrechen** oben beendet ihn. Dadurch kann dasselbe Objekt bzw. eine bereits aktive Auswahl nacheinander an weitere Positionen gesetzt werden.
 
 Neue leere Gruppen und aus einer Auswahl gebildete Gruppen werden nicht sofort eingefügt. Zuerst erscheint ein Namensdialog mit **Unbenannt** als Vorgabe. Über `•••` direkt neben dem Namen kann **Bewegen** vorgemerkt werden. Ohne Bewegen wird die Gruppe bei automatischer Sortierung sofort passend einsortiert; in einem aktiven Save steht sie zunächst ganz oben. Mit Bewegen folgt nach dem Erstellen die rote Zielstrich-Auswahl.
 
@@ -128,7 +134,11 @@ Auch die Hauptoberfläche passt sich jetzt vor einem Überlauf an: Header, Bibli
 
 Die linke Seitenleiste und der rechte Bibliotheksbereich besitzen zusätzlich eigenständiges vertikales Touch-Scrolling. In **Einstellungen → Seitliche Bereiche sperren** kann dieses vertikale unabhängige Scrollen deaktiviert werden; der horizontale Pan-Fallback für nicht verkleinerbare Inhalte bleibt verfügbar. Die Einstellung wird lokal gespeichert.
 
-Der Modus **Leisten verschieben** hat Vorrang vor den responsiven Ersatzbreiten: Während der Bearbeitung werden wieder die gespeicherten Sidebar- und Player-Trennwerte verwendet, sodass die Griffe tatsächlich verschiebbar bleiben. Beim ersten Start nach dieser Änderung wird der auf dem Gerät bereits gespeicherte Layout-Zustand als persönliche Standardbasis übernommen. Der Knopf **Standard** stellt deshalb diesen bisherigen Zustand wieder her statt pauschal auf feste Werkseinstellungen zu springen.
+Der Modus **Leisten verschieben** hat Vorrang vor den responsiven Ersatzbreiten: Während der Bearbeitung werden die gespeicherten Sidebar- und Player-Trennwerte verwendet, sodass die Griffe tatsächlich verschiebbar bleiben. **Layout fertig** schreibt die aktuellen drei Werte noch einmal synchron in `localStorage` und beendet ausschließlich den Bearbeitungsmodus; es setzt keine Breite zurück. Die gleichen CSS-Variablen bleiben auch nach dem Beenden aktiv. Beim ersten Start nach dieser Änderung wird der auf dem Gerät bereits gespeicherte Layout-Zustand als persönliche Standardbasis übernommen. Nur der Knopf **Standard** in den Einstellungen stellt diese Basis wieder her.
+
+## Undo/Redo in Fenstern
+
+Solange ein modales Fenster oder ein Auswahlfenster geöffnet ist, wird eine feste Undo/Redo-Leiste über dem jeweiligen Overlay angezeigt. Sie verwendet den normalen App-Verlauf; im Import-Arbeitsbereich wird zuerst dessen lokaler Entwurfsverlauf verwendet. Die Leiste liegt auch über verschachtelten Bestätigungsfenstern, damit Undo/Redo dort erreichbar bleibt.
 
 ## Präziser Loop-Editor
 
