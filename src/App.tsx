@@ -799,7 +799,7 @@ function App() {
     return true
   }
 
-  const snapshot = (): Snapshot => ({ songs: songs.map((song) => ({ ...song, loopMarkers: song.loopMarkers ? [...song.loopMarkers] : undefined })), playlists: playlists.map((playlist) => ({ ...playlist, songIds: [...playlist.songIds] })), tags: tags.map((tag) => ({ ...tag, songIds: [...tag.songIds], playlistIds: [...tag.playlistIds] })), objectGroups: objectGroups.map((group) => ({ ...group, itemIds: [...group.itemIds] })), objectColors: { ...objectColors } })
+  const snapshot = (): Snapshot => ({ songs: songs.map((song) => ({ ...song, loopMarkers: song.loopMarkers ? [...song.loopMarkers] : undefined })), playlists: playlists.map((playlist) => ({ ...playlist, songIds: [...playlist.songIds] })), tags: tags.map((tag) => ({ ...tag, songIds: [...tag.songIds], playlistIds: [...tag.playlistIds], groupIds: [...(tag.groupIds ?? [])] })), objectGroups: objectGroups.map((group) => ({ ...group, itemIds: [...group.itemIds] })), objectColors: { ...objectColors } })
   const recordHistory = () => { setUndoStack((items) => [...items, snapshot()].slice(-50)); setRedoStack([]) }
   const restoreSnapshot = async (target: Snapshot) => {
     const previousSongs = songs
@@ -1571,11 +1571,17 @@ function App() {
   const membershipText = (songId: string) => { const names = playlists.filter((playlist) => playlist.songIds.includes(songId)).map((playlist) => playlist.name); return names.length ? names.join(' · ') : 'In keiner Playlist' }
   const songTags = (songId: string) => tags.filter((tag) => tag.songIds.includes(songId))
   const playlistTags = (playlistId: string) => tags.filter((tag) => tag.playlistIds.includes(playlistId))
-  const openTagChooser = (kind: 'song' | 'playlist', ids: string[]) => { setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setTagChooserTarget({ kind, ids }); setOverflowMenu(null); setSortMenuOpen(false) }
+  const groupTags = (groupId: string) => tags.filter((tag) => (tag.groupIds ?? []).includes(groupId))
+  const openTagChooser = (kind: 'song' | 'playlist' | 'group', ids: string[]) => { setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setTagChooserTarget({ kind, ids }); setOverflowMenu(null); setSortMenuOpen(false) }
   const toggleTargetTag = async (tag: Tag) => {
     if (!tagChooserTarget?.ids.length) return
-    const memberIds = tagChooserTarget.kind === 'song' ? tag.songIds : tag.playlistIds
+    const memberIds = tagChooserTarget.kind === 'song' ? tag.songIds : tagChooserTarget.kind === 'playlist' ? tag.playlistIds : (tag.groupIds ?? [])
     const allAssigned = tagChooserTarget.ids.every((id) => memberIds.includes(id))
+    if (tagChooserTarget.kind === 'group') {
+      const nextIds = allAssigned ? memberIds.filter((id) => !tagChooserTarget.ids.includes(id)) : [...new Set([...memberIds, ...tagChooserTarget.ids])]
+      await updateTag({ ...tag, groupIds: nextIds, lastUsedAt: Date.now() }, true)
+      return
+    }
     if (allAssigned) {
       if (tagChooserTarget.kind === 'song') await updateTag({ ...tag, songIds: tag.songIds.filter((id) => !tagChooserTarget.ids.includes(id)), lastUsedAt: Date.now() }, true)
       else await updateTag({ ...tag, playlistIds: tag.playlistIds.filter((id) => !tagChooserTarget.ids.includes(id)), lastUsedAt: Date.now() }, true)
@@ -2508,7 +2514,7 @@ function App() {
     const key = containerKey ?? rootContainerKey(group.kind)
     const bundleClass = bundleDisplayClass(key, baseTokens, token)
     const toggleCollapsed = () => setCollapsedGroupIds((current) => { const next = new Set(current); next.has(group.id) ? next.delete(group.id) : next.add(group.id); return next })
-    return <div className={`object-group-header${collapsed ? ' collapsed' : ''}${group.color ? ' custom-surface' : ''}${bundleClass}`} style={surfaceStyle(group.color)} role="button" tabIndex={0} aria-expanded={!collapsed} onClick={toggleCollapsed} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleCollapsed() } }}><div className="object-group-heading"><strong><b className="group-chevron">{collapsed ? '▸' : '▾'}</b><span className="group-name-text">{group.name}</span></strong><span>{groupObjectCount(group, allowed)} Objekte · {formatTime(groupDuration(group, allowed))}</span></div>{renderOrderControls(group.kind, key, baseTokens, token, group.parentGroupId)}{groupMoveId === group.id && !reorderActiveForKind(group.kind) && <div className="group-inline-tools"><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, -1) }}>↑</button><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, 1) }}>↓</button><button type="button" onClick={(event) => { event.stopPropagation(); setGroupMoveId(null) }}>Fertig</button></div>}{groupReorderId === group.id && !reorderActiveForKind(group.kind) && <button className="group-finish" type="button" onClick={(event) => { event.stopPropagation(); setGroupReorderId(null) }}>Fertig</button>}{renderBundleBadge(group.kind, key, baseTokens, token)}<button className="overflow-button group-overflow" type="button" onClick={(event) => { event.stopPropagation(); setOverflowMenu({ kind: 'group', id: group.id }) }}>•••</button></div>
+    return <div className={`object-group-header${collapsed ? ' collapsed' : ''}${group.color ? ' custom-surface' : ''}${bundleClass}`} style={surfaceStyle(group.color)} role="button" tabIndex={0} aria-expanded={!collapsed} onClick={toggleCollapsed} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleCollapsed() } }}><div className="object-group-heading"><strong><b className="group-chevron">{collapsed ? '▸' : '▾'}</b><span className="group-tag-dots">{groupTags(group.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} title={tag.name} />)}</span><span className="group-name-text">{group.name}</span></strong><span>{groupObjectCount(group, allowed)} Objekte · {formatTime(groupDuration(group, allowed))}</span></div>{renderOrderControls(group.kind, key, baseTokens, token, group.parentGroupId)}{groupMoveId === group.id && !reorderActiveForKind(group.kind) && <div className="group-inline-tools"><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, -1) }}>↑</button><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, 1) }}>↓</button><button type="button" onClick={(event) => { event.stopPropagation(); setGroupMoveId(null) }}>Fertig</button></div>}{groupReorderId === group.id && !reorderActiveForKind(group.kind) && <button className="group-finish" type="button" onClick={(event) => { event.stopPropagation(); setGroupReorderId(null) }}>Fertig</button>}{renderBundleBadge(group.kind, key, baseTokens, token)}<button className="overflow-button group-overflow" type="button" onClick={(event) => { event.stopPropagation(); setOverflowMenu({ kind: 'group', id: group.id }) }}>•••</button></div>
   }
   const renderSongRow = (song: Song, index: number, groupId?: string, containerKey?: string, baseTokens: string[] = []) => {
     const groupReordering = groupId === groupReorderId
