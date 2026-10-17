@@ -75,6 +75,9 @@ type SingleMoveTarget = { kind: GroupKind | 'group'; id: string; parentGroupId?:
 type PendingGroupCreate = { kind: GroupKind; sourceIds: string[]; parentGroupId?: string; name: string; moveAfterCreate: boolean } | null
 type CreationPlacement = { kind: GroupKind; id: string; name: string } | null
 type LayoutPreset = { sidebarWidth: number; playerSplitLeft: number; playerSplitRight: number }
+type ImportDraftItem = { id: string; file: File; name: string; originalIndex: number }
+type ImportDraftSnapshot = { items: Array<{ id: string; name: string; originalIndex: number }>; selectedIds: string[]; sortMode: SortMode }
+type ImportDraftConfirmation = 'finish' | 'cancel' | null
 type OverflowMenu = { kind: 'song' | 'songDetail' | 'playlist' | 'playlists' | 'tag' | 'tags' | 'group'; id?: string; parentGroupId?: string } | null
 type SidebarSortTarget = 'tags' | 'playlists' | null
 type RepeatSetting = { kind: 'infinite' } | { kind: 'count'; count: number } | null
@@ -271,6 +274,19 @@ function App() {
   const [creationPlacement, setCreationPlacement] = useState<CreationPlacement>(null)
   const [creationPlacementQueue, setCreationPlacementQueue] = useState<Array<NonNullable<CreationPlacement>>>([])
   const [creationPlacementMenuOpen, setCreationPlacementMenuOpen] = useState(false)
+  const [importDraftItems, setImportDraftItems] = useState<ImportDraftItem[]>([])
+  const [importDraftSelectedIds, setImportDraftSelectedIds] = useState<Set<string>>(new Set())
+  const [importDraftSelectionMode, setImportDraftSelectionMode] = useState(false)
+  const [importDraftMenuOpen, setImportDraftMenuOpen] = useState(false)
+  const [importDraftRenameOpen, setImportDraftRenameOpen] = useState(false)
+  const [importDraftReorderMode, setImportDraftReorderMode] = useState(false)
+  const [importDraftMoveMode, setImportDraftMoveMode] = useState(false)
+  const [importDraftSortMode, setImportDraftSortMode] = useState<SortMode>('manual')
+  const [importDraftSortDirection, setImportDraftSortDirection] = useState<SortDirection>('down')
+  const [importDraftConfirmation, setImportDraftConfirmation] = useState<ImportDraftConfirmation>(null)
+  const [importDraftUndoStack, setImportDraftUndoStack] = useState<ImportDraftSnapshot[]>([])
+  const [importDraftRedoStack, setImportDraftRedoStack] = useState<ImportDraftSnapshot[]>([])
+  const [lastCommittedImportDraft, setLastCommittedImportDraft] = useState<{ items: ImportDraftItem[]; importedIds: string[]; undo: ImportDraftSnapshot[]; redo: ImportDraftSnapshot[] } | null>(null)
   const [tagSortMode, setTagSortMode] = useState<SortMode>(() => (localStorage.getItem('josi-tag-sort-mode') as SortMode) || 'manual')
   const [tagSortDirection, setTagSortDirection] = useState<SortDirection>(() => (localStorage.getItem('josi-tag-sort-direction') as SortDirection) || 'down')
   const [playlistSortMode, setPlaylistSortMode] = useState<SortMode>(() => (localStorage.getItem('josi-playlist-sort-mode') as SortMode) || 'manual')
