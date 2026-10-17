@@ -71,6 +71,9 @@ type SortMode = 'manual' | 'azStart' | 'azEnd' | 'plays' | 'duration' | 'chronol
 type SortDirection = 'down' | 'up'
 type SortSaveKind = 'song' | 'playlist' | 'tag'
 type SortSave = { id: string; kind: SortSaveKind; name: string; orders: Record<string, string[]>; createdAt: number }
+type SingleMoveTarget = { kind: GroupKind | 'group'; id: string; parentGroupId?: string; targetIndex: number | null } | null
+type PendingGroupCreate = { kind: GroupKind; sourceIds: string[]; parentGroupId?: string; name: string; moveAfterCreate: boolean } | null
+type CreationPlacement = { kind: 'song' | 'playlist'; id: string; name: string } | null
 type OverflowMenu = { kind: 'song' | 'songDetail' | 'playlist' | 'playlists' | 'tag' | 'tags' | 'group'; id?: string } | null
 type SidebarSortTarget = 'tags' | 'playlists' | null
 type RepeatSetting = { kind: 'infinite' } | { kind: 'count'; count: number } | null
@@ -236,6 +239,15 @@ function App() {
   })
   const [sortSaveDialogTarget, setSortSaveDialogTarget] = useState<SortSaveKind | null>(null)
   const [sortSaveName, setSortSaveName] = useState('')
+  const [sortSaveRenameId, setSortSaveRenameId] = useState<string | null>(null)
+  const [sortSaveRenameValue, setSortSaveRenameValue] = useState('')
+  const sortSaveHoldTimerRef = useRef<number | null>(null)
+  const sortSaveLongPressRef = useRef(false)
+  const [sidePaneScrollLocked, setSidePaneScrollLocked] = useState(() => localStorage.getItem('josi-side-pane-scroll-locked') === '1')
+  const [singleMoveTarget, setSingleMoveTarget] = useState<SingleMoveTarget>(null)
+  const [pendingGroupCreate, setPendingGroupCreate] = useState<PendingGroupCreate>(null)
+  const [groupCreateMenuOpen, setGroupCreateMenuOpen] = useState(false)
+  const [creationPlacement, setCreationPlacement] = useState<CreationPlacement>(null)
   const [tagSortMode, setTagSortMode] = useState<SortMode>(() => (localStorage.getItem('josi-tag-sort-mode') as SortMode) || 'manual')
   const [tagSortDirection, setTagSortDirection] = useState<SortDirection>(() => (localStorage.getItem('josi-tag-sort-direction') as SortDirection) || 'down')
   const [playlistSortMode, setPlaylistSortMode] = useState<SortMode>(() => (localStorage.getItem('josi-playlist-sort-mode') as SortMode) || 'manual')
@@ -406,6 +418,7 @@ function App() {
 
   useEffect(() => localStorage.setItem('josi-sort-saves', JSON.stringify(sortSaves)), [sortSaves])
   useEffect(() => localStorage.setItem('josi-active-sort-saves', JSON.stringify(activeSortSaveIds)), [activeSortSaveIds])
+  useEffect(() => localStorage.setItem('josi-side-pane-scroll-locked', sidePaneScrollLocked ? '1' : '0'), [sidePaneScrollLocked])
   useEffect(() => localStorage.setItem('josi-mixed-orders', JSON.stringify(mixedOrders)), [mixedOrders])
   useEffect(() => localStorage.setItem('josi-bundle-locks', JSON.stringify(bundleLocks)), [bundleLocks])
   useEffect(() => localStorage.setItem('josi-bundle-anchors', JSON.stringify(bundleAnchors)), [bundleAnchors])
