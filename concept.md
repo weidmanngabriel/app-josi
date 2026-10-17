@@ -80,6 +80,12 @@ Auch Auswahlfenster für Lieder, Playlists, Tags und Gruppen besitzen eine Suchl
 
 Der frühere „Verlauf“-Tab heißt **Importverlauf** und zeigt alle aktiven Songs. In der Navigation steht **x/y**: x ist die blau dargestellte Zahl der noch blau markierten neuen Importe, y die Gesamtzahl aller aktiven Songs. Blau markierte Songs bilden in allen Songlisten vorübergehend eine eigene obere Gruppe; normale Songs stehen darunter. Beide Gruppen werden mit derselben gewählten Sortierung sortiert. Nach „Als gelesen markieren“ verlässt ein Song die blaue Gruppe.
 
+## Import vor dem Speichern bearbeiten
+
+Werden über **Musik importieren** mehrere Dateien gewählt, erscheinen sie zunächst gemeinsam in einem Importfenster und sind noch nicht gespeichert. Die erste Datei steht in der manuellen Reihenfolge ganz oben, danach folgen die weiteren Dateien in der Auswahlreihenfolge. Im `•••` dieses Fensters stehen **Auswählen**, **Umbenennen**, **Reihenfolge ändern** und **Bewegen**. Auswählen kann die folgenden Aktionen auf einzelne Dateien begrenzen. Reihenfolge ändern nutzt Pfeile; Bewegen nutzt rote Zielstellen und bleibt aktiv, bis oben **Abbrechen** gedrückt wird.
+
+**Fertig** und **Abbrechen** schließen den Import niemals sofort, sondern verlangen eine Bestätigung. Nur bestätigtes Fertig speichert die Dateien. Bestätigtes Abbrechen importiert nichts. Undo/Redo ist auch hier verfügbar: Undo nach einem abgeschlossenen Import entfernt den Import wieder und öffnet den Entwurf erneut; weitere Undo-Schritte können die Bearbeitung dieses Entwurfs zurücknehmen.
+
 ## Bibliotheksaktionen unten
 
 Der frühere sichtbare Knopf **Alle Playlists** wird im Player-Bereich durch einen großen `•••`-Knopf ersetzt. Im Menü steht **Alle Playlists** ganz oben und ist nur aktiv, wenn mindestens ein Lied ausgewählt ist; darunter folgen die allgemeinen Bibliotheksaktionen wie **Leere Gruppe erstellen**. Bei aktiver Song-Auswahl kommen die Auswahlaktionen im selben Menü dazu.
@@ -177,7 +183,7 @@ Die nähere Songansicht besitzt ein eigenes `•••` mit songbezogenen Aktion
 
 ## Bildschirmfeste Bedienelemente
 
-Menüs und Dialoge dürfen nicht aus dem sichtbaren Bildschirm hinausragen. Die gesamte Hauptoberfläche versucht ebenfalls zuerst, sich an die verfügbare Breite anzupassen: Header, Bibliothek, Player und Playlist-Übersicht brechen oder stapeln ihre Inhalte auf schmalen Ansichten. Wenn ein Element trotzdem nicht verkleinert werden kann, kann der betroffene Bereich horizontal gezogen werden, um den abgeschnittenen Teil ins Bild zu holen. Linker Seitenbereich und Bibliotheksbereich können unabhängig vertikal gescrollt werden; **Seitliche Bereiche sperren** schaltet dieses vertikale Scrollen ab, nicht den horizontalen Notfall-Pan. **Leisten verschieben** darf diese responsive Darstellung temporär übersteuern, damit die gespeicherten Trennleisten wieder frei bewegt werden können. Der bisherige gespeicherte Layout-Zustand wird als persönliche Standardbasis verwendet.
+Menüs und Dialoge dürfen nicht aus dem sichtbaren Bildschirm hinausragen. Die gesamte Hauptoberfläche versucht ebenfalls zuerst, sich an die verfügbare Breite anzupassen. Der frei eingestellte Bibliotheks-/Player-Schnitt bleibt jedoch auch nach **Layout fertig** bestehen; dieser Knopf beendet nur die Bearbeitung. Ein Rücksprung zur persönlichen Standardbasis erfolgt ausschließlich über **Standard** in den Einstellungen. Linker Seitenbereich und Bibliotheksbereich können unabhängig vertikal gescrollt werden; **Seitliche Bereiche sperren** schaltet dieses vertikale Scrollen ab, nicht den horizontalen Notfall-Pan.
 
 ## Reihenfolge ändern und Sortierbünde
 
@@ -189,7 +195,7 @@ Sortierbünde existieren nur als Sortierhilfe und können nur in **Reihenfolge �
 
 ## Einzelnes Bewegen und neue Objekte
 
-**Bewegen** ist eine Aktion für genau ein Lied, eine Playlist, einen Tag oder eine Gruppe. Sie steht im Drei-Punkte-Menü und bei Menüs mit **Kopieren** direkt darüber. Mehrere ausgewählte Dateien können nicht gemeinsam bewegt werden. Nach **Bewegen** erscheinen rote Zielstriche zwischen den Einträgen derselben Ebene. Ein Klick wählt den Zielstrich, ein Doppelklick verschiebt das Objekt dorthin. Eine Gruppe nimmt ihre Untergruppen und Inhalte unverändert mit; ein Objekt innerhalb einer Gruppe bleibt in dieser Obergruppe.
+**Bewegen** steht im Drei-Punkte-Menü und bei Menüs mit **Kopieren** direkt darüber. Nach **Bewegen** erscheinen rote Zielstriche bzw. Zielpositionen der betreffenden Ebene. Eine Positionierung beendet den Modus nicht mehr automatisch; erst **Abbrechen** beendet ihn. Dadurch können Objekte oder eine bereits aktive Auswahl wiederholt neu positioniert werden. Eine Gruppe nimmt ihre Untergruppen und Inhalte unverändert mit; ein Objekt innerhalb einer Gruppe bleibt in dieser Obergruppe. Im Importfenster kann **Auswählen** die zu bewegende Dateimenge auf einzelne neue Lieder begrenzen.
 
 Vor dem Erstellen einer neuen Gruppe erscheint ein Namensfeld mit **Unbenannt**. Über die drei Punkte daneben kann schon **Bewegen** ausgewählt werden. In einem Save landet eine neue Gruppe ohne diese Option zuerst ganz oben; bei automatischer Sortierung wird sie direkt passend einsortiert.
 
@@ -251,3 +257,6 @@ Der Farbwähler zeigt weiterhin das freie Spektrum und darunter feste Farbknöpf
 In **Einstellungen → Bibliotheks-Interface** kann ein eigener Bearbeitungsmodus gestartet werden. Dann dürfen die Trennleisten der linken Spalte und der Playerbereiche verschoben werden. Mit **Layout fertig** werden die Leisten wieder gesperrt; die gewählten Breiten bleiben gespeichert. Namen und andere Texte werden innerhalb des verfügbaren Platzes begrenzt, statt benachbarte Bereiche zu überdecken.
 
 Im `•••` der Überschriften **Playlists** und **Tags** liegt außerdem **Sortieren**. Diese Sortierung betrifft die Playlist-/Tag-Liste selbst; die Songs innerhalb einer Playlist bleiben davon unabhängig.
+
+
+Undo/Redo bleibt auch in geöffneten Fenstern erreichbar. Eine feste Verlaufsleiste liegt oberhalb von Dialogen und Bestätigungen; im Importfenster steuert sie zuerst dessen eigenen Bearbeitungsverlauf.
