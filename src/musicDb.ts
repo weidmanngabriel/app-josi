@@ -26,6 +26,7 @@ export type Tag = {
   color: string
   songIds: string[]
   playlistIds: string[]
+  groupIds?: string[]
   createdAt: number
   lastUsedAt: number
   sortOrder?: number
