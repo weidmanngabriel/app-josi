@@ -2069,15 +2069,14 @@ function App() {
     const token = singleMoveTarget.kind === 'group' ? groupToken(singleMoveTarget.id) : itemToken(singleMoveTarget.id)
     const currentOrder = normalizedMixedOrder(key, baseTokens)
     const nextOrder = reorderIds(currentOrder, token, targetIndex)
-    if (nextOrder.join('|') === currentOrder.join('|')) { setSingleMoveTarget(null); return }
+    if (nextOrder.join('|') === currentOrder.join('|')) { setSingleMoveTarget((current) => current ? { ...current, targetIndex: null } : current); return }
     recordHistory()
     setMixedOrders((current) => ({ ...current, [key]: nextOrder }))
     await persistRelativeOrder(actualKind, nextOrder, singleMoveTarget.parentGroupId)
     const active = activeSortSave(actualKind)
     if (active) setSortSaves((current) => current.map((save) => save.id === active.id ? { ...save, orders: { ...save.orders, [key]: nextOrder } } : save))
-    setSingleMoveTarget(null)
-    setMessage('Objekt wurde verschoben.')
-    if (creationPlacementQueue.length) advanceCreationPlacement()
+    setSingleMoveTarget((current) => current ? { ...current, targetIndex: null } : current)
+    setMessage('Objekt wurde verschoben. Du kannst eine weitere Position wählen; „Abbrechen“ beendet den Modus.')
   }
   const renderSingleMoveZone = (kind: GroupKind, parentGroupId: string | undefined, index: number) => {
     if (!singleMoveTarget || moveTargetKind(singleMoveTarget) !== kind || (singleMoveTarget.parentGroupId ?? undefined) !== (parentGroupId ?? undefined)) return null
@@ -2505,7 +2504,7 @@ function App() {
       <div className="history-controls" aria-label="Navigation und Verlauf"><button className="home-button" type="button" onClick={goHome} aria-label="Bibliothek">⌂</button><button className="settings-button" type="button" onClick={() => setSettingsOpen(true)} aria-label="Einstellungen">⚙</button><button type="button" onClick={navigateBack} disabled={navigationIndex === 0 && !loopEditorSongId}>‹</button><button type="button" onClick={navigateForward} disabled={navigationIndex >= navigation.length - 1 || Boolean(loopEditorSongId)}>›</button><button type="button" onClick={() => void undo()} disabled={!undoStack.length || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↶</button><button type="button" onClick={() => void redo()} disabled={(!redoStack.length && !cancelledDuplicateAction) || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↷</button>{moveCandidate && <><button className="confirm-move" type="button" onClick={() => void confirmPendingMove()} disabled={moveCandidate.targetIndex === null}>✓</button><button className="cancel-move" type="button" onClick={() => setMoveCandidate(null)}>×</button></>}</div>
       <div className="header-right-actions">{layoutEditMode && <button className="layout-finish-button" type="button" onClick={() => { setLayoutEditMode(false); setLayoutDrag(null) }}>Layout fertig</button>}<button className="import-button" type="button" onClick={openImportPicker}>+ Musik importieren</button></div><input ref={fileInputRef} className="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac" multiple onChange={(event) => void importFiles(event.target.files)} /><input ref={coverInputRef} className="file-input" type="file" accept="image/*" onChange={(event) => void changePlaylistCover(event.target.files)} />
     </header>
-    {singleMoveTarget && <div className="single-move-hint"><span>Zielstrich wählen und doppelt antippen.</span><button type="button" onClick={cancelSingleMove}>Abbrechen</button></div>}
+    {singleMoveTarget && <div className="single-move-hint"><span>Zielstrich wählen und doppelt antippen. Der Modus bleibt aktiv.</span><button type="button" onClick={cancelSingleMove}>Abbrechen</button></div>}
 
     {view !== 'playlistOverview' && <main className={`music-layout${layoutEditMode ? ' layout-editing' : ''}`} style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}><aside className="sidebar">
       <button className={`nav-item${view === 'library' && !activePlaylistId ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'library', playlistId: null, detailOpen: false })}><span>Bibliothek</span><strong>{songs.length}</strong></button>
