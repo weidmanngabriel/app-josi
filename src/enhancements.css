@@ -1555,6 +1555,7 @@ input, textarea {
   background: #4c2fac;
 }
 .import-confirm-layer {
+  pointer-events: auto;
   position: fixed;
   z-index: 1450;
   inset: 0;
