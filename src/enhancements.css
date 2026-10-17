@@ -644,3 +644,16 @@ input, textarea {
     place-items: start center;
   }
 }
+
+
+@media (max-width: 620px) {
+  .tag-color-popover {
+    left: auto;
+    right: 0;
+    transform: none;
+  }
+  .sidebar-selection-dock {
+    max-width: calc(100vw - 24px);
+    flex-wrap: wrap;
+  }
+}
