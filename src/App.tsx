@@ -215,6 +215,9 @@ function App() {
   const [selectionConfirmation, setSelectionConfirmation] = useState<SelectionConfirmation>(null)
   const [trashConfirmation, setTrashConfirmation] = useState(false)
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
+  const [librarySortPickerOpen, setLibrarySortPickerOpen] = useState(false)
+  const [chooserSortMode, setChooserSortMode] = useState<SortMode>('manual')
+  const [chooserSortDirection, setChooserSortDirection] = useState<SortDirection>('down')
   const [sortSaves, setSortSaves] = useState<SortSave[]>(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('josi-sort-saves') ?? '[]')
@@ -1548,6 +1551,34 @@ function App() {
     const aTime = kind === 'song' ? (a as Song).addedAt : (a as Playlist | Tag).createdAt
     const bTime = kind === 'song' ? (b as Song).addedAt : (b as Playlist | Tag).createdAt
     return aTime - bTime
+  }
+  const chooserLabelsFor = (kind: GroupKind) => kind === 'song' ? sortLabels : kind === 'playlist' ? playlistSortLabels : tagSortLabels
+  const chooserManualLabel = (kind: GroupKind) => activeSortSave(kind)?.name ?? 'Save'
+  const sortChooserObjects = <T extends Song | Playlist | Tag>(kind: GroupKind, items: T[]) => {
+    if (chooserSortMode === 'manual') return [...items]
+    const sign = chooserSortDirection === 'down' ? 1 : -1
+    return [...items].sort((a, b) => compareObjects(kind, a, b, chooserSortMode) * sign)
+  }
+  const compareChooserGroups = (kind: GroupKind, a: ObjectGroup, b: ObjectGroup, allowed: Array<Song | Playlist | Tag>) => {
+    if (chooserSortMode === 'azStart') return a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' })
+    if (chooserSortMode === 'azEnd') return reverseText(a.name).localeCompare(reverseText(b.name), 'de', { numeric: true, sensitivity: 'base' })
+    const allowedIds = new Set(allowed.map((item) => item.id))
+    const metric = (group: ObjectGroup) => {
+      const ids = deepGroupItemIds(group).filter((id) => allowedIds.has(id))
+      if (chooserSortMode === 'plays') return ids.reduce((sum, id) => sum + itemPlays(kind, id), 0)
+      if (chooserSortMode === 'duration') return kind === 'song' ? ids.reduce((sum, id) => sum + itemDuration(kind, id), 0) : ids.reduce((sum, id) => sum + itemSongCount(kind, id), 0)
+      return group.createdAt
+    }
+    return metric(a) - metric(b) || a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' })
+  }
+  const sortChooserGroups = (kind: GroupKind, groups: ObjectGroup[], allowed: Array<Song | Playlist | Tag>) => {
+    if (chooserSortMode === 'manual') return [...groups]
+    const sign = chooserSortDirection === 'down' ? 1 : -1
+    return [...groups].sort((a, b) => compareChooserGroups(kind, a, b, allowed) * sign)
+  }
+  const renderChooserSortControls = (kind: GroupKind) => {
+    const labels = chooserLabelsFor(kind)
+    return <div className="chooser-sort-controls"><select value={chooserSortMode} onChange={(event) => setChooserSortMode(event.target.value as SortMode)}><option value="manual">{chooserManualLabel(kind)}</option>{(Object.keys(labels) as SortMode[]).filter((mode) => mode !== 'manual').map((mode) => <option key={mode} value={mode}>{labels[mode]}</option>)}</select><button type="button" disabled={chooserSortMode === 'manual'} onClick={() => setChooserSortDirection((value) => value === 'down' ? 'up' : 'down')}>{chooserSortMode === 'manual' ? '—' : chooserSortDirection === 'down' ? '↓' : '↑'}</button></div>
   }
   const orderedGroupItems = (group: ObjectGroup, allowed: Array<Song | Playlist | Tag>) => {
     const allowedMap = new Map(allowed.map((item) => [item.id, item]))
