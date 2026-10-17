@@ -1806,3 +1806,37 @@ input, textarea {
     grid-template-columns: 24px minmax(0,1fr) auto;
   }
 }
+
+
+/* Persist the user's chosen layout after leaving edit mode. */
+.music-layout.custom-layout {
+  display: grid !important;
+  grid-template-columns: var(--sidebar-width, 240px) minmax(360px,1fr) !important;
+  min-width: max(100vw, calc(var(--sidebar-width, 240px) + 360px));
+  overflow-x: auto;
+}
+.player.custom-layout {
+  grid-template-columns: var(--player-left, 27%) var(--player-middle, 41%) var(--player-right, 32%) !important;
+  min-width: 720px;
+  overflow-x: auto;
+}
+@media (max-width: 880px) {
+  .music-layout.custom-layout {
+    display: grid !important;
+    grid-template-columns: var(--sidebar-width, 240px) minmax(360px,1fr) !important;
+  }
+  .player.custom-layout {
+    grid-template-columns: var(--player-left, 27%) var(--player-middle, 41%) var(--player-right, 32%) !important;
+  }
+}
+@media (max-width: 620px) {
+  .music-layout.custom-layout {
+    display: grid !important;
+    grid-template-columns: var(--sidebar-width, 240px) minmax(360px,1fr) !important;
+    min-width: max(720px, calc(var(--sidebar-width, 240px) + 360px));
+  }
+  .player.custom-layout {
+    grid-template-columns: var(--player-left, 27%) var(--player-middle, 41%) var(--player-right, 32%) !important;
+    min-width: 720px;
+  }
+}
