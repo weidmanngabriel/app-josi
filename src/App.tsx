@@ -991,6 +991,69 @@ function App() {
     setImportDraftSelectionMode(false)
     setImportDraftReorderMode(false)
     setImportDraftMoveMode(false)
+    setImportMoveStep(null)
+    setImportMoveReviewIds([])
+    setImportLibraryTargetIndex(null)
+    setImportDraftSelectedIds(new Set(importDraftItems.map((item) => item.id)))
+  }
+  const beginImportMove = () => {
+    setImportDraftSortMode('manual')
+    setImportDraftMoveMode(true)
+    setImportDraftReorderMode(false)
+    setImportDraftRenameOpen(false)
+    setImportDraftSelectionMode(true)
+    setImportDraftSelectedIds(new Set())
+    setImportMoveReviewIds([])
+    setImportLibraryTargetIndex(null)
+    setImportMoveStep('select')
+    setImportDraftMenuOpen(false)
+  }
+  const confirmImportMoveSelection = () => {
+    if (!importDraftSelectedIds.size) return
+    setImportMoveReviewIds(importDraftItems.filter((item) => importDraftSelectedIds.has(item.id)).map((item) => item.id))
+    setImportMoveStep('review')
+  }
+  const moveImportReviewItem = (id: string, delta: -1 | 1) => {
+    setImportMoveReviewIds((current) => {
+      const index = current.indexOf(id)
+      const other = index + delta
+      if (index < 0 || other < 0 || other >= current.length) return current
+      const next = [...current]
+      ;[next[index], next[other]] = [next[other], next[index]]
+      return next
+    })
+  }
+  const removeImportReviewItem = (id: string) => {
+    setImportMoveReviewIds((current) => current.filter((item) => item !== id))
+    setImportDraftSelectedIds((current) => { const next = new Set(current); next.delete(id); return next })
+  }
+  const openImportLibraryPlacement = () => {
+    if (!importMoveReviewIds.length) return
+    setImportLibraryTargetIndex(null)
+    setImportMoveStep('place')
+    setImportDraftSelectionMode(false)
+    navigateTo({ view: 'library', playlistId: null, detailOpen: false })
+  }
+  const confirmImportLibraryPlacement = () => {
+    if (importLibraryTargetIndex === null || !importMoveReviewIds.length) return
+    setImportLibraryPlacement({ draftIds: [...importMoveReviewIds], targetIndex: importLibraryTargetIndex })
+    setImportMoveStep(null)
+    setImportDraftMoveMode(false)
+    setImportDraftSelectionMode(false)
+    setImportLibraryTargetIndex(null)
+    setMessage('Position für den Import wurde vorgemerkt. Mit „Fertig“ wird sie übernommen.')
+  }
+  const backFromImportPlacement = () => {
+    setImportLibraryTargetIndex(null)
+    setImportMoveStep('review')
+    setImportDraftSelectionMode(true)
+  }
+  const cancelImportMoveFlow = () => {
+    setImportDraftMoveMode(false)
+    setImportDraftSelectionMode(false)
+    setImportMoveStep(null)
+    setImportMoveReviewIds([])
+    setImportLibraryTargetIndex(null)
     setImportDraftSelectedIds(new Set(importDraftItems.map((item) => item.id)))
   }
   const moveImportDraftItem = (id: string, delta: -1 | 1) => {
