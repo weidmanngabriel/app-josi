@@ -657,3 +657,54 @@ input, textarea {
     flex-wrap: wrap;
   }
 }
+
+
+/* Save long-press controls and independently scrollable panes */
+.sort-save-menu-list,
+.sidebar-sort-save-list {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid #303746;
+}
+.sort-save-menu-list button,
+.sidebar-sort-save-list button {
+  min-height: 40px;
+  padding: 0 11px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #e5e7eb;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.sort-save-menu-list button.active-sort-save,
+.sidebar-sort-save-list button.active-sort-save {
+  border-color: #6d4bd1;
+  background: rgba(109,75,209,.18);
+}
+.sidebar,
+.library-panel {
+  overflow-y: auto !important;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+.side-pane-scroll-locked .sidebar,
+.side-pane-scroll-locked .library-panel {
+  overflow-y: hidden !important;
+  touch-action: none;
+}
+@media (max-width: 620px) {
+  .library-panel {
+    max-height: calc(100dvh - 375px);
+    overflow-y: auto !important;
+  }
+  .side-pane-scroll-locked .library-panel {
+    overflow-y: hidden !important;
+  }
+}
