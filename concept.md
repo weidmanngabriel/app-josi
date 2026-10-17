@@ -80,6 +80,12 @@ Auch Auswahlfenster für Lieder, Playlists, Tags und Gruppen besitzen eine Suchl
 
 Der frühere „Verlauf“-Tab heißt **Importverlauf** und zeigt alle aktiven Songs. In der Navigation steht **x/y**: x ist die blau dargestellte Zahl der noch blau markierten neuen Importe, y die Gesamtzahl aller aktiven Songs. Blau markierte Songs bilden in allen Songlisten vorübergehend eine eigene obere Gruppe; normale Songs stehen darunter. Beide Gruppen werden mit derselben gewählten Sortierung sortiert. Nach „Als gelesen markieren“ verlässt ein Song die blaue Gruppe.
 
+## Bibliotheksaktionen unten
+
+Der frühere sichtbare Knopf **Alle Playlists** wird im Player-Bereich durch einen großen `•••`-Knopf ersetzt. Im Menü steht **Alle Playlists** ganz oben und ist nur aktiv, wenn mindestens ein Lied ausgewählt ist; darunter folgen die allgemeinen Bibliotheksaktionen wie **Leere Gruppe erstellen**. Bei aktiver Song-Auswahl kommen die Auswahlaktionen im selben Menü dazu.
+
+Direkt über diesem Knopf zeigt Josi das ausgewählte Lied. Bei mehreren Liedern erscheint eine kompakte Auswahlbox; sie öffnet eine eigene Liste, die durchsucht und sortiert werden kann.
+
 ## Sortierung
 
 Die automatischen Sortierungen bleiben **A–Z Anfang**, **A–Z Ende**, **Anzahl des Hörens**, **Dauer** und **Chronik**. Die frühere Auswahl **Manuell** wird durch benannte **Saves** ersetzt. Eine bestehende manuelle Reihenfolge bleibt als **Save 1** erhalten.
@@ -171,7 +177,7 @@ Die nähere Songansicht besitzt ein eigenes `•••` mit songbezogenen Aktion
 
 ## Bildschirmfeste Bedienelemente
 
-Menüs und Dialoge dürfen nicht aus dem sichtbaren Bildschirm hinausragen. Die gesamte Hauptoberfläche versucht ebenfalls zuerst, sich an die verfügbare Breite anzupassen: Header, Bibliothek, Player und Playlist-Übersicht brechen oder stapeln ihre Inhalte auf schmalen Ansichten. Wenn ein Element trotzdem nicht verkleinert werden kann, kann der betroffene Bereich horizontal gezogen werden, um den abgeschnittenen Teil ins Bild zu holen. Linker Seitenbereich und Bibliotheksbereich können unabhängig vertikal gescrollt werden; **Seitliche Bereiche sperren** schaltet dieses vertikale Scrollen ab, nicht den horizontalen Notfall-Pan.
+Menüs und Dialoge dürfen nicht aus dem sichtbaren Bildschirm hinausragen. Die gesamte Hauptoberfläche versucht ebenfalls zuerst, sich an die verfügbare Breite anzupassen: Header, Bibliothek, Player und Playlist-Übersicht brechen oder stapeln ihre Inhalte auf schmalen Ansichten. Wenn ein Element trotzdem nicht verkleinert werden kann, kann der betroffene Bereich horizontal gezogen werden, um den abgeschnittenen Teil ins Bild zu holen. Linker Seitenbereich und Bibliotheksbereich können unabhängig vertikal gescrollt werden; **Seitliche Bereiche sperren** schaltet dieses vertikale Scrollen ab, nicht den horizontalen Notfall-Pan. **Leisten verschieben** darf diese responsive Darstellung temporär übersteuern, damit die gespeicherten Trennleisten wieder frei bewegt werden können. Der bisherige gespeicherte Layout-Zustand wird als persönliche Standardbasis verwendet.
 
 ## Reihenfolge ändern und Sortierbünde
 

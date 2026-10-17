@@ -78,7 +78,11 @@ Die sichere Metadaten-Speicherung prüft bei Undo, ob der Basis-Song noch existi
 
 ## Mehrfachauswahl und Playlist-Zuordnung
 
-Bibliothek, Playlists, Importverlauf und Loops verwenden denselben Song-Auswahlmodus. Rechts neben „Alle Playlists“ liegt im Auswahlmodus ein runder `•••`-Knopf. Er bietet Gruppieren, Tags und Alle löschen. Playlists und Tags besitzen einen entsprechenden eigenen Auswahlmodus mit einem schwebenden `•••` unten rechts. Dort stehen Gruppieren, Kopieren und Alle löschen zur Verfügung. **Mehrfachauswahl kann nicht bewegt werden.** Bewegen ist ausschließlich eine Einzelobjekt-Aktion im jeweiligen Drei-Punkte-Menü. Kopieren erzeugt neue Objekte desselben Typs, Löschen verschiebt die Auswahl in den Papierkorb. Alle löschen verlangt eine Sicherheitsabfrage und entfernt die ausgewählten lokalen Dateien aus allen Playlists.
+Bibliothek, Playlists, Importverlauf und Loops verwenden denselben Song-Auswahlmodus. Im Player-Bereich ersetzt ein großer Bibliotheks-`•••`-Knopf den früheren sichtbaren „Alle Playlists“-Knopf. Sein erster Menüpunkt ist **Alle Playlists**; er ist nur aktiv, wenn mindestens ein Lied ausgewählt ist. Direkt darunter folgen **Leere Gruppe erstellen**, **Weitere Gruppen abspielen** und **Aktuelle Sortierung speichern**. Im Song-Auswahlmodus enthält dasselbe Menü zusätzlich Gruppieren, Tags, Loop-Aktionen und Alle löschen. Playlists und Tags besitzen weiterhin ihren eigenen Auswahlmodus mit schwebendem `•••`. **Mehrfachauswahl kann nicht bewegt werden.** Bewegen ist ausschließlich eine Einzelobjekt-Aktion im jeweiligen Drei-Punkte-Menü. Kopieren erzeugt neue Objekte desselben Typs, Löschen verschiebt die Auswahl in den Papierkorb. Alle löschen verlangt eine Sicherheitsabfrage und entfernt die ausgewählten lokalen Dateien aus allen Playlists.
+
+## Ausgewählte Lieder im Playlist-Bereich
+
+Oberhalb des unteren Bibliotheks-`•••` steht nicht mehr eine allgemeine Playlist-Beschriftung, sondern die aktuelle Song-Auswahl. Bei genau einem ausgewählten Lied wird dessen Name angezeigt. Bei mehreren ausgewählten Liedern zeigt die Box die Anzahl; ein Tipp öffnet ein eigenes Fenster mit allen ausgewählten Liedern. Diese Liste besitzt Suche und dieselbe chooser-interne Sortierleiste wie andere Auswahlfenster. Die manuelle Option trägt dort den Namen des aktiven Song-Saves.
 
 ## Suche
 
@@ -96,7 +100,7 @@ Songlisten bieten die automatischen Modi `A–Z Anfang`, `A–Z Ende`, `Anzahl d
 
 Über **Aktuelle Sortierung speichern** kann die aktuell sichtbare Reihenfolge als neuer Save gesichert und optional benannt werden. Bleibt der Name leer, verwendet Josi die erste freie Bezeichnung `Save N`. Saves stehen in der Auswahl immer unter den automatischen Modi und werden untereinander nach Namen sortiert. Ein Save speichert die gemischte Reihenfolge aus normalen Objekten und Gruppen; beim Bearbeiten über **Reihenfolge ändern** wird der aktive Save fortgeschrieben. Für Songlisten gelten die Save-Reihenfolgen auch für den jeweiligen Bibliotheks-/Playlist-Kontext.
 
-In der Bibliothek ist die Sortierauswahl kein natives Select mehr, sondern ein eigenes Menü: automatische Sortierungen stehen oben, Saves darunter. Dadurch kann ein Save direkt in der Sortierauswahl etwa 650 ms gedrückt gehalten werden, um ihn umzubenennen; die Save-Liste liegt nicht mehr im `•••`-Menü.
+In der Bibliothek ist die Sortierauswahl kein natives Select mehr, sondern ein eigenes Menü: automatische Sortierungen stehen oben, Saves darunter. Dadurch kann ein Save direkt in der Sortierauswahl etwa 650 ms gedrückt gehalten werden, um ihn umzubenennen. Das frühere Sortier-`•••` neben dieser Leiste wurde entfernt; die Bibliotheksaktionen liegen gesammelt unten im Player-Bereich.
 
 Playlists und Tags besitzen dieselbe Save-Logik in ihrem **Sortieren**-Dialog. Neben Richtungspfeil bzw. Gedankenstrich steht dort **Aktuelle Sortierung speichern**. Die Save-Daten und die aktive Auswahl liegen lokal in `localStorage`.
 
@@ -123,6 +127,8 @@ Dialoge, Auswahlfenster, Drei-Punkte-Menüs, Sortiermenüs und Farbauswahlen wer
 Auch die Hauptoberfläche passt sich jetzt vor einem Überlauf an: Header, Bibliotheksaufteilung, Player und Playlist-Übersicht verwenden CSS-Variablen bzw. responsive Spalten statt nicht überschreibbarer Inline-Spalten. Auf schmalen Ansichten werden Player und Bedienelemente gestapelt oder umgebrochen. Falls ein untergeordnetes Element trotzdem breiter bleibt, besitzen Header, Player, Playlist-Übersicht sowie die beiden Bibliotheksbereiche einen horizontalen Pan-/Scroll-Fallback. Dadurch kann der Nutzer einen seitlich abgeschnittenen Bereich durch Ziehen wieder ins Bild holen.
 
 Die linke Seitenleiste und der rechte Bibliotheksbereich besitzen zusätzlich eigenständiges vertikales Touch-Scrolling. In **Einstellungen → Seitliche Bereiche sperren** kann dieses vertikale unabhängige Scrollen deaktiviert werden; der horizontale Pan-Fallback für nicht verkleinerbare Inhalte bleibt verfügbar. Die Einstellung wird lokal gespeichert.
+
+Der Modus **Leisten verschieben** hat Vorrang vor den responsiven Ersatzbreiten: Während der Bearbeitung werden wieder die gespeicherten Sidebar- und Player-Trennwerte verwendet, sodass die Griffe tatsächlich verschiebbar bleiben. Beim ersten Start nach dieser Änderung wird der auf dem Gerät bereits gespeicherte Layout-Zustand als persönliche Standardbasis übernommen. Der Knopf **Standard** stellt deshalb diesen bisherigen Zustand wieder her statt pauschal auf feste Werkseinstellungen zu springen.
 
 ## Präziser Loop-Editor
 
