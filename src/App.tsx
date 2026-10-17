@@ -2450,8 +2450,9 @@ function App() {
       setTrashedTags((items) => [...moving, ...items.filter((item) => !idSet.has(item.id))])
       if (activeTagId && idSet.has(activeTagId)) goHome()
     }
+    const deletedTagIds = target.kind === 'tag' ? new Set(objectIds) : new Set<string>()
     const tagGroupUpdates = tags
-      .filter((tag) => (tag.groupIds ?? []).some((id) => groupIds.has(id)))
+      .filter((tag) => !deletedTagIds.has(tag.id) && (tag.groupIds ?? []).some((id) => groupIds.has(id)))
       .map((tag) => ({ ...tag, groupIds: (tag.groupIds ?? []).filter((id) => !groupIds.has(id)) }))
     if (tagGroupUpdates.length) {
       await Promise.all(tagGroupUpdates.map(saveTag))
