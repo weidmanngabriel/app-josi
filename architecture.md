@@ -43,7 +43,7 @@ Bereits vor der Trennung beschädigte oder verlorene Blobs können nicht rekonst
 
 ## Drei-Punkte-Menüs
 
-Langdruck wird grundsätzlich nicht für Objektaktionen verwendet. Zusatzfunktionen liegen in sichtbaren `•••`-Menüs. **Einzige bewusste Ausnahme ist der Wiederholen-Knopf im Player:** Langdruck öffnet eine Wiederholungsbox mit `∞` oder einer frei wählbaren Anzahl.
+Langdruck wird nicht für normale Objektaktionen verwendet; diese bleiben in sichtbaren `•••`-Menüs. Bewusste Ausnahmen sind der Wiederholen-Knopf im Player und die benannten Sortier-Saves: Wiederholen öffnet per Langdruck die Wiederholungsbox, ein Save öffnet per Langdruck den Dialog zum Umbenennen.
 
 ### Song-Menü
 
@@ -84,7 +84,7 @@ Bibliothek, Playlists, Importverlauf und Loops verwenden denselben Song-Auswahlm
 
 Bibliothek und geöffnete Playlists besitzen eine lokale Textsuche. Die Suche ist tolerant gegenüber Groß-/Kleinschreibung, Leerzeichen, Trennzeichen und einfachen unvollständigen Eingaben. Dadurch findet zum Beispiel „Miniboss“ auch „Mini Boss“. Eine aktive Suche verändert weder manuelle Reihenfolge noch Songdaten.
 
-Auswahlfenster für Songs, Playlists, Tags und Gruppen besitzen ebenfalls eine Suchleiste. Ihre Listen übernehmen soweit möglich dieselbe Reihenfolge wie die jeweilige Hauptliste: Songs die aktuelle Bibliothekssortierung, Playlists und Tags ihre aktuelle Seitensortierung und Gruppen die aktuelle Gruppenreihenfolge.
+Auswahlfenster für Songs, Playlists, Tags und Gruppen besitzen ebenfalls eine Suchleiste und eine eigene Sortierleiste. Dazu gehören insbesondere Playlist-/Tag-Zuordnung, „Weitere Gruppen abspielen“, „Gruppe hinzufügen/entfernen“ und „Objekte hinzufügen/entfernen“. Die oberste Sortieroption entspricht der manuellen Reihenfolge, trägt aber den Namen des aktuell aktiven Saves des jeweiligen Listentyps. Darunter stehen die automatischen Sortierungen mit Richtungspfeil. Die Auswahlfenster verändern die eigentliche Hauptsortierung nicht.
 
 ## Importverlauf
 
@@ -94,7 +94,9 @@ Der frühere Tab „Verlauf“ heißt „Importverlauf“. Er zeigt alle aktiven
 
 Songlisten bieten die automatischen Modi `A–Z Anfang`, `A–Z Ende`, `Anzahl des Hörens`, `Dauer` und `Chronik`. Die frühere sichtbare Option `Manuell` wurde durch benannte **Saves** ersetzt. Bestehende manuelle Reihenfolgen werden beim Umstieg als **Save 1** weitergeführt, damit keine vorhandene Reihenfolge verloren geht.
 
-Über **Aktuelle Sortierung speichern** kann die aktuell sichtbare Reihenfolge als neuer Save gesichert und optional benannt werden. Bleibt der Name leer, verwendet Josi die erste freie Bezeichnung `Save N`. Saves stehen in der Auswahl immer unter den automatischen Modi und werden untereinander nach Namen sortiert. Ein Save speichert die gemischte Reihenfolge aus normalen Objekten und Gruppen; beim Bearbeiten über **Reihenfolge ändern** wird der aktive Save fortgeschrieben. Für Songlisten gelten die Save-Reihenfolgen auch für den jeweiligen Bibliotheks-/Playlist-Kontext. In den Save-Listen kann ein Save etwa 650 ms gedrückt gehalten werden; anschließend öffnet sich ein Dialog zum Umbenennen.
+Über **Aktuelle Sortierung speichern** kann die aktuell sichtbare Reihenfolge als neuer Save gesichert und optional benannt werden. Bleibt der Name leer, verwendet Josi die erste freie Bezeichnung `Save N`. Saves stehen in der Auswahl immer unter den automatischen Modi und werden untereinander nach Namen sortiert. Ein Save speichert die gemischte Reihenfolge aus normalen Objekten und Gruppen; beim Bearbeiten über **Reihenfolge ändern** wird der aktive Save fortgeschrieben. Für Songlisten gelten die Save-Reihenfolgen auch für den jeweiligen Bibliotheks-/Playlist-Kontext.
+
+In der Bibliothek ist die Sortierauswahl kein natives Select mehr, sondern ein eigenes Menü: automatische Sortierungen stehen oben, Saves darunter. Dadurch kann ein Save direkt in der Sortierauswahl etwa 650 ms gedrückt gehalten werden, um ihn umzubenennen; die Save-Liste liegt nicht mehr im `•••`-Menü.
 
 Playlists und Tags besitzen dieselbe Save-Logik in ihrem **Sortieren**-Dialog. Neben Richtungspfeil bzw. Gedankenstrich steht dort **Aktuelle Sortierung speichern**. Die Save-Daten und die aktive Auswahl liegen lokal in `localStorage`.
 
@@ -116,9 +118,11 @@ Neu importierte Lieder sowie neu erstellte Playlists und Tags erhalten direkt na
 
 ## Bildschirmgrenzen für Dialoge und Menüs
 
-Dialoge, Auswahlfenster, Drei-Punkte-Menüs, Sortiermenüs und Farbauswahlen werden auf die aktuelle Viewport-Größe inklusive Safe-Area begrenzt. Solange ihr Inhalt hineinpasst, entsteht keine zusätzliche Scrollfläche. Erst wenn Breite oder Höhe nicht ausreichen, wird innerhalb des betroffenen Kastens gescrollt. Dadurch dürfen Bedienelemente auch auf kleinen iPad-/Mobilansichten nicht außerhalb des sichtbaren Bildschirms liegen.
+Dialoge, Auswahlfenster, Drei-Punkte-Menüs, Sortiermenüs und Farbauswahlen werden auf die aktuelle Viewport-Größe inklusive Safe-Area begrenzt. Solange ihr Inhalt hineinpasst, entsteht keine zusätzliche Scrollfläche. Erst wenn Breite oder Höhe nicht ausreichen, wird innerhalb des betroffenen Kastens gescrollt.
 
-Die linke Seitenleiste und der rechte Bibliotheksbereich besitzen eigenständiges vertikales Touch-Scrolling. In **Einstellungen → Seitliche Bereiche sperren** kann dieses unabhängige Scrollen über einen Ein-/Aus-Schalter deaktiviert werden. Die Einstellung wird lokal gespeichert.
+Auch die Hauptoberfläche passt sich jetzt vor einem Überlauf an: Header, Bibliotheksaufteilung, Player und Playlist-Übersicht verwenden CSS-Variablen bzw. responsive Spalten statt nicht überschreibbarer Inline-Spalten. Auf schmalen Ansichten werden Player und Bedienelemente gestapelt oder umgebrochen. Falls ein untergeordnetes Element trotzdem breiter bleibt, besitzen Header, Player, Playlist-Übersicht sowie die beiden Bibliotheksbereiche einen horizontalen Pan-/Scroll-Fallback. Dadurch kann der Nutzer einen seitlich abgeschnittenen Bereich durch Ziehen wieder ins Bild holen.
+
+Die linke Seitenleiste und der rechte Bibliotheksbereich besitzen zusätzlich eigenständiges vertikales Touch-Scrolling. In **Einstellungen → Seitliche Bereiche sperren** kann dieses vertikale unabhängige Scrollen deaktiviert werden; der horizontale Pan-Fallback für nicht verkleinerbare Inhalte bleibt verfügbar. Die Einstellung wird lokal gespeichert.
 
 ## Präziser Loop-Editor
 
