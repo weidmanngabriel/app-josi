@@ -752,6 +752,39 @@ function App() {
     return () => cancelAnimationFrame(frame)
   }, [loopZoom])
 
+  const importDraftSnapshot = (): ImportDraftSnapshot => ({
+    items: importDraftItems.map((item) => ({ id: item.id, name: item.name, originalIndex: item.originalIndex })),
+    selectedIds: [...importDraftSelectedIds],
+    sortMode: importDraftSortMode,
+  })
+  const restoreImportDraftSnapshot = (target: ImportDraftSnapshot) => {
+    const fileById = new Map(importDraftItems.map((item) => [item.id, item.file]))
+    lastCommittedImportDraft?.items.forEach((item) => { if (!fileById.has(item.id)) fileById.set(item.id, item.file) })
+    setImportDraftItems(target.items.map((item) => ({ ...item, file: fileById.get(item.id)! })).filter((item) => Boolean(item.file)))
+    setImportDraftSelectedIds(new Set(target.selectedIds))
+    setImportDraftSortMode(target.sortMode)
+  }
+  const recordImportDraftHistory = () => {
+    setImportDraftUndoStack((items) => [...items, importDraftSnapshot()].slice(-50))
+    setImportDraftRedoStack([])
+  }
+  const undoImportDraft = () => {
+    const target = importDraftUndoStack.at(-1)
+    if (!target) return false
+    setImportDraftUndoStack((items) => items.slice(0, -1))
+    setImportDraftRedoStack((items) => [...items, importDraftSnapshot()].slice(-50))
+    restoreImportDraftSnapshot(target)
+    return true
+  }
+  const redoImportDraft = () => {
+    const target = importDraftRedoStack.at(-1)
+    if (!target) return false
+    setImportDraftRedoStack((items) => items.slice(0, -1))
+    setImportDraftUndoStack((items) => [...items, importDraftSnapshot()].slice(-50))
+    restoreImportDraftSnapshot(target)
+    return true
+  }
+
   const snapshot = (): Snapshot => ({ songs: songs.map((song) => ({ ...song, loopMarkers: song.loopMarkers ? [...song.loopMarkers] : undefined })), playlists: playlists.map((playlist) => ({ ...playlist, songIds: [...playlist.songIds] })), tags: tags.map((tag) => ({ ...tag, songIds: [...tag.songIds], playlistIds: [...tag.playlistIds] })), objectGroups: objectGroups.map((group) => ({ ...group, itemIds: [...group.itemIds] })), objectColors: { ...objectColors } })
   const recordHistory = () => { setUndoStack((items) => [...items, snapshot()].slice(-50)); setRedoStack([]) }
   const restoreSnapshot = async (target: Snapshot) => {
