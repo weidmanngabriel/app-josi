@@ -806,10 +806,54 @@ function App() {
     await Promise.all(previousTags.filter((tag) => !tagIds.has(tag.id)).map((tag) => deleteTag(tag.id)))
     await Promise.all(target.tags.map(saveTag))
   }
-  const undo = async () => { const target = undoStack.at(-1); if (!target || moveCandidate) return; setCancelledDuplicateAction(null); setUndoStack((items) => items.slice(0, -1)); setRedoStack((items) => [...items, snapshot()].slice(-50)); await restoreSnapshot(target) }
+  const undo = async () => {
+    if (importDraftItems.length) {
+      if (undoImportDraft()) return
+      return
+    }
+    const target = undoStack.at(-1)
+    if (!target || moveCandidate) return
+    setCancelledDuplicateAction(null)
+    const undoingCommittedImport = Boolean(lastCommittedImportDraft?.importedIds.length)
+      && lastCommittedImportDraft!.importedIds.every((id) => songs.some((song) => song.id === id))
+      && lastCommittedImportDraft!.importedIds.every((id) => !target.songs.some((song) => song.id === id))
+    setUndoStack((items) => items.slice(0, -1))
+    setRedoStack((items) => [...items, snapshot()].slice(-50))
+    await restoreSnapshot(target)
+    if (undoingCommittedImport && lastCommittedImportDraft) {
+      setImportDraftItems(lastCommittedImportDraft.items.map((item) => ({ ...item })))
+      setImportDraftSelectedIds(new Set(lastCommittedImportDraft.items.map((item) => item.id)))
+      setImportDraftSelectionMode(false)
+      setImportDraftMenuOpen(false)
+      setImportDraftRenameOpen(false)
+      setImportDraftReorderMode(false)
+      setImportDraftMoveMode(false)
+      setImportDraftSortMode('manual')
+      setImportDraftConfirmation(null)
+      setImportDraftUndoStack([...lastCommittedImportDraft.undo])
+      setImportDraftRedoStack([...lastCommittedImportDraft.redo])
+      setMessage('Import wurde zurückgenommen. Das Importfenster ist wieder geöffnet.')
+    }
+  }
   const redo = async () => {
+    if (importDraftItems.length) {
+      if (redoImportDraft()) return
+      const target = redoStack.at(-1)
+      if (target && lastCommittedImportDraft?.importedIds.some((id) => target.songs.some((song) => song.id === id))) {
+        setRedoStack((items) => items.slice(0, -1))
+        setUndoStack((items) => [...items, snapshot()].slice(-50))
+        await restoreSnapshot(target)
+        setImportDraftItems([])
+        setImportDraftSelectedIds(new Set())
+        setMessage('Import wurde wiederhergestellt.')
+      }
+      return
+    }
     if (cancelledDuplicateAction) { const action = cancelledDuplicateAction; setCancelledDuplicateAction(null); requestDuplicateAction(action); return }
-    const target = redoStack.at(-1); if (!target || moveCandidate) return; setRedoStack((items) => items.slice(0, -1)); setUndoStack((items) => [...items, snapshot()].slice(-50)); await restoreSnapshot(target)
+    const target = redoStack.at(-1); if (!target || moveCandidate) return
+    setRedoStack((items) => items.slice(0, -1))
+    setUndoStack((items) => [...items, snapshot()].slice(-50))
+    await restoreSnapshot(target)
   }
 
   const applyNavigation = (entry: NavigationEntry) => {
