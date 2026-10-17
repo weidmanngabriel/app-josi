@@ -708,3 +708,125 @@ input, textarea {
     overflow-y: hidden !important;
   }
 }
+
+
+/* Single-object placement and creation editors */
+.single-move-hint {
+  position: fixed;
+  z-index: 235;
+  top: max(72px, calc(env(safe-area-inset-top) + 60px));
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: calc(100vw - 24px);
+  padding: 9px 10px 9px 14px;
+  border: 1px solid #7f1d1d;
+  border-radius: 999px;
+  background: #2a1216;
+  box-shadow: 0 14px 38px rgba(0,0,0,.42);
+  transform: translateX(-50%);
+}
+.single-move-hint span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #fecaca;
+  font-size: 12px;
+}
+.single-move-hint button {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid #7f1d1d;
+  border-radius: 999px;
+  background: #3a171c;
+  color: #fff;
+  cursor: pointer;
+}
+.single-move-zone {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 12px;
+  margin: -4px 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  z-index: 12;
+}
+.single-move-zone span {
+  position: absolute;
+  left: 5px;
+  right: 5px;
+  top: 5px;
+  height: 2px;
+  border-radius: 999px;
+  background: rgba(239,68,68,.35);
+}
+.single-move-zone.selected span {
+  height: 3px;
+  background: #ef4444;
+  box-shadow: 0 0 0 1px rgba(239,68,68,.22), 0 0 10px rgba(239,68,68,.35);
+}
+.creation-name-row {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 44px;
+  gap: 8px;
+  margin: 10px 0 14px;
+}
+.creation-name-row > input {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 1px solid #3b4352;
+  border-radius: 10px;
+  background: #0f131b;
+  color: #fff;
+  font: inherit;
+}
+.creation-more-wrap {
+  position: relative;
+}
+.creation-more-button {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid #3b4352;
+  border-radius: 10px;
+  background: #171b24;
+  color: #fff;
+  cursor: pointer;
+}
+.creation-more-menu {
+  position: absolute;
+  z-index: 250;
+  top: 50px;
+  right: 0;
+  width: min(190px, calc(100vw - 36px));
+  padding: 6px;
+  border: 1px solid #3a4050;
+  border-radius: 11px;
+  background: #171b24;
+  box-shadow: 0 16px 45px rgba(0,0,0,.45);
+}
+.creation-more-menu button {
+  width: 100%;
+  min-height: 40px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+.creation-more-menu button:hover {
+  background: #252a36;
+}
+.creation-placement-dialog,
+.group-create-dialog {
+  width: min(500px, calc(100vw - 24px));
+}
