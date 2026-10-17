@@ -829,6 +829,11 @@ function App() {
       if (previousNew.length) await Promise.all(previousNew.map((song) => saveSong({ ...song, isNew: false })))
       const imported = await saveSongs(audioFiles)
       setSongs([...songs.map((song) => ({ ...song, isNew: false })), ...imported])
+      if (imported.length) {
+        const placements = imported.map((song) => ({ kind: 'song' as const, id: song.id, name: song.name }))
+        setCreationPlacement(placements[0] ?? null)
+        setCreationPlacementQueue(placements.slice(1))
+      }
       setMessage(`${imported.length} ${imported.length === 1 ? 'Song wurde' : 'Songs wurden'} importiert.`)
     } catch (error) {
       const quota = error instanceof DOMException && (error.name === 'QuotaExceededError' || error.name === 'UnknownError')
@@ -1169,11 +1174,45 @@ function App() {
     setMessage(`Loop für „${editorSong.name}“ gespeichert.`)
   }
 
+  const advanceCreationPlacement = () => {
+    setCreationPlacementQueue((current) => {
+      const [next, ...rest] = current
+      setCreationPlacement(next ?? null)
+      return rest
+    })
+    setCreationPlacementMenuOpen(false)
+  }
+  const finishCreationPlacement = async (moveAfter: boolean) => {
+    const target = creationPlacement
+    if (!target) return
+    const name = target.name.trim()
+    if (name) {
+      if (target.kind === 'song') {
+        const song = songs.find((item) => item.id === target.id)
+        if (song && song.name !== name) await updateSong({ ...song, name }, true)
+      } else if (target.kind === 'playlist') {
+        const playlist = playlists.find((item) => item.id === target.id)
+        if (playlist && playlist.name !== name) await updatePlaylist({ ...playlist, name, lastUsedAt: Date.now() }, true)
+      } else {
+        const tag = tags.find((item) => item.id === target.id)
+        if (tag && tag.name !== name) await updateTag({ ...tag, name, lastUsedAt: Date.now() }, true)
+      }
+    }
+    setCreationPlacement(null)
+    setCreationPlacementMenuOpen(false)
+    if (moveAfter) openSingleMove(target.kind, target.id)
+    else advanceCreationPlacement()
+  }
+  const cancelSingleMove = () => {
+    setSingleMoveTarget(null)
+    if (creationPlacementQueue.length) advanceCreationPlacement()
+  }
+
   const createTag = async (event: React.FormEvent) => {
     event.preventDefault(); const name = tagName.trim(); if (!name) return
     if (tags.some((tag) => normalizeName(tag.name) === normalizeName(name))) { setMessage('Ein Tag mit diesem Namen existiert bereits.'); return }
     recordHistory(); const now = Date.now(); const tag: Tag = { id: crypto.randomUUID(), name, color: tagColor, songIds: [], playlistIds: [], createdAt: now, lastUsedAt: now, sortOrder: tags.length }
-    await saveTag(tag); setTags((items) => [...items, tag]); setTagName(''); setTagColor('#60a5fa')
+    await saveTag(tag); setTags((items) => [...items, tag]); setTagName(''); setTagColor('#60a5fa'); setCreationPlacement({ kind: 'tag', id: tag.id, name: tag.name })
   }
   const openTag = async (id: string) => {
     if (reorderScope === 'tags') return
@@ -1187,7 +1226,7 @@ function App() {
   const createPlaylist = async (event: React.FormEvent) => {
     event.preventDefault(); const name = playlistName.trim(); if (!name) return; recordHistory()
     const playlist: Playlist = { id: crypto.randomUUID(), name, songIds: [], createdAt: Date.now(), lastUsedAt: Date.now(), sortOrder: -Date.now() }
-    await savePlaylist(playlist); setPlaylists((items) => [playlist, ...items]); setPlaylistName(''); navigateTo({ view: 'library', playlistId: playlist.id, detailOpen: false })
+    await savePlaylist(playlist); setPlaylists((items) => [playlist, ...items]); setPlaylistName(''); setCreationPlacement({ kind: 'playlist', id: playlist.id, name: playlist.name }); navigateTo({ view: 'library', playlistId: playlist.id, detailOpen: false })
   }
   const openPlaylist = async (id: string | null) => { if (reorderScope === 'sidebar') return; navigateTo({ view: 'library', playlistId: id, detailOpen: false }); const playlist = playlists.find((item) => item.id === id); if (playlist) await updatePlaylist({ ...playlist, lastUsedAt: Date.now() }) }
   const removeSongFromActivePlaylist = async (songId: string) => { if (!activePlaylist) return; await updatePlaylist({ ...activePlaylist, songIds: activePlaylist.songIds.filter((id) => id !== songId), lastUsedAt: Date.now() }, true) }
@@ -1751,6 +1790,7 @@ function App() {
     if (active) setSortSaves((current) => current.map((save) => save.id === active.id ? { ...save, orders: { ...save.orders, [key]: nextOrder } } : save))
     setSingleMoveTarget(null)
     setMessage('Objekt wurde verschoben.')
+    if (creationPlacementQueue.length) advanceCreationPlacement()
   }
   const renderSingleMoveZone = (kind: GroupKind, parentGroupId: string | undefined, index: number) => {
     if (!singleMoveTarget || moveTargetKind(singleMoveTarget) !== kind || (singleMoveTarget.parentGroupId ?? undefined) !== (parentGroupId ?? undefined)) return null
