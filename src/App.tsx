@@ -1554,8 +1554,60 @@ function App() {
   }
   const chooserLabelsFor = (kind: GroupKind) => kind === 'song' ? sortLabels : kind === 'playlist' ? playlistSortLabels : tagSortLabels
   const chooserManualLabel = (kind: GroupKind) => activeSortSave(kind)?.name ?? 'Save'
+  const chooserManualRanks = (kind: GroupKind) => {
+    const itemRank = new Map<string, number>()
+    const groupRank = new Map<string, number>()
+    let rank = 0
+    const save = activeSortSave(kind)
+    const allowed: Array<Song | Playlist | Tag> = kind === 'song'
+      ? manualQueue
+      : kind === 'playlist'
+        ? [...playlists].sort((a, b) => (a.sortOrder ?? Number.MAX_SAFE_INTEGER) - (b.sortOrder ?? Number.MAX_SAFE_INTEGER) || a.createdAt - b.createdAt)
+        : [...tags].sort((a, b) => (a.sortOrder ?? a.createdAt) - (b.sortOrder ?? b.createdAt))
+    const allowedIds = new Set(allowed.map((item) => item.id))
+    const orderFor = (key: string, baseTokens: string[]) => {
+      const valid = new Set(baseTokens)
+      const stored = (save?.orders[key] ?? mixedOrders[key] ?? []).filter((token) => valid.has(token))
+      const known = new Set(stored)
+      return [...stored, ...baseTokens.filter((token) => !known.has(token))]
+    }
+    const visit = (parentGroupId?: string) => {
+      const children = objectGroups
+        .filter((group) => group.kind === kind && (group.parentGroupId ?? undefined) === parentGroupId)
+        .filter((group) => {
+          const ids = deepGroupItemIds(group)
+          return ids.length === 0 || ids.some((id) => allowedIds.has(id))
+        })
+        .sort((a, b) => a.sortOrder - b.sortOrder || a.createdAt - b.createdAt)
+      const childIds = new Set(children.flatMap((group) => deepGroupItemIds(group)))
+      const items = parentGroupId
+        ? (objectGroups.find((group) => group.id === parentGroupId)?.itemIds ?? []).map((id) => allowed.find((item) => item.id === id)).filter((item): item is Song | Playlist | Tag => Boolean(item))
+        : allowed.filter((item) => !objectGroups.some((group) => group.kind === kind && group.itemIds.includes(item.id)))
+      const baseTokens = [
+        ...children.filter((group) => !group.afterItems).map((group) => groupToken(group.id)),
+        ...items.filter((item) => !childIds.has(item.id)).map((item) => itemToken(item.id)),
+        ...children.filter((group) => group.afterItems).map((group) => groupToken(group.id)),
+      ]
+      const key = parentGroupId ? groupContainerKey(kind, parentGroupId) : rootContainerKey(kind)
+      orderFor(key, baseTokens).forEach((token) => {
+        if (isGroupToken(token)) {
+          const id = tokenId(token)
+          if (!groupRank.has(id)) groupRank.set(id, rank++)
+          visit(id)
+        } else {
+          const id = tokenId(token)
+          if (!itemRank.has(id)) itemRank.set(id, rank++)
+        }
+      })
+    }
+    visit()
+    return { itemRank, groupRank }
+  }
   const sortChooserObjects = <T extends Song | Playlist | Tag>(kind: GroupKind, items: T[]) => {
-    if (chooserSortMode === 'manual') return [...items]
+    if (chooserSortMode === 'manual') {
+      const { itemRank } = chooserManualRanks(kind)
+      return [...items].sort((a, b) => (itemRank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (itemRank.get(b.id) ?? Number.MAX_SAFE_INTEGER))
+    }
     const sign = chooserSortDirection === 'down' ? 1 : -1
     return [...items].sort((a, b) => compareObjects(kind, a, b, chooserSortMode) * sign)
   }
@@ -1572,7 +1624,10 @@ function App() {
     return metric(a) - metric(b) || a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' })
   }
   const sortChooserGroups = (kind: GroupKind, groups: ObjectGroup[], allowed: Array<Song | Playlist | Tag>) => {
-    if (chooserSortMode === 'manual') return [...groups]
+    if (chooserSortMode === 'manual') {
+      const { groupRank } = chooserManualRanks(kind)
+      return [...groups].sort((a, b) => (groupRank.get(a.id) ?? Number.MAX_SAFE_INTEGER) - (groupRank.get(b.id) ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name, 'de'))
+    }
     const sign = chooserSortDirection === 'down' ? 1 : -1
     return [...groups].sort((a, b) => compareChooserGroups(kind, a, b, allowed) * sign)
   }
