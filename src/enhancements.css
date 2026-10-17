@@ -830,3 +830,236 @@ input, textarea {
 .group-create-dialog {
   width: min(500px, calc(100vw - 24px));
 }
+
+
+/* Sort picker, chooser sorting and viewport-pan fallback */
+.library-sort-picker {
+  position: relative;
+  min-width: min(260px, 48vw);
+}
+.library-sort-picker-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  min-height: 38px;
+  padding: 0 11px;
+  border: 1px solid #343b49;
+  border-radius: 10px;
+  background: #171b24;
+  color: #e5e7eb;
+  text-align: left;
+  cursor: pointer;
+}
+.library-sort-picker-button b {
+  color: #8d96a6;
+  font-size: 11px;
+}
+.sort-picker-shield {
+  position: fixed;
+  inset: 0;
+  z-index: 176;
+  border: 0;
+  background: transparent;
+}
+.library-sort-picker-menu {
+  position: absolute;
+  z-index: 177;
+  top: 44px;
+  left: 0;
+  display: grid;
+  width: min(320px, calc(100vw - 24px));
+  max-height: min(68dvh, calc(100dvh - 110px));
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: 6px;
+  border: 1px solid #3a4050;
+  border-radius: 13px;
+  background: #171b24;
+  box-shadow: 0 18px 50px rgba(0,0,0,.5);
+  overscroll-behavior: contain;
+}
+.library-sort-picker-menu > button {
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: #e5e7eb;
+  text-align: left;
+  cursor: pointer;
+  touch-action: manipulation;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.library-sort-picker-menu > button:hover {
+  background: #252a36;
+}
+.library-sort-picker-menu > button.active-sort-save {
+  border-color: #6d4bd1;
+  background: rgba(109,75,209,.18);
+}
+.sort-picker-divider {
+  height: 1px;
+  margin: 5px 4px;
+  background: #303746;
+}
+
+.chooser-sort-controls {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 42px;
+  gap: 8px;
+  padding: 6px 12px 8px;
+}
+.chooser-sort-controls select,
+.chooser-sort-controls button {
+  min-height: 40px;
+  border: 1px solid #3b4352;
+  border-radius: 9px;
+  background: #171b24;
+  color: #e5e7eb;
+}
+.chooser-sort-controls select {
+  min-width: 0;
+  padding: 0 10px;
+}
+.chooser-sort-controls button {
+  padding: 0;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+/* Custom layout widths become CSS variables so responsive rules can override them. */
+.music-layout {
+  grid-template-columns: var(--sidebar-width, 240px) minmax(0,1fr);
+  max-width: 100vw;
+  min-width: 0;
+}
+.player {
+  grid-template-columns: var(--player-left, minmax(190px,.8fr)) var(--player-middle, minmax(280px,1.2fr)) var(--player-right, minmax(250px,1fr));
+  max-width: 100vw;
+  min-width: 0;
+}
+
+/* Fit first; if a child still cannot shrink, allow drag/pan back into view. */
+.site-header,
+.header-right-actions,
+.sidebar,
+.library-panel,
+.player,
+.playlist-overview {
+  box-sizing: border-box;
+  max-width: 100vw;
+}
+.site-header {
+  min-width: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+}
+.history-controls,
+.header-right-actions {
+  min-width: 0;
+}
+.header-right-actions {
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x;
+}
+.sidebar,
+.library-panel {
+  overflow-x: auto !important;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+}
+.side-pane-scroll-locked .sidebar,
+.side-pane-scroll-locked .library-panel {
+  overflow-y: hidden !important;
+  overflow-x: auto !important;
+  touch-action: pan-x;
+}
+.player,
+.playlist-overview {
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-x pan-y;
+}
+.playlist-overview {
+  width: 100%;
+  min-width: 0;
+}
+.playlist-grid {
+  grid-template-columns: repeat(auto-fit, minmax(min(170px, 100%), 1fr));
+}
+
+@media (max-width: 880px) {
+  .site-header {
+    flex-wrap: wrap;
+    align-content: center;
+    gap: 8px 12px;
+  }
+  .header-right-actions {
+    margin-left: auto;
+  }
+  .music-layout {
+    grid-template-columns: minmax(170px, 34vw) minmax(0,1fr) !important;
+  }
+  .player {
+    grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important;
+  }
+  .quick-playlists {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (max-width: 620px) {
+  .site-header {
+    padding-right: 8px;
+    padding-left: 8px;
+  }
+  .header-right-actions {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: nowrap;
+  }
+  .music-layout {
+    display: block;
+  }
+  .sidebar {
+    width: 100%;
+    max-width: 100vw;
+  }
+  .library-panel {
+    width: 100%;
+    max-width: 100vw;
+  }
+  .player {
+    grid-template-columns: minmax(0,1fr) !important;
+    max-width: 100vw;
+  }
+  .quick-playlists {
+    grid-column: auto;
+  }
+  .playlist-overview {
+    max-width: 100vw;
+  }
+  .playlist-grid {
+    grid-template-columns: repeat(2, minmax(0,1fr));
+  }
+  .library-sort-picker {
+    min-width: 0;
+    flex: 1 1 180px;
+  }
+  .library-sort-picker-menu {
+    left: 0;
+    right: auto;
+  }
+}
