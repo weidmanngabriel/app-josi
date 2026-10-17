@@ -351,6 +351,7 @@ function App() {
   const repeatHoldTimerRef = useRef<number | null>(null)
   const repeatHoldTriggeredRef = useRef(false)
   const repeatRemainingRef = useRef<number | null>(null)
+  const groupPlaybackIdsRef = useRef<string[] | null>(null)
 
   const currentPlaybackAudio = () => playbackAudioRef.current ?? audioRef.current
   const otherPlaybackAudio = (audio: HTMLAudioElement) => audio === audioRef.current ? overlapAudioRef.current : audioRef.current
@@ -897,7 +898,10 @@ function App() {
   const toggleSelected = (id: string) => setSelectedSongIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next })
   const playSong = (id: string, remember = true, preserveGroupQueue = false) => {
     if (selectionMode) return toggleSelected(id)
-    if (!preserveGroupQueue) setGroupPlaybackIds(null)
+    if (!preserveGroupQueue) {
+      groupPlaybackIdsRef.current = null
+      setGroupPlaybackIds(null)
+    }
     const song = songs.find((item) => item.id === id)
     if (!song?.file || song.file.size === 0) { setMessage('Diese Audiodatei ist lokal nicht mehr verfügbar. Bitte importiere sie erneut.'); return }
     if (id === currentSongId && currentPlaybackAudio()) return void currentPlaybackAudio()?.play().catch(() => setMessage(`„${song.name}“ konnte nicht gestartet werden.`))
@@ -914,17 +918,21 @@ function App() {
     playSong(song.id, true, true)
   }
   const moveSong = (direction: 1 | -1) => {
-    if (!playerQueue.length) return
-    const queue = playerQueue
+    const lockedGroupIds = groupPlaybackIdsRef.current
+    const queue = lockedGroupIds !== null
+      ? lockedGroupIds.map((id) => songs.find((song) => song.id === id)).filter((song): song is Song => Boolean(song))
+      : playerQueue
+    if (!queue.length) return
     const currentIndex = queue.findIndex((song) => song.id === currentSongId)
-    if (shuffle && direction === 1 && playerQueue.length > 1) {
-      const options = playerQueue.filter((song) => song.id !== currentSongId && song.file?.size)
-      if (options.length) return playSong(options[Math.floor(Math.random() * options.length)].id, true, true)
+    if (shuffle && direction === 1 && queue.length > 1) {
+      const options = queue.filter((song) => song.id !== currentSongId && song.file?.size)
+      if (options.length) return playSong(options[Math.floor(Math.random() * options.length)].id, true, lockedGroupIds !== null)
     }
     const nextIndex = currentIndex < 0 ? (direction === 1 ? 0 : queue.length - 1) : currentIndex + direction
-    if (nextIndex >= 0 && nextIndex < queue.length) return playQueueSong(queue[nextIndex])
-    if (repeatQueue) return playSong(playerQueue[direction === 1 ? 0 : playerQueue.length - 1].id, true, true)
-    shouldAutoPlayRef.current = false; setIsPlaying(false)
+    if (nextIndex >= 0 && nextIndex < queue.length) return playSong(queue[nextIndex].id, true, lockedGroupIds !== null)
+    if (repeatQueue) return playSong(queue[direction === 1 ? 0 : queue.length - 1].id, true, lockedGroupIds !== null)
+    shouldAutoPlayRef.current = false
+    setIsPlaying(false)
   }
   const togglePlayback = () => {
     const audio = currentPlaybackAudio()
@@ -940,7 +948,13 @@ function App() {
     setCurrentTime(next); if (loopEditorSongId) setLoopCursor(next)
   }
   const skipSeconds = (seconds: number) => seek(currentTime + seconds)
-  const playPreviousFromHistory = () => { const previous = playHistory.at(-1); if (!previous) return; setPlayHistory((items) => items.slice(0, -1)); playSong(previous, false) }
+  const playPreviousFromHistory = () => {
+    if (groupPlaybackIdsRef.current !== null) { moveSong(-1); return }
+    const previous = playHistory.at(-1)
+    if (!previous) return
+    setPlayHistory((items) => items.slice(0, -1))
+    playSong(previous, false)
+  }
 
   useEffect(() => {
     if (!('mediaSession' in navigator)) return
@@ -2490,6 +2504,7 @@ function App() {
   const startGroupPlayback = (groups: ObjectGroup[]) => {
     const ids = groups.flatMap((group) => groupPlaybackSongIds(group))
     if (!ids.length) { setMessage('In der Auswahl befinden sich keine abspielbaren Lieder.'); return }
+    groupPlaybackIdsRef.current = ids
     setGroupPlaybackIds(ids)
     setGroupPlaybackChooserOpen(false)
     setChooserSearch('')
