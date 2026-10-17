@@ -84,9 +84,11 @@ Der frühere „Verlauf“-Tab heißt **Importverlauf** und zeigt alle aktiven S
 
 Die automatischen Sortierungen bleiben **A–Z Anfang**, **A–Z Ende**, **Anzahl des Hörens**, **Dauer** und **Chronik**. Die frühere Auswahl **Manuell** wird durch benannte **Saves** ersetzt. Eine bestehende manuelle Reihenfolge bleibt als **Save 1** erhalten.
 
-Über **Aktuelle Sortierung speichern** lässt sich die sichtbare Reihenfolge sichern. Der Save kann benannt werden; ohne Eingabe verwendet Josi die erste freie Nummer wie **Save 1**, **Save 2** usw. Automatische Sortierungen stehen zuerst, alle Saves darunter alphabetisch. Wird ein Save ausgewählt und anschließend über **Reihenfolge ändern** bearbeitet, bleibt diese neue Reihenfolge in diesem Save erhalten. Wird ein Save in der Save-Liste gedrückt gehalten, öffnet sich ein Fenster zum Umbenennen.
+Über **Aktuelle Sortierung speichern** lässt sich die sichtbare Reihenfolge sichern. Der Save kann benannt werden; ohne Eingabe verwendet Josi die erste freie Nummer wie **Save 1**, **Save 2** usw. Automatische Sortierungen stehen zuerst, alle Saves darunter alphabetisch. Wird ein Save ausgewählt und anschließend über **Reihenfolge ändern** bearbeitet, bleibt diese neue Reihenfolge in diesem Save erhalten. In der Bibliothek werden Saves direkt in der Sortierauswahl angezeigt; dort öffnet Langdruck auf einen Save das Fenster zum Umbenennen.
 
 Playlists und Tags erhalten dieselbe Funktion in **Sortieren**. Dort steht **Aktuelle Sortierung speichern** direkt neben den Sortier-Steuerelementen.
+
+Auswahlfenster wie **Gruppe hinzufügen**, **Gruppe entfernen**, **Objekte hinzufügen**, Playlist-/Tag-Auswahl und **Weitere Gruppen abspielen** besitzen eine eigene Sortierleiste. Ganz oben steht die manuelle Option unter dem Namen des aktuell aktiven Saves der betreffenden Liste. Die anderen Sortiermodi folgen darunter; diese Auswahl verändert die Sortierung der Hauptliste nicht.
 
 ## Papierkorb
 
@@ -169,7 +171,7 @@ Die nähere Songansicht besitzt ein eigenes `•••` mit songbezogenen Aktion
 
 ## Bildschirmfeste Bedienelemente
 
-Menüs und Dialoge dürfen nicht aus dem sichtbaren Bildschirm hinausragen. Sie passen sich zuerst an die verfügbare Größe an. Nur wenn der Inhalt trotzdem nicht vollständig hineinpasst, wird der jeweilige Kasten intern scrollbar. Linker Seitenbereich und Bibliotheksbereich können unabhängig gescrollt werden. In den Einstellungen kann **Seitliche Bereiche sperren** dieses Scrollen per Ein-/Aus-Schalter abschalten.
+Menüs und Dialoge dürfen nicht aus dem sichtbaren Bildschirm hinausragen. Die gesamte Hauptoberfläche versucht ebenfalls zuerst, sich an die verfügbare Breite anzupassen: Header, Bibliothek, Player und Playlist-Übersicht brechen oder stapeln ihre Inhalte auf schmalen Ansichten. Wenn ein Element trotzdem nicht verkleinert werden kann, kann der betroffene Bereich horizontal gezogen werden, um den abgeschnittenen Teil ins Bild zu holen. Linker Seitenbereich und Bibliotheksbereich können unabhängig vertikal gescrollt werden; **Seitliche Bereiche sperren** schaltet dieses vertikale Scrollen ab, nicht den horizontalen Notfall-Pan.
 
 ## Reihenfolge ändern und Sortierbünde
 
