@@ -69,6 +69,8 @@ type Snapshot = { songs: Song[]; playlists: Playlist[]; tags: Tag[]; objectGroup
 type PlaylistChooserMode = 'current' | 'bulk' | null
 type SortMode = 'manual' | 'azStart' | 'azEnd' | 'plays' | 'duration' | 'chronology'
 type SortDirection = 'down' | 'up'
+type SortSaveKind = 'song' | 'playlist' | 'tag'
+type SortSave = { id: string; kind: SortSaveKind; name: string; orders: Record<string, string[]>; createdAt: number }
 type OverflowMenu = { kind: 'song' | 'songDetail' | 'playlist' | 'playlists' | 'tag' | 'tags' | 'group'; id?: string } | null
 type SidebarSortTarget = 'tags' | 'playlists' | null
 type RepeatSetting = { kind: 'infinite' } | { kind: 'count'; count: number } | null
@@ -211,6 +213,30 @@ function App() {
   const [trashConfirmation, setTrashConfirmation] = useState(false)
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
   const [sortConfirmation, setSortConfirmation] = useState(false)
+  const [sortSaves, setSortSaves] = useState<SortSave[]>(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('josi-sort-saves') ?? '[]')
+      if (Array.isArray(stored) && stored.length) return stored
+    } catch { /* use migration defaults */ }
+    return [
+      { id: 'legacy-song-save-1', kind: 'song', name: 'Save 1', orders: {}, createdAt: 1 },
+      { id: 'legacy-playlist-save-1', kind: 'playlist', name: 'Save 1', orders: {}, createdAt: 1 },
+      { id: 'legacy-tag-save-1', kind: 'tag', name: 'Save 1', orders: {}, createdAt: 1 },
+    ]
+  })
+  const [activeSortSaveIds, setActiveSortSaveIds] = useState<Record<SortSaveKind, string>>(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('josi-active-sort-saves') ?? '{}')
+      if (stored && typeof stored === 'object') return {
+        song: typeof stored.song === 'string' ? stored.song : 'legacy-song-save-1',
+        playlist: typeof stored.playlist === 'string' ? stored.playlist : 'legacy-playlist-save-1',
+        tag: typeof stored.tag === 'string' ? stored.tag : 'legacy-tag-save-1',
+      }
+    } catch { /* use defaults */ }
+    return { song: 'legacy-song-save-1', playlist: 'legacy-playlist-save-1', tag: 'legacy-tag-save-1' }
+  })
+  const [sortSaveDialogTarget, setSortSaveDialogTarget] = useState<SortSaveKind | null>(null)
+  const [sortSaveName, setSortSaveName] = useState('')
   const [tagSortMode, setTagSortMode] = useState<SortMode>(() => (localStorage.getItem('josi-tag-sort-mode') as SortMode) || 'manual')
   const [tagSortDirection, setTagSortDirection] = useState<SortDirection>(() => (localStorage.getItem('josi-tag-sort-direction') as SortDirection) || 'down')
   const [playlistSortMode, setPlaylistSortMode] = useState<SortMode>(() => (localStorage.getItem('josi-playlist-sort-mode') as SortMode) || 'manual')
@@ -379,6 +405,8 @@ function App() {
     return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop); window.removeEventListener('pointercancel', stop) }
   }, [layoutDrag, playerSplitLeft, playerSplitRight])
 
+  useEffect(() => localStorage.setItem('josi-sort-saves', JSON.stringify(sortSaves)), [sortSaves])
+  useEffect(() => localStorage.setItem('josi-active-sort-saves', JSON.stringify(activeSortSaveIds)), [activeSortSaveIds])
   useEffect(() => localStorage.setItem('josi-mixed-orders', JSON.stringify(mixedOrders)), [mixedOrders])
   useEffect(() => localStorage.setItem('josi-bundle-locks', JSON.stringify(bundleLocks)), [bundleLocks])
   useEffect(() => localStorage.setItem('josi-bundle-anchors', JSON.stringify(bundleAnchors)), [bundleAnchors])
