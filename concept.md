@@ -82,13 +82,15 @@ Der frühere „Verlauf“-Tab heißt **Importverlauf** und zeigt alle aktiven S
 
 ## Import vor dem Speichern bearbeiten
 
-Werden über **Musik importieren** mehrere Dateien gewählt, erscheinen sie zunächst gemeinsam in einem Importfenster und sind noch nicht gespeichert. Die erste Datei steht in der manuellen Reihenfolge ganz oben, danach folgen die weiteren Dateien in der Auswahlreihenfolge. Im `•••` dieses Fensters stehen **Auswählen**, **Umbenennen**, **Reihenfolge ändern** und **Bewegen**. Auswählen kann die folgenden Aktionen auf einzelne Dateien begrenzen. Reihenfolge ändern nutzt Pfeile; Bewegen nutzt rote Zielstellen und bleibt aktiv, bis oben **Abbrechen** gedrückt wird.
+Werden über **Musik importieren** mehrere Dateien gewählt, erscheinen sie zunächst gemeinsam in einem Importfenster und sind noch nicht gespeichert. Die erste Datei steht in der manuellen Reihenfolge ganz oben, danach folgen die weiteren Dateien in der Auswahlreihenfolge. Im `•••` dieses Fensters stehen **Auswählen**, **Umbenennen**, **Reihenfolge ändern** und **Bewegen**.
+
+Bei **Bewegen** ist zunächst keine Datei markiert. Neben **Alles auswählen** steht **Nichts auswählen**. Nach der ersten Bestätigung erscheint ein eigenes Fenster nur mit der gewählten Teilmenge; dort kann man Dateien wieder herausnehmen und ihre interne Reihenfolge mit Pfeilen ändern. Die nächste Bestätigung zeigt die Bibliothek mit roten Zielstrichen. **Zurück** führt in die vorherige Stufe, **Bestätigen** übernimmt die Stufe und **Abbrechen** öffnet in jeder Stufe die Bestätigung zum Abbruch des gesamten Imports. Erst beim abschließenden Import wird die vorgemerkte Position gespeichert.
 
 **Fertig** und **Abbrechen** schließen den Import niemals sofort, sondern verlangen eine Bestätigung. Nur bestätigtes Fertig speichert die Dateien. Bestätigtes Abbrechen importiert nichts. Undo/Redo ist auch hier verfügbar: Undo nach einem abgeschlossenen Import entfernt den Import wieder und öffnet den Entwurf erneut; weitere Undo-Schritte können die Bearbeitung dieses Entwurfs zurücknehmen.
 
 ## Bibliotheksaktionen unten
 
-Der frühere sichtbare Knopf **Alle Playlists** wird im Player-Bereich durch einen großen `•••`-Knopf ersetzt. Im Menü steht **Alle Playlists** ganz oben und ist nur aktiv, wenn mindestens ein Lied ausgewählt ist; darunter folgen die allgemeinen Bibliotheksaktionen wie **Leere Gruppe erstellen**. Bei aktiver Song-Auswahl kommen die Auswahlaktionen im selben Menü dazu.
+Der frühere sichtbare Knopf **Alle Playlists** wird im Player-Bereich durch einen großen `•••`-Knopf ersetzt. Im Menü stehen ganz oben **Auswählen** und direkt darunter **Reihenfolge ändern**. Danach folgen die übrigen Bibliotheksaktionen; **Alle Playlists** ist nur bei vorhandener Song-Auswahl aktiv. Bei aktiver Song-Auswahl kommen die Auswahlaktionen im selben Menü dazu.
 
 Direkt über diesem Knopf zeigt Josi das ausgewählte Lied. Bei mehreren Liedern erscheint eine kompakte Auswahlbox; sie öffnet eine eigene Liste, die durchsucht und sortiert werden kann.
 
@@ -183,7 +185,7 @@ Die nähere Songansicht besitzt ein eigenes `•••` mit songbezogenen Aktion
 
 ## Bildschirmfeste Bedienelemente
 
-Menüs und Dialoge dürfen nicht aus dem sichtbaren Bildschirm hinausragen. Die gesamte Hauptoberfläche versucht ebenfalls zuerst, sich an die verfügbare Breite anzupassen. Der frei eingestellte Bibliotheks-/Player-Schnitt bleibt jedoch auch nach **Layout fertig** bestehen; dieser Knopf beendet nur die Bearbeitung. Ein Rücksprung zur persönlichen Standardbasis erfolgt ausschließlich über **Standard** in den Einstellungen. Linker Seitenbereich und Bibliotheksbereich können unabhängig vertikal gescrollt werden; **Seitliche Bereiche sperren** schaltet dieses vertikale Scrollen ab, nicht den horizontalen Notfall-Pan.
+Menüs und Dialoge dürfen nicht aus dem sichtbaren Bildschirm hinausragen. Der frei eingestellte Bibliotheks-/Player-Schnitt bleibt auch nach **Layout fertig** bestehen; dieser Knopf speichert die aktuellen Werte und beendet nur die Bearbeitung. Die fertige Ansicht verwendet die gespeicherten Spalten direkt und lässt sie nicht mehr von responsiven Ersatzspalten überschreiben. Ein Rücksprung zur persönlichen Standardbasis erfolgt ausschließlich über **Standard** in den Einstellungen. Linker Seitenbereich und Bibliotheksbereich können unabhängig vertikal gescrollt werden; **Seitliche Bereiche sperren** schaltet dieses vertikale Scrollen ab, nicht den horizontalen Notfall-Pan.
 
 ## Reihenfolge ändern und Sortierbünde
 
@@ -195,7 +197,7 @@ Sortierbünde existieren nur als Sortierhilfe und können nur in **Reihenfolge �
 
 ## Einzelnes Bewegen und neue Objekte
 
-**Bewegen** steht im Drei-Punkte-Menü und bei Menüs mit **Kopieren** direkt darüber. Nach **Bewegen** erscheinen rote Zielstriche bzw. Zielpositionen der betreffenden Ebene. Eine Positionierung beendet den Modus nicht mehr automatisch; erst **Abbrechen** beendet ihn. Dadurch können Objekte oder eine bereits aktive Auswahl wiederholt neu positioniert werden. Eine Gruppe nimmt ihre Untergruppen und Inhalte unverändert mit; ein Objekt innerhalb einer Gruppe bleibt in dieser Obergruppe. Im Importfenster kann **Auswählen** die zu bewegende Dateimenge auf einzelne neue Lieder begrenzen.
+**Bewegen** steht im Drei-Punkte-Menü und bei Menüs mit **Kopieren** direkt darüber. Nach **Bewegen** erscheinen rote Zielstriche bzw. Zielpositionen der betreffenden Ebene. Eine Positionierung beendet den Modus nicht mehr automatisch; erst **Abbrechen** beendet ihn. Beim Import wird die Bewegung zusätzlich in Auswahl, Prüf-Fenster und Bibliotheks-Zielposition aufgeteilt. Dadurch können Objekte oder eine bereits aktive Auswahl wiederholt neu positioniert werden. Eine Gruppe nimmt ihre Untergruppen und Inhalte unverändert mit; ein Objekt innerhalb einer Gruppe bleibt in dieser Obergruppe. Im Importfenster kann **Auswählen** die zu bewegende Dateimenge auf einzelne neue Lieder begrenzen.
 
 Vor dem Erstellen einer neuen Gruppe erscheint ein Namensfeld mit **Unbenannt**. Über die drei Punkte daneben kann schon **Bewegen** ausgewählt werden. In einem Save landet eine neue Gruppe ohne diese Option zuerst ganz oben; bei automatischer Sortierung wird sie direkt passend einsortiert.
 
@@ -218,9 +220,13 @@ Leere Gruppen können direkt erstellt werden und bleiben auch leer bestehen. **A
 
 **Gruppe auflösen** behält die enthaltenen Objekte und verschiebt Untergruppen eine Ebene nach oben. **Gruppe löschen** steht direkt darunter und verlangt eine Bestätigung. Danach werden die Gruppe, ihre Untergruppen und die enthaltenen Objekte in den Papierkorb verschoben. Bei Playlist-Gruppen bleiben die Musikdateien der Playlists erhalten.
 
-Bei Liedgruppen gilt **Gruppe abspielen** als abgeschlossene Wiedergabe: Shuffle, Listen-Wiederholung und das Ende der Wiedergabe bleiben innerhalb der ausgewählten Gruppe samt Untergruppen. Über **Weitere Gruppen abspielen** direkt unter **Leere Gruppe erstellen** im Drei-Punkte-Menü neben der Sortierung können mehrere Gruppen ausgewählt und in eine eigene Reihenfolge gebracht werden. Eine Untergruppe darf dabei zusätzlich separat ausgewählt sein; sie wird dann zuerst separat und später innerhalb ihrer Obergruppe erneut abgespielt.
+Bei Liedgruppen gilt **Gruppe abspielen** als strikt abgeschlossene Wiedergabe: Nur direkte Lieder dieser Gruppe und Lieder ihrer echten Untergruppen bilden die Queue. Dateien außerhalb dieses Teilbaums dürfen auch am Listenende nicht als Fallback erscheinen. Shuffle, Vor/Zurück und Listen-Wiederholung arbeiten ausschließlich innerhalb dieser Gruppenqueue. Über **Weitere Gruppen abspielen** direkt unter **Leere Gruppe erstellen** im Drei-Punkte-Menü neben der Sortierung können mehrere Gruppen ausgewählt und in eine eigene Reihenfolge gebracht werden. Eine Untergruppe darf dabei zusätzlich separat ausgewählt sein; sie wird dann zuerst separat und später innerhalb ihrer Obergruppe erneut abgespielt.
 
 Im Playlist-Auswahlmodus steht neben dem Drei-Punkte-Knopf der Überschrift **Alle auswählen**. Dabei werden auch Playlists markiert, die bereits in Gruppen oder Untergruppen liegen.
+
+## Gruppen und Playlists direkt taggen
+
+Bei einer Playlist und bei einer benannten Gruppe steht **Tags** direkt unter **Kopieren**. Mehrere ausgewählte Playlists können ebenfalls gemeinsam getaggt werden; die Song-Mehrfachauswahl behält ihre bestehende Tag-Aktion. Ein Gruppen-Tag gehört ausschließlich zur Gruppe selbst. Die darin enthaltenen Lieder, Playlists, Tags oder Untergruppen erhalten dieses Tag nicht automatisch.
 
 ## Freie Tag-Farbe
 
