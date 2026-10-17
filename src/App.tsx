@@ -75,6 +75,9 @@ type SingleMoveTarget = { kind: GroupKind | 'group'; id: string; parentGroupId?:
 type PendingGroupCreate = { kind: GroupKind; sourceIds: string[]; parentGroupId?: string; name: string; moveAfterCreate: boolean } | null
 type CreationPlacement = { kind: GroupKind; id: string; name: string } | null
 type LayoutPreset = { sidebarWidth: number; playerSplitLeft: number; playerSplitRight: number }
+type ImportDraftItem = { id: string; file: File; name: string; originalIndex: number }
+type ImportDraftSnapshot = { items: Array<{ id: string; name: string; originalIndex: number }>; selectedIds: string[]; sortMode: SortMode }
+type ImportDraftConfirmation = 'finish' | 'cancel' | null
 type OverflowMenu = { kind: 'song' | 'songDetail' | 'playlist' | 'playlists' | 'tag' | 'tags' | 'group'; id?: string; parentGroupId?: string } | null
 type SidebarSortTarget = 'tags' | 'playlists' | null
 type RepeatSetting = { kind: 'infinite' } | { kind: 'count'; count: number } | null
@@ -271,6 +274,19 @@ function App() {
   const [creationPlacement, setCreationPlacement] = useState<CreationPlacement>(null)
   const [creationPlacementQueue, setCreationPlacementQueue] = useState<Array<NonNullable<CreationPlacement>>>([])
   const [creationPlacementMenuOpen, setCreationPlacementMenuOpen] = useState(false)
+  const [importDraftItems, setImportDraftItems] = useState<ImportDraftItem[]>([])
+  const [importDraftSelectedIds, setImportDraftSelectedIds] = useState<Set<string>>(new Set())
+  const [importDraftSelectionMode, setImportDraftSelectionMode] = useState(false)
+  const [importDraftMenuOpen, setImportDraftMenuOpen] = useState(false)
+  const [importDraftRenameOpen, setImportDraftRenameOpen] = useState(false)
+  const [importDraftReorderMode, setImportDraftReorderMode] = useState(false)
+  const [importDraftMoveMode, setImportDraftMoveMode] = useState(false)
+  const [importDraftSortMode, setImportDraftSortMode] = useState<SortMode>('manual')
+  const [importDraftSortDirection, setImportDraftSortDirection] = useState<SortDirection>('down')
+  const [importDraftConfirmation, setImportDraftConfirmation] = useState<ImportDraftConfirmation>(null)
+  const [importDraftUndoStack, setImportDraftUndoStack] = useState<ImportDraftSnapshot[]>([])
+  const [importDraftRedoStack, setImportDraftRedoStack] = useState<ImportDraftSnapshot[]>([])
+  const [lastCommittedImportDraft, setLastCommittedImportDraft] = useState<{ items: ImportDraftItem[]; importedIds: string[]; undo: ImportDraftSnapshot[]; redo: ImportDraftSnapshot[] } | null>(null)
   const [tagSortMode, setTagSortMode] = useState<SortMode>(() => (localStorage.getItem('josi-tag-sort-mode') as SortMode) || 'manual')
   const [tagSortDirection, setTagSortDirection] = useState<SortDirection>(() => (localStorage.getItem('josi-tag-sort-direction') as SortDirection) || 'down')
   const [playlistSortMode, setPlaylistSortMode] = useState<SortMode>(() => (localStorage.getItem('josi-playlist-sort-mode') as SortMode) || 'manual')
@@ -438,6 +454,14 @@ function App() {
     window.addEventListener('pointercancel', stop)
     return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop); window.removeEventListener('pointercancel', stop) }
   }, [layoutDrag, playerSplitLeft, playerSplitRight])
+
+  const finishLayoutEditing = () => {
+    localStorage.setItem('josi-sidebar-width', String(sidebarWidth))
+    localStorage.setItem('josi-player-split-left', String(playerSplitLeft))
+    localStorage.setItem('josi-player-split-right', String(playerSplitRight))
+    setLayoutDrag(null)
+    setLayoutEditMode(false)
+  }
 
   useEffect(() => localStorage.setItem('josi-sort-saves', JSON.stringify(sortSaves)), [sortSaves])
   useEffect(() => localStorage.setItem('josi-active-sort-saves', JSON.stringify(activeSortSaveIds)), [activeSortSaveIds])
@@ -736,6 +760,39 @@ function App() {
     return () => cancelAnimationFrame(frame)
   }, [loopZoom])
 
+  const importDraftSnapshot = (): ImportDraftSnapshot => ({
+    items: importDraftItems.map((item) => ({ id: item.id, name: item.name, originalIndex: item.originalIndex })),
+    selectedIds: [...importDraftSelectedIds],
+    sortMode: importDraftSortMode,
+  })
+  const restoreImportDraftSnapshot = (target: ImportDraftSnapshot) => {
+    const fileById = new Map(importDraftItems.map((item) => [item.id, item.file]))
+    lastCommittedImportDraft?.items.forEach((item) => { if (!fileById.has(item.id)) fileById.set(item.id, item.file) })
+    setImportDraftItems(target.items.map((item) => ({ ...item, file: fileById.get(item.id)! })).filter((item) => Boolean(item.file)))
+    setImportDraftSelectedIds(new Set(target.selectedIds))
+    setImportDraftSortMode(target.sortMode)
+  }
+  const recordImportDraftHistory = () => {
+    setImportDraftUndoStack((items) => [...items, importDraftSnapshot()].slice(-50))
+    setImportDraftRedoStack([])
+  }
+  const undoImportDraft = () => {
+    const target = importDraftUndoStack.at(-1)
+    if (!target) return false
+    setImportDraftUndoStack((items) => items.slice(0, -1))
+    setImportDraftRedoStack((items) => [...items, importDraftSnapshot()].slice(-50))
+    restoreImportDraftSnapshot(target)
+    return true
+  }
+  const redoImportDraft = () => {
+    const target = importDraftRedoStack.at(-1)
+    if (!target) return false
+    setImportDraftRedoStack((items) => items.slice(0, -1))
+    setImportDraftUndoStack((items) => [...items, importDraftSnapshot()].slice(-50))
+    restoreImportDraftSnapshot(target)
+    return true
+  }
+
   const snapshot = (): Snapshot => ({ songs: songs.map((song) => ({ ...song, loopMarkers: song.loopMarkers ? [...song.loopMarkers] : undefined })), playlists: playlists.map((playlist) => ({ ...playlist, songIds: [...playlist.songIds] })), tags: tags.map((tag) => ({ ...tag, songIds: [...tag.songIds], playlistIds: [...tag.playlistIds] })), objectGroups: objectGroups.map((group) => ({ ...group, itemIds: [...group.itemIds] })), objectColors: { ...objectColors } })
   const recordHistory = () => { setUndoStack((items) => [...items, snapshot()].slice(-50)); setRedoStack([]) }
   const restoreSnapshot = async (target: Snapshot) => {
@@ -757,10 +814,54 @@ function App() {
     await Promise.all(previousTags.filter((tag) => !tagIds.has(tag.id)).map((tag) => deleteTag(tag.id)))
     await Promise.all(target.tags.map(saveTag))
   }
-  const undo = async () => { const target = undoStack.at(-1); if (!target || moveCandidate) return; setCancelledDuplicateAction(null); setUndoStack((items) => items.slice(0, -1)); setRedoStack((items) => [...items, snapshot()].slice(-50)); await restoreSnapshot(target) }
+  const undo = async () => {
+    if (importDraftItems.length) {
+      if (undoImportDraft()) return
+      return
+    }
+    const target = undoStack.at(-1)
+    if (!target || moveCandidate) return
+    setCancelledDuplicateAction(null)
+    const undoingCommittedImport = Boolean(lastCommittedImportDraft?.importedIds.length)
+      && lastCommittedImportDraft!.importedIds.every((id) => songs.some((song) => song.id === id))
+      && lastCommittedImportDraft!.importedIds.every((id) => !target.songs.some((song) => song.id === id))
+    setUndoStack((items) => items.slice(0, -1))
+    setRedoStack((items) => [...items, snapshot()].slice(-50))
+    await restoreSnapshot(target)
+    if (undoingCommittedImport && lastCommittedImportDraft) {
+      setImportDraftItems(lastCommittedImportDraft.items.map((item) => ({ ...item })))
+      setImportDraftSelectedIds(new Set(lastCommittedImportDraft.items.map((item) => item.id)))
+      setImportDraftSelectionMode(false)
+      setImportDraftMenuOpen(false)
+      setImportDraftRenameOpen(false)
+      setImportDraftReorderMode(false)
+      setImportDraftMoveMode(false)
+      setImportDraftSortMode('manual')
+      setImportDraftConfirmation(null)
+      setImportDraftUndoStack([...lastCommittedImportDraft.undo])
+      setImportDraftRedoStack([...lastCommittedImportDraft.redo])
+      setMessage('Import wurde zurückgenommen. Das Importfenster ist wieder geöffnet.')
+    }
+  }
   const redo = async () => {
+    if (importDraftItems.length) {
+      if (redoImportDraft()) return
+      const target = redoStack.at(-1)
+      if (target && lastCommittedImportDraft?.importedIds.some((id) => target.songs.some((song) => song.id === id))) {
+        setRedoStack((items) => items.slice(0, -1))
+        setUndoStack((items) => [...items, snapshot()].slice(-50))
+        await restoreSnapshot(target)
+        setImportDraftItems([])
+        setImportDraftSelectedIds(new Set())
+        setMessage('Import wurde wiederhergestellt.')
+      }
+      return
+    }
     if (cancelledDuplicateAction) { const action = cancelledDuplicateAction; setCancelledDuplicateAction(null); requestDuplicateAction(action); return }
-    const target = redoStack.at(-1); if (!target || moveCandidate) return; setRedoStack((items) => items.slice(0, -1)); setUndoStack((items) => [...items, snapshot()].slice(-50)); await restoreSnapshot(target)
+    const target = redoStack.at(-1); if (!target || moveCandidate) return
+    setRedoStack((items) => items.slice(0, -1))
+    setUndoStack((items) => [...items, snapshot()].slice(-50))
+    await restoreSnapshot(target)
   }
 
   const applyNavigation = (entry: NavigationEntry) => {
@@ -845,22 +946,112 @@ function App() {
     if (!files?.length) return
     const audioFiles = Array.from(files).filter((file) => file.type.startsWith('audio/') || /\.(mp3|m4a|aac|wav|ogg|flac)$/i.test(file.name))
     if (!audioFiles.length) return setMessage('Keine unterstützten Audiodateien ausgewählt.')
+    const items = audioFiles.map((file, index) => ({ id: crypto.randomUUID(), file, name: file.name.replace(/\.[^.]+$/, '') || file.name, originalIndex: index }))
+    setImportDraftItems(items)
+    setImportDraftSelectedIds(new Set(items.map((item) => item.id)))
+    setImportDraftSelectionMode(false)
+    setImportDraftMenuOpen(false)
+    setImportDraftRenameOpen(false)
+    setImportDraftReorderMode(false)
+    setImportDraftMoveMode(false)
+    setImportDraftSortMode('manual')
+    setImportDraftSortDirection('down')
+    setImportDraftUndoStack([])
+    setImportDraftRedoStack([])
+    setImportDraftConfirmation(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+  const importDraftTargetIds = () => importDraftSelectionMode ? [...importDraftSelectedIds] : importDraftItems.map((item) => item.id)
+  const sortedImportDraftItems = () => {
+    if (importDraftSortMode === 'manual') return [...importDraftItems]
+    const sign = importDraftSortDirection === 'down' ? 1 : -1
+    const items = [...importDraftItems]
+    return items.sort((a, b) => {
+      if (importDraftSortMode === 'azStart') return a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' }) * sign
+      if (importDraftSortMode === 'azEnd') return reverseText(a.name).localeCompare(reverseText(b.name), 'de', { numeric: true, sensitivity: 'base' }) * sign
+      return (a.originalIndex - b.originalIndex) * sign
+    })
+  }
+  const toggleImportDraftSelected = (id: string) => setImportDraftSelectedIds((current) => {
+    const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next
+  })
+  const beginImportDraftSelection = () => {
+    recordImportDraftHistory()
+    setImportDraftSelectionMode(true)
+    setImportDraftSelectedIds(new Set(importDraftItems.map((item) => item.id)))
+    setImportDraftMenuOpen(false)
+  }
+  const cancelImportDraftMode = () => {
+    setImportDraftSelectionMode(false)
+    setImportDraftReorderMode(false)
+    setImportDraftMoveMode(false)
+    setImportDraftSelectedIds(new Set(importDraftItems.map((item) => item.id)))
+  }
+  const moveImportDraftItem = (id: string, delta: -1 | 1) => {
+    const index = importDraftItems.findIndex((item) => item.id === id)
+    const other = index + delta
+    if (index < 0 || other < 0 || other >= importDraftItems.length) return
+    recordImportDraftHistory()
+    const next = [...importDraftItems]
+    ;[next[index], next[other]] = [next[other], next[index]]
+    setImportDraftItems(next)
+    setImportDraftSortMode('manual')
+  }
+  const moveImportDraftSelectionTo = (targetIndex: number) => {
+    const selected = new Set(importDraftTargetIds())
+    if (!selected.size || selected.size === importDraftItems.length) return
+    recordImportDraftHistory()
+    const moving = importDraftItems.filter((item) => selected.has(item.id))
+    const remaining = importDraftItems.filter((item) => !selected.has(item.id))
+    const removedBefore = importDraftItems.slice(0, targetIndex).filter((item) => selected.has(item.id)).length
+    const insertAt = Math.max(0, Math.min(remaining.length, targetIndex - removedBefore))
+    setImportDraftItems([...remaining.slice(0, insertAt), ...moving, ...remaining.slice(insertAt)])
+    setImportDraftSortMode('manual')
+  }
+  const updateImportDraftName = (id: string, name: string) => {
+    setImportDraftItems((current) => current.map((item) => item.id === id ? { ...item, name } : item))
+  }
+  const commitImportDraft = async (fromRedo = false) => {
+    if (!importDraftItems.length) return
     try {
+      if (!fromRedo) recordHistory()
       const previousNew = songs.filter((song) => song.isNew)
       if (previousNew.length) await Promise.all(previousNew.map((song) => saveSong({ ...song, isNew: false })))
-      const imported = await saveSongs(audioFiles)
-      setSongs([...songs.map((song) => ({ ...song, isNew: false })), ...imported])
-      if (imported.length) {
-        const placements = imported.map((song) => ({ kind: 'song' as const, id: song.id, name: song.name }))
-        setCreationPlacement(placements[0] ?? null)
-        setCreationPlacementQueue(placements.slice(1))
-      }
-      setMessage(`${imported.length} ${imported.length === 1 ? 'Song wurde' : 'Songs wurden'} importiert.`)
+      const orderedFiles = importDraftItems.map((item) => item.file)
+      const imported = await saveSongs(orderedFiles)
+      const renamed = imported.map((song, index) => ({ ...song, name: importDraftItems[index]?.name.trim() || song.name }))
+      await Promise.all(renamed.map(saveSong))
+      const nextSongs = [...songs.map((song) => ({ ...song, isNew: false })), ...renamed]
+      setSongs(nextSongs)
+      setLastCommittedImportDraft({ items: importDraftItems.map((item) => ({ ...item })), importedIds: renamed.map((song) => song.id), undo: [...importDraftUndoStack], redo: [...importDraftRedoStack] })
+      setImportDraftItems([])
+      setImportDraftSelectedIds(new Set())
+      setImportDraftSelectionMode(false)
+      setImportDraftMenuOpen(false)
+      setImportDraftRenameOpen(false)
+      setImportDraftReorderMode(false)
+      setImportDraftMoveMode(false)
+      setImportDraftConfirmation(null)
+      setMessage(`${renamed.length} ${renamed.length === 1 ? 'Song wurde' : 'Songs wurden'} importiert.`)
     } catch (error) {
       const quota = error instanceof DOMException && (error.name === 'QuotaExceededError' || error.name === 'UnknownError')
-      setMessage(quota ? 'Import fehlgeschlagen: Der lokale Browser-Speicher ist wahrscheinlich voll oder wurde von iPadOS begrenzt.' : 'Import fehlgeschlagen. Bitte wähle die Dateien erneut über „Auswählen“ und „Öffnen“.')
-    } finally { if (fileInputRef.current) fileInputRef.current.value = '' }
+      setMessage(quota ? 'Import fehlgeschlagen: Der lokale Browser-Speicher ist wahrscheinlich voll oder wurde von iPadOS begrenzt.' : 'Import fehlgeschlagen. Bitte versuche es erneut.')
+    }
   }
+  const discardImportDraft = () => {
+    setImportDraftItems([])
+    setImportDraftSelectedIds(new Set())
+    setImportDraftSelectionMode(false)
+    setImportDraftMenuOpen(false)
+    setImportDraftRenameOpen(false)
+    setImportDraftReorderMode(false)
+    setImportDraftMoveMode(false)
+    setImportDraftConfirmation(null)
+    setImportDraftUndoStack([])
+    setImportDraftRedoStack([])
+    setMessage('Import wurde abgebrochen.')
+  }
+
 
   const markSeen = async (id?: string) => {
     if (id) { const song = songs.find((item) => item.id === id); if (song) await updateSong({ ...song, isNew: false }) }
@@ -1322,7 +1513,7 @@ function App() {
       setSongs(updated)
       await saveSongOrder(updated)
     }
-    setBulkMoveMode(false)
+    setMessage('Auswahl wurde bewegt. Der Bewegen-Modus bleibt aktiv, bis du Abbrechen wählst.')
   }
   const renderBulkMoveDropZone = (index: number) => !bulkMoveMode ? null : <button className="drop-zone bulk-move-zone" type="button" onClick={() => void moveSelectedToIndex(index)} aria-label="Auswahl hierhin bewegen"><span /></button>
   const deleteSelectedSongs = async () => {
@@ -1886,15 +2077,14 @@ function App() {
     const token = singleMoveTarget.kind === 'group' ? groupToken(singleMoveTarget.id) : itemToken(singleMoveTarget.id)
     const currentOrder = normalizedMixedOrder(key, baseTokens)
     const nextOrder = reorderIds(currentOrder, token, targetIndex)
-    if (nextOrder.join('|') === currentOrder.join('|')) { setSingleMoveTarget(null); return }
+    if (nextOrder.join('|') === currentOrder.join('|')) { setSingleMoveTarget((current) => current ? { ...current, targetIndex: null } : current); return }
     recordHistory()
     setMixedOrders((current) => ({ ...current, [key]: nextOrder }))
     await persistRelativeOrder(actualKind, nextOrder, singleMoveTarget.parentGroupId)
     const active = activeSortSave(actualKind)
     if (active) setSortSaves((current) => current.map((save) => save.id === active.id ? { ...save, orders: { ...save.orders, [key]: nextOrder } } : save))
-    setSingleMoveTarget(null)
-    setMessage('Objekt wurde verschoben.')
-    if (creationPlacementQueue.length) advanceCreationPlacement()
+    setSingleMoveTarget((current) => current ? { ...current, targetIndex: null } : current)
+    setMessage('Objekt wurde verschoben. Du kannst eine weitere Position wählen; „Abbrechen“ beendet den Modus.')
   }
   const renderSingleMoveZone = (kind: GroupKind, parentGroupId: string | undefined, index: number) => {
     if (!singleMoveTarget || moveTargetKind(singleMoveTarget) !== kind || (singleMoveTarget.parentGroupId ?? undefined) !== (parentGroupId ?? undefined)) return null
@@ -2007,7 +2197,7 @@ function App() {
     recordHistory()
     if (sidebarMoveKind === 'playlist') { const order = new Map(ordered.map((item, index) => [item.id, index])); const updated = playlists.map((item) => ({ ...item, sortOrder: order.get(item.id) ?? item.sortOrder })); setPlaylists(updated); await Promise.all(updated.map(savePlaylist)) }
     else { const order = new Map(ordered.map((item, index) => [item.id, index])); const updated = tags.map((item) => ({ ...item, sortOrder: order.get(item.id) ?? item.sortOrder })); setTags(updated); await Promise.all(updated.map(saveTag)) }
-    setSidebarMoveKind(null); stopSidebarSelection(); setMessage('Auswahl wurde bewegt.')
+    setMessage('Auswahl wurde bewegt. Du kannst weitere Zielpositionen wählen; „Abbrechen“ beendet den Modus.')
   }
   const deleteSelectedSidebarObjects = async () => {
     if (!sidebarSelectionKind) return
@@ -2279,6 +2469,13 @@ function App() {
   }
   const renderPlaylistOverviewGroup = (group: ObjectGroup, depth = 0): React.ReactNode => { const children = sortedGroupsFor('playlist', sidebarPlaylists, group.id); return <section className={`object-group overview-object-group${depth ? ' nested-object-group' : ''}`} key={group.id}>{renderGroupHeader(group, sidebarPlaylists)}{!collapsedGroupIds.has(group.id) && <>{children.filter((child) => !child.afterItems).map((child) => renderPlaylistOverviewGroup(child, depth + 1))}<div className="playlist-grid">{orderedGroupItems(group, sidebarPlaylists).map((item) => renderPlaylistCard(item as Playlist))}</div>{children.filter((child) => child.afterItems).map((child) => renderPlaylistOverviewGroup(child, depth + 1))}</>}</section> }
   const repeatBadge = repeatSetting?.kind === 'infinite' ? '∞' : repeatSetting?.kind === 'count' ? String(repeatRemaining ?? repeatSetting.count) : null
+  const overlayWindowOpen = Boolean(
+    importDraftItems.length || selectedSongsListOpen || playlistChooserMode || tagChooserTarget || sidebarMoveKind || sidebarSelectionConfirmation ||
+    pendingGroupCreate || groupRenameId || groupSortId || groupDeleteTargetId || groupNestingTarget || groupMembershipTarget ||
+    groupPlaybackChooserOpen || repeatMenuOpen || sidebarSortTarget || duplicateConflict || tagToDelete || loopConfirmation ||
+    trashConfirmation || sortSaveDialogTarget || sortSaveRenameId || settingsOpen || selectionConfirmation || loopManualRequest ||
+    creationPlacement || renameTarget || songToDelete || playlistToDelete
+  )
 
   const songEditMode = reorderScope === (activePlaylist ? 'playlist' : 'library') && view === 'library'
   const tagEditMode = reorderScope === 'tags'
@@ -2320,9 +2517,48 @@ function App() {
   return <div className={`app-shell${sidePaneScrollLocked ? ' side-pane-scroll-locked' : ''}`}>
     <header className="site-header">
       <div className="history-controls" aria-label="Navigation und Verlauf"><button className="home-button" type="button" onClick={goHome} aria-label="Bibliothek">⌂</button><button className="settings-button" type="button" onClick={() => setSettingsOpen(true)} aria-label="Einstellungen">⚙</button><button type="button" onClick={navigateBack} disabled={navigationIndex === 0 && !loopEditorSongId}>‹</button><button type="button" onClick={navigateForward} disabled={navigationIndex >= navigation.length - 1 || Boolean(loopEditorSongId)}>›</button><button type="button" onClick={() => void undo()} disabled={!undoStack.length || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↶</button><button type="button" onClick={() => void redo()} disabled={(!redoStack.length && !cancelledDuplicateAction) || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↷</button>{moveCandidate && <><button className="confirm-move" type="button" onClick={() => void confirmPendingMove()} disabled={moveCandidate.targetIndex === null}>✓</button><button className="cancel-move" type="button" onClick={() => setMoveCandidate(null)}>×</button></>}</div>
-      <div className="header-right-actions">{layoutEditMode && <button className="layout-finish-button" type="button" onClick={() => { setLayoutEditMode(false); setLayoutDrag(null) }}>Layout fertig</button>}<button className="import-button" type="button" onClick={openImportPicker}>+ Musik importieren</button></div><input ref={fileInputRef} className="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac" multiple onChange={(event) => void importFiles(event.target.files)} /><input ref={coverInputRef} className="file-input" type="file" accept="image/*" onChange={(event) => void changePlaylistCover(event.target.files)} />
+      <div className="header-right-actions">{layoutEditMode && <button className="layout-finish-button" type="button" onClick={finishLayoutEditing}>Layout fertig</button>}<button className="import-button" type="button" onClick={openImportPicker}>+ Musik importieren</button></div><input ref={fileInputRef} className="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac" multiple onChange={(event) => void importFiles(event.target.files)} /><input ref={coverInputRef} className="file-input" type="file" accept="image/*" onChange={(event) => void changePlaylistCover(event.target.files)} />
     </header>
-    {singleMoveTarget && <div className="single-move-hint"><span>Zielstrich wählen und doppelt antippen.</span><button type="button" onClick={cancelSingleMove}>Abbrechen</button></div>}
+    {overlayWindowOpen && <div className="dialog-history-controls"><button type="button" onClick={() => void undo()} disabled={importDraftItems.length ? !importDraftUndoStack.length : !undoStack.length || Boolean(moveCandidate)}>↶</button><button type="button" onClick={() => void redo()} disabled={importDraftItems.length ? !importDraftRedoStack.length && !redoStack.length : !redoStack.length && !cancelledDuplicateAction}>↷</button></div>}
+    {importDraftItems.length > 0 && (() => {
+      const draftItems = sortedImportDraftItems()
+      const modeActive = importDraftSelectionMode || importDraftRenameOpen || importDraftReorderMode || importDraftMoveMode
+      const targetIds = new Set(importDraftTargetIds())
+      return <div className="modal-backdrop import-workspace-backdrop"><section className="import-workspace" onClick={(event) => event.stopPropagation()}>
+        <div className="import-workspace-topbar">
+          <div className="import-history-spacer" aria-hidden="true" />
+          {modeActive && <button className="import-mode-cancel" type="button" onClick={() => {
+            if (importDraftRenameOpen) { setImportDraftRenameOpen(false); return }
+            cancelImportDraftMode()
+          }}>{importDraftRenameOpen ? 'Fertig' : 'Abbrechen'}</button>}
+          <div className="import-workspace-title"><small>MUSIK IMPORTIEREN</small><strong>{importDraftItems.length} {importDraftItems.length === 1 ? 'Lied' : 'Lieder'}</strong></div>
+        </div>
+        <div className="import-workspace-toolbar">
+          <div className="import-sort-controls"><select value={importDraftSortMode} onChange={(event) => setImportDraftSortMode(event.target.value as SortMode)} disabled={importDraftReorderMode || importDraftMoveMode}><option value="manual">Manuell</option><option value="azStart">A–Z Anfang</option><option value="azEnd">A–Z Ende</option><option value="chronology">Auswahlreihenfolge</option></select><button type="button" disabled={importDraftSortMode === 'manual' || importDraftReorderMode || importDraftMoveMode} onClick={() => setImportDraftSortDirection((value) => value === 'down' ? 'up' : 'down')}>{importDraftSortMode === 'manual' ? '—' : importDraftSortDirection === 'down' ? '↓' : '↑'}</button></div>
+          <div className="import-menu-wrap"><button className="import-menu-button" type="button" onClick={() => setImportDraftMenuOpen((value) => !value)}>•••</button>{importDraftMenuOpen && <><button className="import-menu-shield" type="button" onClick={() => setImportDraftMenuOpen(false)} /><div className="import-action-menu"><button type="button" onClick={beginImportDraftSelection}>Auswählen</button><button type="button" onClick={() => { recordImportDraftHistory(); setImportDraftRenameOpen(true); setImportDraftMenuOpen(false) }}>Umbenennen</button><button type="button" onClick={() => { setImportDraftSortMode('manual'); setImportDraftReorderMode(true); setImportDraftMoveMode(false); setImportDraftMenuOpen(false) }}>Reihenfolge ändern</button><button type="button" onClick={() => { setImportDraftSortMode('manual'); setImportDraftMoveMode(true); setImportDraftReorderMode(false); setImportDraftMenuOpen(false) }}>Bewegen</button></div></>}</div>
+        </div>
+        {importDraftSelectionMode && <div className="import-selection-status"><span>{importDraftSelectedIds.size} ausgewählt</span><button type="button" onClick={() => setImportDraftSelectedIds(new Set(importDraftItems.map((item) => item.id)))}>Alle</button></div>}
+        <div className="import-draft-list">
+          {draftItems.map((item, index) => <Fragment key={item.id}>
+            {importDraftMoveMode && importDraftSortMode === 'manual' && <button className="import-move-zone" type="button" onClick={() => moveImportDraftSelectionTo(index)} aria-label="Auswahl hierhin bewegen"><span /></button>}
+            <div className={`import-draft-row${targetIds.has(item.id) ? ' targeted' : ''}`}>
+              {importDraftSelectionMode && <button className="selection-check" type="button" onClick={() => toggleImportDraftSelected(item.id)}>{importDraftSelectedIds.has(item.id) ? '✓' : ''}</button>}
+              <span className="import-draft-index">{index + 1}</span>
+              {importDraftRenameOpen && targetIds.has(item.id) ? <input value={item.name} onChange={(event) => updateImportDraftName(item.id, event.target.value)} /> : <strong>{item.name}</strong>}
+              <small>{item.file.name}</small>
+              {importDraftReorderMode && <span className="import-draft-reorder"><button type="button" onClick={() => moveImportDraftItem(item.id, -1)}>↑</button><button type="button" onClick={() => moveImportDraftItem(item.id, 1)}>↓</button></span>}
+            </div>
+          </Fragment>)}
+          {importDraftMoveMode && importDraftSortMode === 'manual' && <button className="import-move-zone" type="button" onClick={() => moveImportDraftSelectionTo(importDraftItems.length)} aria-label="Auswahl ans Ende bewegen"><span /></button>}
+        </div>
+        <div className="import-workspace-actions"><button type="button" onClick={() => setImportDraftConfirmation('cancel')}>Abbrechen</button><button className="primary-import-finish" type="button" onClick={() => setImportDraftConfirmation('finish')}>Fertig</button></div>
+      </section>
+      {importDraftConfirmation && <div className="import-confirm-layer"><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>{importDraftConfirmation === 'finish' ? 'Import abschließen?' : 'Import abbrechen?'}</h2><p>{importDraftConfirmation === 'finish' ? `${importDraftItems.length} ${importDraftItems.length === 1 ? 'Lied wird' : 'Lieder werden'} jetzt lokal gespeichert.` : 'Die ausgewählten Dateien werden nicht importiert.'}</p><div className="dialog-actions"><button type="button" onClick={() => setImportDraftConfirmation(null)}>Zurück</button>{importDraftConfirmation === 'finish' ? <button type="button" onClick={() => void commitImportDraft()}>Importieren</button> : <button className="danger-button" type="button" onClick={discardImportDraft}>Nicht importieren</button>}</div></div></div>}
+      </div>
+    })()}
+    {singleMoveTarget && <div className="single-move-hint"><span>Zielstrich wählen und doppelt antippen. Der Modus bleibt aktiv.</span><button type="button" onClick={cancelSingleMove}>Abbrechen</button></div>}
+    {sidebarMoveKind && <div className="single-move-hint persistent-move-hint"><span>Bewegen bleibt aktiv.</span><button type="button" onClick={() => { setSidebarMoveKind(null); setChooserSearch('') }}>Abbrechen</button></div>}
+    {bulkMoveMode && <div className="single-move-hint persistent-move-hint"><span>Bewegen bleibt aktiv.</span><button type="button" onClick={() => setBulkMoveMode(false)}>Abbrechen</button></div>}
 
     {view !== 'playlistOverview' && <main className={`music-layout${layoutEditMode ? ' layout-editing' : ''}`} style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}><aside className="sidebar">
       <button className={`nav-item${view === 'library' && !activePlaylistId ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'library', playlistId: null, detailOpen: false })}><span>Bibliothek</span><strong>{songs.length}</strong></button>
@@ -2413,7 +2649,7 @@ function App() {
     {tagChooserTarget && <div className="playlist-chooser-backdrop tag-chooser-backdrop" onClick={() => { setTagChooserTarget(null); setChooserSearch('') }}><section className="playlist-chooser tag-chooser" onClick={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">TAGS</p><h2>{tagChooserTarget.kind === 'song' ? `${tagChooserTarget.ids.length} ${tagChooserTarget.ids.length === 1 ? 'Lied' : 'Lieder'}` : `${tagChooserTarget.ids.length} ${tagChooserTarget.ids.length === 1 ? 'Playlist' : 'Playlists'}`} taggen</h2></div><button type="button" onClick={() => { setTagChooserTarget(null); setChooserSearch('') }}>×</button></div><div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Tags suchen" /></div>{renderChooserSortControls('tag')}<div className="tag-chooser-list">{sortChooserObjects('tag', sidebarTags).filter((tag) => fuzzyMatch(tag.name, chooserSearch)).map((tag) => { const ids = tagChooserTarget.kind === 'song' ? tag.songIds : tag.playlistIds; const all = tagChooserTarget.ids.every((id) => ids.includes(id)); const some = !all && tagChooserTarget.ids.some((id) => ids.includes(id)); return <button key={tag.id} type="button" onClick={() => void toggleTargetTag(tag)}><span><i className="tag-dot" style={{ background: tag.color }} /><b>{tag.name}</b></span><small>{tag.songIds.filter((id) => songs.some((song) => song.id === id)).length} Lieder</small><strong>{all ? '−' : some ? '±' : '+'}</strong></button> })}{!sidebarTags.length && <p className="tag-empty-hint">Erstelle zuerst links unter „Tags“ einen Tag.</p>}</div></section></div>}
 
     {sidebarSelectionKind && <div className="sidebar-selection-dock"><strong>{sidebarSelectionKind === 'playlist' ? selectedPlaylistIds.size : selectedTagIds.size} ausgewählt</strong><button type="button" onClick={stopSidebarSelection}>Abbrechen</button><div className="selection-more-wrap"><button className="selection-more-button" type="button" onClick={() => setSidebarSelectionMenuOpen((value) => !value)}>•••</button>{sidebarSelectionMenuOpen && <><button className="selection-menu-shield" type="button" onClick={() => setSidebarSelectionMenuOpen(false)} /><div className="selection-action-menu sidebar-selection-action-menu"><button type="button" disabled={(sidebarSelectionKind === 'playlist' ? selectedPlaylistIds.size : selectedTagIds.size) < 2} onClick={() => createObjectGroup(sidebarSelectionKind, [...(sidebarSelectionKind === 'playlist' ? selectedPlaylistIds : selectedTagIds)])}>Gruppieren</button><button type="button" disabled={!(sidebarSelectionKind === 'playlist' ? selectedPlaylistIds.size : selectedTagIds.size)} onClick={() => void copySelectedSidebarObjects()}>Kopieren</button><button className="danger-menu-action" type="button" disabled={!(sidebarSelectionKind === 'playlist' ? selectedPlaylistIds.size : selectedTagIds.size)} onClick={() => { setSidebarSelectionMenuOpen(false); setSidebarSelectionConfirmation('delete') }}>Alle löschen</button></div></>}</div></div>}
-    {sidebarMoveKind && (() => { const source = sidebarMoveKind === 'playlist' ? sidebarPlaylists : sidebarTags; const selected = new Set(selectedSidebarIds(sidebarMoveKind)); const remaining = source.filter((item) => !selected.has(item.id)); const filteredRemaining = remaining.filter((item) => fuzzyMatch(item.name, chooserSearch)); return <div className="modal-backdrop sidebar-move-backdrop" onClick={() => { setSidebarMoveKind(null); setChooserSearch('') }}><div className="confirm-dialog sidebar-move-dialog" onClick={(event) => event.stopPropagation()}><h2>{sidebarMoveKind === 'playlist' ? 'Playlists' : 'Tags'} bewegen</h2><p>Wähle die Zielposition für die gesamte Auswahl.</p><div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Suchen" /></div><div className="sidebar-move-targets"><button type="button" onClick={() => void applySidebarSelectionMove(0)}>Ganz nach oben</button>{filteredRemaining.map((item) => <button type="button" key={item.id} onClick={() => void applySidebarSelectionMove(remaining.findIndex((candidate) => candidate.id === item.id))}>Vor „{item.name}“</button>)}<button type="button" onClick={() => void applySidebarSelectionMove(remaining.length)}>Ganz nach unten</button></div><div className="dialog-actions"><button type="button" onClick={() => setSidebarMoveKind(null)}>Abbrechen</button></div></div></div> })()}
+    {sidebarMoveKind && (() => { const source = sidebarMoveKind === 'playlist' ? sidebarPlaylists : sidebarTags; const selected = new Set(selectedSidebarIds(sidebarMoveKind)); const remaining = source.filter((item) => !selected.has(item.id)); const filteredRemaining = remaining.filter((item) => fuzzyMatch(item.name, chooserSearch)); return <div className="modal-backdrop sidebar-move-backdrop"><div className="confirm-dialog sidebar-move-dialog" onClick={(event) => event.stopPropagation()}><h2>{sidebarMoveKind === 'playlist' ? 'Playlists' : 'Tags'} bewegen</h2><p>Wähle weitere Zielpositionen. Der Modus endet erst mit „Abbrechen“.</p><div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Suchen" /></div><div className="sidebar-move-targets"><button type="button" onClick={() => void applySidebarSelectionMove(0)}>Ganz nach oben</button>{filteredRemaining.map((item) => <button type="button" key={item.id} onClick={() => void applySidebarSelectionMove(remaining.findIndex((candidate) => candidate.id === item.id))}>Vor „{item.name}“</button>)}<button type="button" onClick={() => void applySidebarSelectionMove(remaining.length)}>Ganz nach unten</button></div><div className="dialog-actions"><button type="button" onClick={() => setSidebarMoveKind(null)}>Abbrechen</button></div></div></div> })()}
     {sidebarSelectionConfirmation === 'switchManualMove' && sidebarSelectionKind && (() => { const kind: SortSaveKind = sidebarSelectionKind === 'playlist' ? 'playlist' : 'tag'; const saveName = activeSortSave(kind)?.name ?? 'Save'; return <div className="modal-backdrop" onClick={() => setSidebarSelectionConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Zu „{saveName}“ wechseln?</h2><p>Die Auswahl kann nur innerhalb einer gespeicherten {sidebarSelectionKind === 'playlist' ? 'Playlist-' : 'Tag-'}Reihenfolge bewegt werden.</p><div className="dialog-actions"><button type="button" onClick={() => setSidebarSelectionConfirmation(null)}>Nein</button><button type="button" onClick={() => { if (kind === 'playlist') setPlaylistSortMode('manual'); else setTagSortMode('manual'); setSidebarSelectionConfirmation(null); setSidebarMoveKind(sidebarSelectionKind) }}>Ja, wechseln</button></div></div></div> })()}
     {sidebarSelectionConfirmation === 'delete' && sidebarSelectionKind && <div className="modal-backdrop" onClick={() => setSidebarSelectionConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Auswahl löschen?</h2><p>{selectedSidebarIds(sidebarSelectionKind).length} {sidebarSelectionKind === 'playlist' ? 'Playlists' : 'Tags'} werden in den Papierkorb verschoben.</p><div className="dialog-actions"><button type="button" onClick={() => setSidebarSelectionConfirmation(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void deleteSelectedSidebarObjects()}>In Papierkorb</button></div></div></div>}
     {pendingGroupCreate && <div className="modal-backdrop" onClick={() => { setPendingGroupCreate(null); setGroupCreateMenuOpen(false) }}><form className="confirm-dialog group-create-dialog" onSubmit={(event) => { event.preventDefault(); finalizePendingGroupCreate() }} onClick={(event) => event.stopPropagation()}><h2>Neue Gruppe</h2><div className="creation-name-row"><input value={pendingGroupCreate.name} onChange={(event) => setPendingGroupCreate((current) => current ? { ...current, name: event.target.value } : current)} autoFocus /><div className="creation-more-wrap"><button className="creation-more-button" type="button" onClick={() => setGroupCreateMenuOpen((value) => !value)}>•••</button>{groupCreateMenuOpen && <div className="creation-more-menu"><button type="button" onClick={() => { setPendingGroupCreate((current) => current ? { ...current, moveAfterCreate: true } : current); setGroupCreateMenuOpen(false) }}>{pendingGroupCreate.moveAfterCreate ? 'Bewegen ✓' : 'Bewegen'}</button></div>}</div></div><p>{pendingGroupCreate.moveAfterCreate ? 'Nach dem Erstellen wählst du die Zielposition mit dem roten Strich.' : 'Bei einem Save erscheint die neue Gruppe ganz oben. Bei automatischer Sortierung wird sie sofort passend eingeordnet.'}</p><div className="dialog-actions"><button type="button" onClick={() => { setPendingGroupCreate(null); setGroupCreateMenuOpen(false) }}>Abbrechen</button><button type="submit">Fertig</button></div></form></div>}
