@@ -894,22 +894,112 @@ function App() {
     if (!files?.length) return
     const audioFiles = Array.from(files).filter((file) => file.type.startsWith('audio/') || /\.(mp3|m4a|aac|wav|ogg|flac)$/i.test(file.name))
     if (!audioFiles.length) return setMessage('Keine unterstützten Audiodateien ausgewählt.')
+    const items = audioFiles.map((file, index) => ({ id: crypto.randomUUID(), file, name: file.name.replace(/\.[^.]+$/, '') || file.name, originalIndex: index }))
+    setImportDraftItems(items)
+    setImportDraftSelectedIds(new Set(items.map((item) => item.id)))
+    setImportDraftSelectionMode(false)
+    setImportDraftMenuOpen(false)
+    setImportDraftRenameOpen(false)
+    setImportDraftReorderMode(false)
+    setImportDraftMoveMode(false)
+    setImportDraftSortMode('manual')
+    setImportDraftSortDirection('down')
+    setImportDraftUndoStack([])
+    setImportDraftRedoStack([])
+    setImportDraftConfirmation(null)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+  const importDraftTargetIds = () => importDraftSelectionMode ? [...importDraftSelectedIds] : importDraftItems.map((item) => item.id)
+  const sortedImportDraftItems = () => {
+    if (importDraftSortMode === 'manual') return [...importDraftItems]
+    const sign = importDraftSortDirection === 'down' ? 1 : -1
+    const items = [...importDraftItems]
+    return items.sort((a, b) => {
+      if (importDraftSortMode === 'azStart') return a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' }) * sign
+      if (importDraftSortMode === 'azEnd') return reverseText(a.name).localeCompare(reverseText(b.name), 'de', { numeric: true, sensitivity: 'base' }) * sign
+      return (a.originalIndex - b.originalIndex) * sign
+    })
+  }
+  const toggleImportDraftSelected = (id: string) => setImportDraftSelectedIds((current) => {
+    const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next
+  })
+  const beginImportDraftSelection = () => {
+    recordImportDraftHistory()
+    setImportDraftSelectionMode(true)
+    setImportDraftSelectedIds(new Set(importDraftItems.map((item) => item.id)))
+    setImportDraftMenuOpen(false)
+  }
+  const cancelImportDraftMode = () => {
+    setImportDraftSelectionMode(false)
+    setImportDraftReorderMode(false)
+    setImportDraftMoveMode(false)
+    setImportDraftSelectedIds(new Set(importDraftItems.map((item) => item.id)))
+  }
+  const moveImportDraftItem = (id: string, delta: -1 | 1) => {
+    const index = importDraftItems.findIndex((item) => item.id === id)
+    const other = index + delta
+    if (index < 0 || other < 0 || other >= importDraftItems.length) return
+    recordImportDraftHistory()
+    const next = [...importDraftItems]
+    ;[next[index], next[other]] = [next[other], next[index]]
+    setImportDraftItems(next)
+    setImportDraftSortMode('manual')
+  }
+  const moveImportDraftSelectionTo = (targetIndex: number) => {
+    const selected = new Set(importDraftTargetIds())
+    if (!selected.size || selected.size === importDraftItems.length) return
+    recordImportDraftHistory()
+    const moving = importDraftItems.filter((item) => selected.has(item.id))
+    const remaining = importDraftItems.filter((item) => !selected.has(item.id))
+    const removedBefore = importDraftItems.slice(0, targetIndex).filter((item) => selected.has(item.id)).length
+    const insertAt = Math.max(0, Math.min(remaining.length, targetIndex - removedBefore))
+    setImportDraftItems([...remaining.slice(0, insertAt), ...moving, ...remaining.slice(insertAt)])
+    setImportDraftSortMode('manual')
+  }
+  const updateImportDraftName = (id: string, name: string) => {
+    setImportDraftItems((current) => current.map((item) => item.id === id ? { ...item, name } : item))
+  }
+  const commitImportDraft = async (fromRedo = false) => {
+    if (!importDraftItems.length) return
     try {
+      if (!fromRedo) recordHistory()
       const previousNew = songs.filter((song) => song.isNew)
       if (previousNew.length) await Promise.all(previousNew.map((song) => saveSong({ ...song, isNew: false })))
-      const imported = await saveSongs(audioFiles)
-      setSongs([...songs.map((song) => ({ ...song, isNew: false })), ...imported])
-      if (imported.length) {
-        const placements = imported.map((song) => ({ kind: 'song' as const, id: song.id, name: song.name }))
-        setCreationPlacement(placements[0] ?? null)
-        setCreationPlacementQueue(placements.slice(1))
-      }
-      setMessage(`${imported.length} ${imported.length === 1 ? 'Song wurde' : 'Songs wurden'} importiert.`)
+      const orderedFiles = importDraftItems.map((item) => item.file)
+      const imported = await saveSongs(orderedFiles)
+      const renamed = imported.map((song, index) => ({ ...song, name: importDraftItems[index]?.name.trim() || song.name }))
+      await Promise.all(renamed.map(saveSong))
+      const nextSongs = [...songs.map((song) => ({ ...song, isNew: false })), ...renamed]
+      setSongs(nextSongs)
+      setLastCommittedImportDraft({ items: importDraftItems.map((item) => ({ ...item })), importedIds: renamed.map((song) => song.id), undo: [...importDraftUndoStack], redo: [...importDraftRedoStack] })
+      setImportDraftItems([])
+      setImportDraftSelectedIds(new Set())
+      setImportDraftSelectionMode(false)
+      setImportDraftMenuOpen(false)
+      setImportDraftRenameOpen(false)
+      setImportDraftReorderMode(false)
+      setImportDraftMoveMode(false)
+      setImportDraftConfirmation(null)
+      setMessage(`${renamed.length} ${renamed.length === 1 ? 'Song wurde' : 'Songs wurden'} importiert.`)
     } catch (error) {
       const quota = error instanceof DOMException && (error.name === 'QuotaExceededError' || error.name === 'UnknownError')
-      setMessage(quota ? 'Import fehlgeschlagen: Der lokale Browser-Speicher ist wahrscheinlich voll oder wurde von iPadOS begrenzt.' : 'Import fehlgeschlagen. Bitte wähle die Dateien erneut über „Auswählen“ und „Öffnen“.')
-    } finally { if (fileInputRef.current) fileInputRef.current.value = '' }
+      setMessage(quota ? 'Import fehlgeschlagen: Der lokale Browser-Speicher ist wahrscheinlich voll oder wurde von iPadOS begrenzt.' : 'Import fehlgeschlagen. Bitte versuche es erneut.')
+    }
   }
+  const discardImportDraft = () => {
+    setImportDraftItems([])
+    setImportDraftSelectedIds(new Set())
+    setImportDraftSelectionMode(false)
+    setImportDraftMenuOpen(false)
+    setImportDraftRenameOpen(false)
+    setImportDraftReorderMode(false)
+    setImportDraftMoveMode(false)
+    setImportDraftConfirmation(null)
+    setImportDraftUndoStack([])
+    setImportDraftRedoStack([])
+    setMessage('Import wurde abgebrochen.')
+  }
+
 
   const markSeen = async (id?: string) => {
     if (id) { const song = songs.find((item) => item.id === id); if (song) await updateSong({ ...song, isNew: false }) }
