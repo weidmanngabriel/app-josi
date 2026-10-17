@@ -1505,7 +1505,7 @@ function App() {
       setSongs(updated)
       await saveSongOrder(updated)
     }
-    setBulkMoveMode(false)
+    setMessage('Auswahl wurde bewegt. Der Bewegen-Modus bleibt aktiv, bis du Abbrechen wählst.')
   }
   const renderBulkMoveDropZone = (index: number) => !bulkMoveMode ? null : <button className="drop-zone bulk-move-zone" type="button" onClick={() => void moveSelectedToIndex(index)} aria-label="Auswahl hierhin bewegen"><span /></button>
   const deleteSelectedSongs = async () => {
@@ -2189,7 +2189,7 @@ function App() {
     recordHistory()
     if (sidebarMoveKind === 'playlist') { const order = new Map(ordered.map((item, index) => [item.id, index])); const updated = playlists.map((item) => ({ ...item, sortOrder: order.get(item.id) ?? item.sortOrder })); setPlaylists(updated); await Promise.all(updated.map(savePlaylist)) }
     else { const order = new Map(ordered.map((item, index) => [item.id, index])); const updated = tags.map((item) => ({ ...item, sortOrder: order.get(item.id) ?? item.sortOrder })); setTags(updated); await Promise.all(updated.map(saveTag)) }
-    setSidebarMoveKind(null); stopSidebarSelection(); setMessage('Auswahl wurde bewegt.')
+    setMessage('Auswahl wurde bewegt. Du kannst weitere Zielpositionen wählen; „Abbrechen“ beendet den Modus.')
   }
   const deleteSelectedSidebarObjects = async () => {
     if (!sidebarSelectionKind) return
