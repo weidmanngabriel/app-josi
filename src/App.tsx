@@ -2504,6 +2504,43 @@ function App() {
       <div className="history-controls" aria-label="Navigation und Verlauf"><button className="home-button" type="button" onClick={goHome} aria-label="Bibliothek">⌂</button><button className="settings-button" type="button" onClick={() => setSettingsOpen(true)} aria-label="Einstellungen">⚙</button><button type="button" onClick={navigateBack} disabled={navigationIndex === 0 && !loopEditorSongId}>‹</button><button type="button" onClick={navigateForward} disabled={navigationIndex >= navigation.length - 1 || Boolean(loopEditorSongId)}>›</button><button type="button" onClick={() => void undo()} disabled={!undoStack.length || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↶</button><button type="button" onClick={() => void redo()} disabled={(!redoStack.length && !cancelledDuplicateAction) || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↷</button>{moveCandidate && <><button className="confirm-move" type="button" onClick={() => void confirmPendingMove()} disabled={moveCandidate.targetIndex === null}>✓</button><button className="cancel-move" type="button" onClick={() => setMoveCandidate(null)}>×</button></>}</div>
       <div className="header-right-actions">{layoutEditMode && <button className="layout-finish-button" type="button" onClick={() => { setLayoutEditMode(false); setLayoutDrag(null) }}>Layout fertig</button>}<button className="import-button" type="button" onClick={openImportPicker}>+ Musik importieren</button></div><input ref={fileInputRef} className="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac" multiple onChange={(event) => void importFiles(event.target.files)} /><input ref={coverInputRef} className="file-input" type="file" accept="image/*" onChange={(event) => void changePlaylistCover(event.target.files)} />
     </header>
+    {importDraftItems.length > 0 && (() => {
+      const draftItems = sortedImportDraftItems()
+      const modeActive = importDraftSelectionMode || importDraftRenameOpen || importDraftReorderMode || importDraftMoveMode
+      const targetIds = new Set(importDraftTargetIds())
+      return <div className="modal-backdrop import-workspace-backdrop"><section className="import-workspace" onClick={(event) => event.stopPropagation()}>
+        <div className="import-workspace-topbar">
+          <div className="import-history-controls"><button type="button" onClick={() => void undo()} disabled={!importDraftUndoStack.length}>↶</button><button type="button" onClick={() => void redo()} disabled={!importDraftRedoStack.length && !redoStack.length}>↷</button></div>
+          {modeActive && <button className="import-mode-cancel" type="button" onClick={() => {
+            if (importDraftRenameOpen && importDraftUndoStack.length) undoImportDraft()
+            setImportDraftRenameOpen(false)
+            cancelImportDraftMode()
+          }}>Abbrechen</button>}
+          <div className="import-workspace-title"><small>MUSIK IMPORTIEREN</small><strong>{importDraftItems.length} {importDraftItems.length === 1 ? 'Lied' : 'Lieder'}</strong></div>
+        </div>
+        <div className="import-workspace-toolbar">
+          <div className="import-sort-controls"><select value={importDraftSortMode} onChange={(event) => setImportDraftSortMode(event.target.value as SortMode)} disabled={importDraftReorderMode || importDraftMoveMode}><option value="manual">Manuell</option><option value="azStart">A–Z Anfang</option><option value="azEnd">A–Z Ende</option><option value="chronology">Auswahlreihenfolge</option></select><button type="button" disabled={importDraftSortMode === 'manual' || importDraftReorderMode || importDraftMoveMode} onClick={() => setImportDraftSortDirection((value) => value === 'down' ? 'up' : 'down')}>{importDraftSortMode === 'manual' ? '—' : importDraftSortDirection === 'down' ? '↓' : '↑'}</button></div>
+          <div className="import-menu-wrap"><button className="import-menu-button" type="button" onClick={() => setImportDraftMenuOpen((value) => !value)}>•••</button>{importDraftMenuOpen && <><button className="import-menu-shield" type="button" onClick={() => setImportDraftMenuOpen(false)} /><div className="import-action-menu"><button type="button" onClick={beginImportDraftSelection}>Auswählen</button><button type="button" onClick={() => { recordImportDraftHistory(); setImportDraftRenameOpen(true); setImportDraftMenuOpen(false) }}>Umbenennen</button><button type="button" onClick={() => { setImportDraftSortMode('manual'); setImportDraftReorderMode(true); setImportDraftMoveMode(false); setImportDraftMenuOpen(false) }}>Reihenfolge ändern</button><button type="button" onClick={() => { setImportDraftSortMode('manual'); setImportDraftMoveMode(true); setImportDraftReorderMode(false); setImportDraftMenuOpen(false) }}>Bewegen</button></div></>}</div>
+        </div>
+        {importDraftSelectionMode && <div className="import-selection-status"><span>{importDraftSelectedIds.size} ausgewählt</span><button type="button" onClick={() => setImportDraftSelectedIds(new Set(importDraftItems.map((item) => item.id)))}>Alle</button></div>}
+        <div className="import-draft-list">
+          {draftItems.map((item, index) => <Fragment key={item.id}>
+            {importDraftMoveMode && importDraftSortMode === 'manual' && <button className="import-move-zone" type="button" onClick={() => moveImportDraftSelectionTo(index)} aria-label="Auswahl hierhin bewegen"><span /></button>}
+            <div className={`import-draft-row${targetIds.has(item.id) ? ' targeted' : ''}`}>
+              {importDraftSelectionMode && <button className="selection-check" type="button" onClick={() => toggleImportDraftSelected(item.id)}>{importDraftSelectedIds.has(item.id) ? '✓' : ''}</button>}
+              <span className="import-draft-index">{index + 1}</span>
+              {importDraftRenameOpen && targetIds.has(item.id) ? <input value={item.name} onChange={(event) => updateImportDraftName(item.id, event.target.value)} /> : <strong>{item.name}</strong>}
+              <small>{item.file.name}</small>
+              {importDraftReorderMode && <span className="import-draft-reorder"><button type="button" onClick={() => moveImportDraftItem(item.id, -1)}>↑</button><button type="button" onClick={() => moveImportDraftItem(item.id, 1)}>↓</button></span>}
+            </div>
+          </Fragment>)}
+          {importDraftMoveMode && importDraftSortMode === 'manual' && <button className="import-move-zone" type="button" onClick={() => moveImportDraftSelectionTo(importDraftItems.length)} aria-label="Auswahl ans Ende bewegen"><span /></button>}
+        </div>
+        <div className="import-workspace-actions"><button type="button" onClick={() => setImportDraftConfirmation('cancel')}>Abbrechen</button><button className="primary-import-finish" type="button" onClick={() => setImportDraftConfirmation('finish')}>Fertig</button></div>
+      </section>
+      {importDraftConfirmation && <div className="import-confirm-layer"><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>{importDraftConfirmation === 'finish' ? 'Import abschließen?' : 'Import abbrechen?'}</h2><p>{importDraftConfirmation === 'finish' ? `${importDraftItems.length} ${importDraftItems.length === 1 ? 'Lied wird' : 'Lieder werden'} jetzt lokal gespeichert.` : 'Die ausgewählten Dateien werden nicht importiert.'}</p><div className="dialog-actions"><button type="button" onClick={() => setImportDraftConfirmation(null)}>Zurück</button>{importDraftConfirmation === 'finish' ? <button type="button" onClick={() => void commitImportDraft()}>Importieren</button> : <button className="danger-button" type="button" onClick={discardImportDraft}>Nicht importieren</button>}</div></div></div>}
+      </div>
+    })()}
     {singleMoveTarget && <div className="single-move-hint"><span>Zielstrich wählen und doppelt antippen. Der Modus bleibt aktiv.</span><button type="button" onClick={cancelSingleMove}>Abbrechen</button></div>}
 
     {view !== 'playlistOverview' && <main className={`music-layout${layoutEditMode ? ' layout-editing' : ''}`} style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}><aside className="sidebar">
