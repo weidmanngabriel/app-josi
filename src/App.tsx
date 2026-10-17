@@ -1351,22 +1351,78 @@ function App() {
     setSongs((items) => items.map((song) => song.trashedLoop ? { ...song, trashedLoop: undefined } : song))
     setTrashedSongs([]); setTrashedPlaylists([]); setTrashedTags([]); setTrashConfirmation(false)
   }
-  const applyCurrentSortAsManual = async () => {
-    if (view !== 'library' || sortMode === 'manual') { setSortConfirmation(false); return }
-    const source = activePlaylist ? [...manualQueue] : [...songs].sort((a, b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt))
-    const direction = sortDirection === 'down' ? 1 : -1
-    const compare = (a: Song, b: Song) => {
-      if (sortMode === 'azStart') return a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' })
-      if (sortMode === 'azEnd') return reverseText(a.name).localeCompare(reverseText(b.name), 'de', { numeric: true, sensitivity: 'base' })
-      if (sortMode === 'plays') return (a.completedPlays ?? 0) - (b.completedPlays ?? 0) || a.name.localeCompare(b.name, 'de')
-      if (sortMode === 'duration') return (a.duration ?? Number.MAX_SAFE_INTEGER) - (b.duration ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name, 'de')
-      return a.addedAt - b.addedAt
+  const sortSavesFor = (kind: SortSaveKind) => sortSaves.filter((save) => save.kind === kind).sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' }))
+  const activeSortSave = (kind: SortSaveKind) => sortSavesFor(kind).find((save) => save.id === activeSortSaveIds[kind]) ?? sortSavesFor(kind)[0] ?? null
+  const sortModeFor = (kind: SortSaveKind) => kind === 'song' ? sortMode : kind === 'playlist' ? playlistSortMode : tagSortMode
+  const setSortModeFor = (kind: SortSaveKind, mode: SortMode) => {
+    if (kind === 'song') setSortMode(mode)
+    else if (kind === 'playlist') setPlaylistSortMode(mode)
+    else setTagSortMode(mode)
+  }
+  const nextSortSaveName = (kind: SortSaveKind) => {
+    const used = new Set(sortSavesFor(kind).map((save) => {
+      const match = save.name.trim().match(/^Save\s+(\d+)$/i)
+      return match ? Number(match[1]) : 0
+    }).filter(Boolean))
+    let value = 1
+    while (used.has(value)) value += 1
+    return `Save ${value}`
+  }
+  const currentRootOrderFor = (kind: SortSaveKind) => kind === 'song' ? songRootOrder : kind === 'playlist' ? playlistRootOrder : tagRootOrder
+  const captureSortOrders = (kind: SortSaveKind) => {
+    const prefix = `${kind}:`
+    const orders = Object.fromEntries(Object.entries(mixedOrders).filter(([key]) => key.startsWith(prefix)).map(([key, value]) => [key, [...value]]))
+    orders[rootContainerKey(kind)] = [...currentRootOrderFor(kind)]
+    return orders
+  }
+  const snapshotActiveSortSave = (kind: SortSaveKind) => {
+    if (sortModeFor(kind) !== 'manual') return
+    const active = activeSortSave(kind)
+    if (!active) return
+    const orders = captureSortOrders(kind)
+    setSortSaves((current) => current.map((save) => save.id === active.id ? { ...save, orders } : save))
+  }
+  const applySortSave = (kind: SortSaveKind, saveId: string) => {
+    const save = sortSaves.find((item) => item.kind === kind && item.id === saveId)
+    if (!save) return
+    if (sortModeFor(kind) === 'manual' && activeSortSave(kind)?.id !== saveId) snapshotActiveSortSave(kind)
+    setActiveSortSaveIds((current) => ({ ...current, [kind]: saveId }))
+    setMixedOrders((current) => {
+      const next = Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${kind}:`)))
+      return { ...next, ...Object.fromEntries(Object.entries(save.orders).map(([key, value]) => [key, [...value]])) }
+    })
+    setSortModeFor(kind, 'manual')
+  }
+  const changeSortSelection = (kind: SortSaveKind, value: string) => {
+    if (value.startsWith('save:')) { applySortSave(kind, value.slice(5)); return }
+    if (sortModeFor(kind) === 'manual') snapshotActiveSortSave(kind)
+    setSortModeFor(kind, value.replace('auto:', '') as SortMode)
+  }
+  const openSortSaveDialog = (kind: SortSaveKind) => {
+    setSortSaveName('')
+    setSortSaveDialogTarget(kind)
+    setSortMenuOpen(false)
+    setSidebarSortTarget(null)
+  }
+  const saveCurrentSort = () => {
+    const kind = sortSaveDialogTarget
+    if (!kind) return
+    if (sortModeFor(kind) === 'manual') snapshotActiveSortSave(kind)
+    const requested = sortSaveName.trim()
+    const name = requested || nextSortSaveName(kind)
+    if (sortSavesFor(kind).some((save) => save.name.localeCompare(name, 'de', { sensitivity: 'base' }) === 0)) {
+      setMessage(`Ein Save mit dem Namen „${name}“ existiert bereits.`)
+      return
     }
-    const ordered = source.sort((a, b) => compare(a, b) * direction)
-    recordHistory()
-    if (activePlaylist) await updatePlaylist({ ...activePlaylist, songIds: ordered.map((song) => song.id), lastUsedAt: Date.now() })
-    else { const updated = ordered.map((song, index) => ({ ...song, libraryOrder: index })); setSongs(updated); await saveSongOrder(updated) }
-    setSortMode('manual'); setSortConfirmation(false); setSortMenuOpen(false)
+    const orders = captureSortOrders(kind)
+    const save: SortSave = { id: crypto.randomUUID(), kind, name, orders, createdAt: Date.now() }
+    setSortSaves((current) => [...current, save])
+    setActiveSortSaveIds((current) => ({ ...current, [kind]: save.id }))
+    setMixedOrders((current) => ({ ...current, ...orders }))
+    setSortModeFor(kind, 'manual')
+    setSortSaveDialogTarget(null)
+    setSortSaveName('')
+    setMessage(`„${name}“ wurde gespeichert.`)
   }
 
   const globalSortForKind = (kind: GroupKind) => kind === 'song' ? { mode: sortMode, direction: sortDirection } : kind === 'playlist' ? { mode: playlistSortMode, direction: playlistSortDirection } : { mode: tagSortMode, direction: tagSortDirection }
