@@ -212,7 +212,6 @@ function App() {
   const [selectionConfirmation, setSelectionConfirmation] = useState<SelectionConfirmation>(null)
   const [trashConfirmation, setTrashConfirmation] = useState(false)
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
-  const [sortConfirmation, setSortConfirmation] = useState(false)
   const [sortSaves, setSortSaves] = useState<SortSave[]>(() => {
     try {
       const stored = JSON.parse(localStorage.getItem('josi-sort-saves') ?? '[]')
