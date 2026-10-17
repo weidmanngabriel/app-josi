@@ -78,7 +78,7 @@ Die sichere Metadaten-Speicherung prüft bei Undo, ob der Basis-Song noch existi
 
 ## Mehrfachauswahl und Playlist-Zuordnung
 
-Bibliothek, Playlists, Importverlauf und Loops verwenden denselben Song-Auswahlmodus. Rechts neben „Alle Playlists“ liegt im Auswahlmodus ein runder `•••`-Knopf. Er bietet unter anderem Gruppieren, Bewegen, Tags und Alle löschen. Playlists und Tags besitzen einen entsprechenden eigenen Auswahlmodus mit einem schwebenden `•••` unten rechts. Dort stehen Gruppieren, Bewegen, Kopieren und Alle löschen zur Verfügung. Bewegen verlangt bei einer automatischen Sortierung zuerst den Wechsel zu Manuell; Kopieren erzeugt neue Objekte desselben Typs, Löschen verschiebt die Auswahl in den Papierkorb. Bewegen arbeitet nur in Bibliothek bzw. geöffneter Playlist und verschiebt die Auswahl als Block innerhalb der manuellen Reihenfolge. Ist eine andere Sortierung aktiv, fragt Josi vorab nach dem Wechsel auf Manuell; bei Nein wird abgebrochen. Alle löschen verlangt eine Sicherheitsabfrage und entfernt die ausgewählten lokalen Dateien aus allen Playlists.
+Bibliothek, Playlists, Importverlauf und Loops verwenden denselben Song-Auswahlmodus. Rechts neben „Alle Playlists“ liegt im Auswahlmodus ein runder `•••`-Knopf. Er bietet Gruppieren, Tags und Alle löschen. Playlists und Tags besitzen einen entsprechenden eigenen Auswahlmodus mit einem schwebenden `•••` unten rechts. Dort stehen Gruppieren, Kopieren und Alle löschen zur Verfügung. **Mehrfachauswahl kann nicht bewegt werden.** Bewegen ist ausschließlich eine Einzelobjekt-Aktion im jeweiligen Drei-Punkte-Menü. Kopieren erzeugt neue Objekte desselben Typs, Löschen verschiebt die Auswahl in den Papierkorb. Alle löschen verlangt eine Sicherheitsabfrage und entfernt die ausgewählten lokalen Dateien aus allen Playlists.
 
 ## Suche
 
@@ -94,7 +94,7 @@ Der frühere Tab „Verlauf“ heißt „Importverlauf“. Er zeigt alle aktiven
 
 Songlisten bieten die automatischen Modi `A–Z Anfang`, `A–Z Ende`, `Anzahl des Hörens`, `Dauer` und `Chronik`. Die frühere sichtbare Option `Manuell` wurde durch benannte **Saves** ersetzt. Bestehende manuelle Reihenfolgen werden beim Umstieg als **Save 1** weitergeführt, damit keine vorhandene Reihenfolge verloren geht.
 
-Über **Aktuelle Sortierung speichern** kann die aktuell sichtbare Reihenfolge als neuer Save gesichert und optional benannt werden. Bleibt der Name leer, verwendet Josi die erste freie Bezeichnung `Save N`. Saves stehen in der Auswahl immer unter den automatischen Modi und werden untereinander nach Namen sortiert. Ein Save speichert die gemischte Reihenfolge aus normalen Objekten und Gruppen; beim Bearbeiten über **Reihenfolge ändern** wird der aktive Save fortgeschrieben. Für Songlisten gelten die Save-Reihenfolgen auch für den jeweiligen Bibliotheks-/Playlist-Kontext.
+Über **Aktuelle Sortierung speichern** kann die aktuell sichtbare Reihenfolge als neuer Save gesichert und optional benannt werden. Bleibt der Name leer, verwendet Josi die erste freie Bezeichnung `Save N`. Saves stehen in der Auswahl immer unter den automatischen Modi und werden untereinander nach Namen sortiert. Ein Save speichert die gemischte Reihenfolge aus normalen Objekten und Gruppen; beim Bearbeiten über **Reihenfolge ändern** wird der aktive Save fortgeschrieben. Für Songlisten gelten die Save-Reihenfolgen auch für den jeweiligen Bibliotheks-/Playlist-Kontext. In den Save-Listen kann ein Save etwa 650 ms gedrückt gehalten werden; anschließend öffnet sich ein Dialog zum Umbenennen.
 
 Playlists und Tags besitzen dieselbe Save-Logik in ihrem **Sortieren**-Dialog. Neben Richtungspfeil bzw. Gedankenstrich steht dort **Aktuelle Sortierung speichern**. Die Save-Daten und die aktive Auswahl liegen lokal in `localStorage`.
 
@@ -106,9 +106,19 @@ Jeder Eintrag erhält im Bearbeitungsmodus zusätzlich ein Schloss. Offen bedeut
 
 Sortierbünde sind keine Objektgruppen: Sie haben keinen Namen, kein Gruppenmenü und können nur im Modus **Reihenfolge ändern** bearbeitet werden. Außerhalb des Modus zeigt jedes Bund-Mitglied ein kleines geschlossenes Schloss neben `•••` und eine sehr dezente helle Umrandung. Einzelne geschlossene Schlösser ohne direkt benachbartes weiteres geschlossenes Element werden beim Klick auf **Fertig** automatisch wieder geöffnet.
 
+## Einzelobjekt-Bewegen und Erstellungsposition
+
+Lieder, Playlists, Tags und benannte Gruppen besitzen im jeweiligen Drei-Punkte-Menü die Aktion **Bewegen**; bei Menüs mit **Kopieren** steht Bewegen direkt darüber. Es kann immer nur ein Objekt gleichzeitig bewegt werden. Die Aktion wechselt für diesen Typ auf den aktiven Save und zeigt auf derselben Hierarchieebene rote Zielstriche zwischen den sichtbaren Objekten und Gruppen. Ein einfacher Klick markiert einen Zielstrich, ein Doppelklick bestätigt. Gruppen werden dabei als ein Token verschoben; Untergruppen und direkte Inhalte bleiben intern unverändert. Objekte innerhalb einer benannten Gruppe bleiben beim Bewegen in dieser Obergruppe.
+
+Neue leere Gruppen und aus einer Auswahl gebildete Gruppen werden nicht sofort eingefügt. Zuerst erscheint ein Namensdialog mit **Unbenannt** als Vorgabe. Über `•••` direkt neben dem Namen kann **Bewegen** vorgemerkt werden. Ohne Bewegen wird die Gruppe bei automatischer Sortierung sofort passend einsortiert; in einem aktiven Save steht sie zunächst ganz oben. Mit Bewegen folgt nach dem Erstellen die rote Zielstrich-Auswahl.
+
+Neu importierte Lieder sowie neu erstellte Playlists und Tags erhalten direkt nach ihrer Erstellung einen kompakten Namensdialog. Der Name kann sofort geändert werden; `••• → Bewegen` öffnet anschließend dieselbe Einzelobjekt-Positionierung. Bei einem Mehrfachimport werden diese Schritte nacheinander pro Lied angeboten.
+
 ## Bildschirmgrenzen für Dialoge und Menüs
 
 Dialoge, Auswahlfenster, Drei-Punkte-Menüs, Sortiermenüs und Farbauswahlen werden auf die aktuelle Viewport-Größe inklusive Safe-Area begrenzt. Solange ihr Inhalt hineinpasst, entsteht keine zusätzliche Scrollfläche. Erst wenn Breite oder Höhe nicht ausreichen, wird innerhalb des betroffenen Kastens gescrollt. Dadurch dürfen Bedienelemente auch auf kleinen iPad-/Mobilansichten nicht außerhalb des sichtbaren Bildschirms liegen.
+
+Die linke Seitenleiste und der rechte Bibliotheksbereich besitzen eigenständiges vertikales Touch-Scrolling. In **Einstellungen → Seitliche Bereiche sperren** kann dieses unabhängige Scrollen über einen Ein-/Aus-Schalter deaktiviert werden. Die Einstellung wird lokal gespeichert.
 
 ## Präziser Loop-Editor
 
