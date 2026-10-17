@@ -1702,6 +1702,62 @@ function App() {
     setMixedOrders((current) => ({ ...current, [containerKey]: nextOrder }))
     await persistRelativeOrder(kind, nextOrder, parentGroupId)
   }
+  const containerBaseTokensFor = (kind: GroupKind, parentGroupId?: string) => {
+    const allowed: Array<Song | Playlist | Tag> = kind === 'song' ? visibleSongs : kind === 'playlist' ? sidebarPlaylists : sidebarTags
+    if (parentGroupId) {
+      const parent = objectGroups.find((group) => group.id === parentGroupId && group.kind === kind)
+      if (!parent) return []
+      const children = sortedGroupsFor(kind, allowed, parentGroupId)
+      const items = orderedGroupItems(parent, allowed)
+      return [...children.filter((child) => !child.afterItems).map((child) => groupToken(child.id)), ...items.map((item) => itemToken(item.id)), ...children.filter((child) => child.afterItems).map((child) => groupToken(child.id))]
+    }
+    const groups = sortedGroupsFor(kind, allowed)
+    const groupedIds = new Set(objectGroups.filter((group) => group.kind === kind).flatMap((group) => group.itemIds))
+    const ungrouped = allowed.filter((item) => !groupedIds.has(item.id))
+    return [...groups.map((group) => groupToken(group.id)), ...ungrouped.map((item) => itemToken(item.id))]
+  }
+  const moveTargetKind = (target: SingleMoveTarget): GroupKind | null => {
+    if (!target) return null
+    if (target.kind !== 'group') return target.kind
+    return objectGroups.find((group) => group.id === target.id)?.kind ?? null
+  }
+  const openSingleMove = (kind: GroupKind | 'group', id: string, parentGroupId?: string) => {
+    const actualKind = kind === 'group' ? objectGroups.find((group) => group.id === id)?.kind : kind
+    if (!actualKind) return
+    const baseTokens = containerBaseTokensFor(actualKind, parentGroupId)
+    const key = parentGroupId ? groupContainerKey(actualKind, parentGroupId) : rootContainerKey(actualKind)
+    const currentOrder = orderedTokensForContainer(key, baseTokens, containerManualMode(actualKind, parentGroupId))
+    setMixedOrders((current) => ({ ...current, [key]: currentOrder }))
+    setSortModeFor(actualKind, 'manual')
+    setSingleMoveTarget({ kind, id, parentGroupId, targetIndex: null })
+    setOverflowMenu(null)
+    setCreationPlacementMenuOpen(false)
+    setMessage('Zielstrich einmal auswählen und dann doppelt antippen, um zu verschieben.')
+  }
+  const confirmSingleMove = async (targetIndex: number) => {
+    if (!singleMoveTarget) return
+    const actualKind = moveTargetKind(singleMoveTarget)
+    if (!actualKind) { setSingleMoveTarget(null); return }
+    const baseTokens = containerBaseTokensFor(actualKind, singleMoveTarget.parentGroupId)
+    const key = singleMoveTarget.parentGroupId ? groupContainerKey(actualKind, singleMoveTarget.parentGroupId) : rootContainerKey(actualKind)
+    const token = singleMoveTarget.kind === 'group' ? groupToken(singleMoveTarget.id) : itemToken(singleMoveTarget.id)
+    const currentOrder = normalizedMixedOrder(key, baseTokens)
+    const nextOrder = reorderIds(currentOrder, token, targetIndex)
+    if (nextOrder.join('|') === currentOrder.join('|')) { setSingleMoveTarget(null); return }
+    recordHistory()
+    setMixedOrders((current) => ({ ...current, [key]: nextOrder }))
+    await persistRelativeOrder(actualKind, nextOrder, singleMoveTarget.parentGroupId)
+    const active = activeSortSave(actualKind)
+    if (active) setSortSaves((current) => current.map((save) => save.id === active.id ? { ...save, orders: { ...save.orders, [key]: nextOrder } } : save))
+    setSingleMoveTarget(null)
+    setMessage('Objekt wurde verschoben.')
+  }
+  const renderSingleMoveZone = (kind: GroupKind, parentGroupId: string | undefined, index: number) => {
+    if (!singleMoveTarget || moveTargetKind(singleMoveTarget) !== kind || (singleMoveTarget.parentGroupId ?? undefined) !== (parentGroupId ?? undefined)) return null
+    const selected = singleMoveTarget.targetIndex === index
+    return <button className={`single-move-zone${selected ? ' selected' : ''}`} type="button" aria-label="Zielposition" onClick={(event) => { event.stopPropagation(); setSingleMoveTarget((current) => current ? { ...current, targetIndex: index } : current) }} onDoubleClick={(event) => { event.stopPropagation(); void confirmSingleMove(index) }}><span /></button>
+  }
+
   const cleanupBundleSingletons = () => {
     const nextLocks: BundleStateMap = { ...bundleLocks }
     const nextAnchors: BundleStateMap = { ...bundleAnchors }
