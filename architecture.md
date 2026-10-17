@@ -31,7 +31,7 @@ Diese Trennung ist eine Datenintegritätsmaßnahme für Safari/iPadOS. Sie verhi
 
 ### Playlists und Tags
 
-Playlists enthalten ID, Name, geordnete Song-IDs, optionales Bild, Erstellungs-/Nutzungszeit und manuelle Sortierposition. Tags liegen ab IndexedDB-Version 3 in einem eigenen `tags`-Store und enthalten Name, frei wählbare Farbe, Song-IDs, Playlist-IDs und eine manuelle Sortierposition. Beim Erstellen und Umbenennen öffnet der Farbring ein frei antippbares Farbspektrum; erst „Fertig“ übernimmt die gewählte Farbe. Tags referenzieren ausschließlich vorhandene Objekte und duplizieren niemals Audiodateien. Ein Song oder eine Playlist kann mehrere Tags besitzen; Tags selbst können nicht Mitglied einer Playlist sein.
+Playlists enthalten ID, Name, geordnete Song-IDs, optionales Bild, Erstellungs-/Nutzungszeit und manuelle Sortierposition. Tags liegen ab IndexedDB-Version 3 in einem eigenen `tags`-Store und enthalten Name, frei wählbare Farbe, Song-IDs, Playlist-IDs, optionale Gruppen-IDs und eine manuelle Sortierposition. Beim Erstellen und Umbenennen öffnet der Farbring ein frei antippbares Farbspektrum; erst „Fertig“ übernimmt die gewählte Farbe. Tags referenzieren ausschließlich vorhandene Objekte und duplizieren niemals Audiodateien. Eine getaggte Gruppe speichert nur die Gruppen-ID: ihre enthaltenen Lieder, Playlists, Tags oder Untergruppen werden dadurch nicht automatisch getaggt. Beim Auflösen oder Löschen einer Gruppe werden verwaiste Gruppen-Referenzen aus Tags entfernt.
 
 ## Import und Speicherstabilität
 
@@ -43,7 +43,9 @@ Bereits vor der Trennung beschädigte oder verlorene Blobs können nicht rekonst
 
 ## Import-Arbeitsbereich
 
-Bei einem Mehrfachimport bleibt die ursprüngliche Dateiauswahl als manuelle Reihenfolge erhalten: zuerst ausgewählte Datei oben, danach die weiteren Dateien. Das Importfenster besitzt zusätzlich A–Z Anfang, A–Z Ende und Auswahlreihenfolge als reine Ansichtssortierungen. Über das eigene `•••` stehen **Auswählen**, **Umbenennen**, **Reihenfolge ändern** und **Bewegen** zur Verfügung. **Auswählen** kann die Zielmenge der folgenden Aktionen auf einzelne Importdateien begrenzen. **Reihenfolge ändern** arbeitet mit Pfeilen und verändert die manuelle Importreihenfolge. **Bewegen** arbeitet mit roten Einfügelinien; der Modus bleibt nach jeder Positionierung aktiv und endet erst über **Abbrechen** oben in der Mitte.
+Bei einem Mehrfachimport bleibt die ursprüngliche Dateiauswahl als manuelle Reihenfolge erhalten: zuerst ausgewählte Datei oben, danach die weiteren Dateien. Das Importfenster besitzt zusätzlich A–Z Anfang, A–Z Ende und Auswahlreihenfolge als reine Ansichtssortierungen. Über das eigene `•••` stehen **Auswählen**, **Umbenennen**, **Reihenfolge ändern** und **Bewegen** zur Verfügung. **Auswählen** kann die Zielmenge der folgenden Aktionen auf einzelne Importdateien begrenzen. **Reihenfolge ändern** arbeitet mit Pfeilen und verändert die manuelle Importreihenfolge.
+
+**Bewegen** ist dreistufig. Es startet ausdrücklich mit leerer Auswahl; **Alles auswählen** und **Nichts auswählen** stehen nebeneinander. Nach **Bestätigen** erscheint ein eigenes Prüf-Fenster nur mit den ausgewählten Dateien. Dort können Dateien wieder aus dieser Bewegung entfernt und mit Pfeilen untereinander neu angeordnet werden. Nach erneutem **Bestätigen** wird die echte Bibliothek sichtbar; rote Einfügelinien markieren die mögliche Zielposition. **Zurück** führt jeweils eine Stufe zurück, **Bestätigen** übernimmt die aktuelle Stufe und **Abbrechen** beendet den Bewegen-Ablauf. Die gewählte Bibliotheksposition wird erst beim abschließenden Import gespeichert.
 
 Umbenennen wird als ein Undo-Schritt vorbereitet; Positionsänderungen erzeugen jeweils eigene Import-Undo-Schritte. Undo/Redo im Importfenster arbeitet zuerst auf diesem Entwurf. Beim bestätigten Import wird zusätzlich ein normaler App-Snapshot angelegt. Ein direkt anschließendes globales Undo entfernt die importierten Songs wieder aus IndexedDB und öffnet denselben Importentwurf inklusive der noch im Arbeitsspeicher gehaltenen Dateien erneut. Weitere Undo-Schritte können anschließend die vor dem Import vorgenommenen Umbenennungen und Bewegungen rückgängig machen. Redo funktioniert entsprechend in Gegenrichtung.
 
@@ -74,17 +76,21 @@ Einzelne Playlists bieten Bild ändern, Umbenennen, Kopieren, Einfügen, Tags, T
 
 Das `•••` neben der Überschrift „Playlists“ bietet „Auswählen“, „Reihenfolge ändern“ und „Übersicht“. Bei Tags heißt die entsprechende Aktion ebenfalls „Reihenfolge ändern“. Im Auswahlmodus erscheint zusätzlich der schwebende Drei-Punkte-Knopf unten rechts.
 
+## Direkte Tags für Playlists und Gruppen
+
+Einzelne Playlists besitzen **Tags** direkt unter **Kopieren**. Im Playlist-Mehrfachauswahlmenü steht dieselbe Aktion für alle markierten Playlists. Benannte Gruppen besitzen ebenfalls **Tags** direkt unter **Kopieren**. Gruppen-Tags werden als eigene `groupIds` im Tag gespeichert; das Tag wird nicht auf Gruppeninhalte vererbt. Die Tag-Ansicht zeigt direkt getaggte Gruppen separat von direkt getaggten Playlists und Songs.
+
 ## Papierkorb, Löschen und Undo/Redo
 
 Unter Loops liegt ein Papierkorb. Song- und Playlist-Löschen verwenden Bestätigungsdialoge und verschieben die Objekte zunächst nur in diesen lokalen Papierkorb. Der Song-Blob bleibt dabei im bestehenden Song-Store; Playlists werden per `trashedAt` ausgeblendet. Gelöschte Loops bleiben als kleine `trashedLoop`-Metadaten am Song erhalten. Alle drei Typen können einzeln wiederhergestellt werden. Erst „Papierkorb leeren“ entfernt nach erneuter Bestätigung Songs/Blobs und Playlists endgültig bzw. verwirft gelöschte Loop-Metadaten. Normale Löschaktionen werden deshalb nicht zusätzlich in den Undo-Verlauf geschrieben.
 
-Undo/Redo bleibt für normale Bearbeitungen, Kopieren und Reihenfolgeänderungen zuständig. Löschvorgänge werden dagegen über den Papierkorb wiederhergestellt und nicht zusätzlich als Undo-Schritt geführt. Frisch importierte Dateien werden weiterhin nicht automatisch durch Undo gelöscht.
+Undo/Redo bleibt für normale Bearbeitungen, Kopieren und Reihenfolgeänderungen zuständig. Löschvorgänge werden dagegen über den Papierkorb wiederhergestellt und nicht zusätzlich als Undo-Schritt geführt. Ein bestätigter Import bildet dagegen bewusst einen Undo-Schritt: direktes Undo entfernt die neu importierten Songs wieder und öffnet den Importentwurf erneut. Weitere Import-Undo-Schritte können unter anderem eine vorgemerkte Bibliotheksposition zurücknehmen.
 
 Die sichere Metadaten-Speicherung prüft bei Undo, ob der Basis-Song noch existiert. Nur wenn er fehlt, wird der Blob aus dem Snapshot einmalig wiederhergestellt; vorhandene Blobs werden nicht überschrieben.
 
 ## Mehrfachauswahl und Playlist-Zuordnung
 
-Bibliothek, Playlists, Importverlauf und Loops verwenden denselben Song-Auswahlmodus. Im Player-Bereich ersetzt ein großer Bibliotheks-`•••`-Knopf den früheren sichtbaren „Alle Playlists“-Knopf. Sein erster Menüpunkt ist **Alle Playlists**; er ist nur aktiv, wenn mindestens ein Lied ausgewählt ist. Direkt darunter folgen **Leere Gruppe erstellen**, **Weitere Gruppen abspielen** und **Aktuelle Sortierung speichern**. Im Song-Auswahlmodus enthält dasselbe Menü zusätzlich Gruppieren, Tags, Loop-Aktionen und Alle löschen. Playlists und Tags besitzen weiterhin ihren eigenen Auswahlmodus mit schwebendem `•••`. In den normalen Bibliotheks-/Objektmenüs bleibt **Bewegen** eine gezielte Objekt- bzw. bereits vorhandene Auswahlaktion; der neue Import-Arbeitsbereich darf dagegen eine eingeschränkte Importauswahl als Block positionieren. Kopieren erzeugt neue Objekte desselben Typs, Löschen verschiebt die Auswahl in den Papierkorb. Alle löschen verlangt eine Sicherheitsabfrage und entfernt die ausgewählten lokalen Dateien aus allen Playlists.
+Bibliothek, Playlists, Importverlauf und Loops verwenden denselben Song-Auswahlmodus. Im Player-Bereich ersetzt ein großer Bibliotheks-`•••`-Knopf den früheren sichtbaren „Alle Playlists“-Knopf. Ganz oben stehen dort immer **Auswählen** und direkt darunter **Reihenfolge ändern**. Danach folgen die übrigen Bibliotheksaktionen; **Alle Playlists** ist nur aktiv, wenn mindestens ein Lied ausgewählt ist. Im Song-Auswahlmodus enthält dasselbe Menü zusätzlich Gruppieren, Tags, Loop-Aktionen und Alle löschen. Playlists und Tags besitzen weiterhin ihren eigenen Auswahlmodus mit schwebendem `•••`. In den normalen Bibliotheks-/Objektmenüs bleibt **Bewegen** eine gezielte Objekt- bzw. bereits vorhandene Auswahlaktion; der neue Import-Arbeitsbereich darf dagegen eine eingeschränkte Importauswahl als Block positionieren. Kopieren erzeugt neue Objekte desselben Typs, Löschen verschiebt die Auswahl in den Papierkorb. Alle löschen verlangt eine Sicherheitsabfrage und entfernt die ausgewählten lokalen Dateien aus allen Playlists.
 
 ## Ausgewählte Lieder im Playlist-Bereich
 
@@ -134,7 +140,7 @@ Auch die Hauptoberfläche passt sich jetzt vor einem Überlauf an: Header, Bibli
 
 Die linke Seitenleiste und der rechte Bibliotheksbereich besitzen zusätzlich eigenständiges vertikales Touch-Scrolling. In **Einstellungen → Seitliche Bereiche sperren** kann dieses vertikale unabhängige Scrollen deaktiviert werden; der horizontale Pan-Fallback für nicht verkleinerbare Inhalte bleibt verfügbar. Die Einstellung wird lokal gespeichert.
 
-Der Modus **Leisten verschieben** hat Vorrang vor den responsiven Ersatzbreiten: Während der Bearbeitung werden die gespeicherten Sidebar- und Player-Trennwerte verwendet, sodass die Griffe tatsächlich verschiebbar bleiben. **Layout fertig** schreibt die aktuellen drei Werte noch einmal synchron in `localStorage` und beendet ausschließlich den Bearbeitungsmodus; es setzt keine Breite zurück. Die gleichen CSS-Variablen bleiben auch nach dem Beenden aktiv. Beim ersten Start nach dieser Änderung wird der auf dem Gerät bereits gespeicherte Layout-Zustand als persönliche Standardbasis übernommen. Nur der Knopf **Standard** in den Einstellungen stellt diese Basis wieder her.
+Der Modus **Leisten verschieben** speichert Sidebar-Breite und beide Player-Trennwerte fortlaufend in `localStorage`. **Layout fertig** schreibt dieselben aktuellen Werte erneut und beendet ausschließlich den Bearbeitungsmodus. Die fertige Ansicht erhält die drei Spaltenwerte zusätzlich direkt als Inline-Grid-Definitionen; responsive `!important`-Regeln dürfen diese Werte außerhalb des Bearbeitungsmodus nicht mehr überschreiben. Nur der Knopf **Standard** in den Einstellungen verändert die Werte zurück auf die persönliche Standardbasis.
 
 ## Undo/Redo in Fenstern
 
@@ -160,6 +166,10 @@ Unter der Zeitachse liegen kompakte Präzisionsbereiche. Fokus und Cursor stehen
 Markierungen werden als A, B, C usw. angezeigt. Über den globalen Löschknopf steht ein eigener **Markierung setzen**-Knopf. Eine ausgewählte Markierung kann über `•••` direkt zum Cursor, zum Zoom-Fokus, zum Loop-Anfang oder zum Loop-Ende übertragen oder einzeln gelöscht werden. Das Löschen aller Markierungen verlangt eine Bestätigung.
 
 Die Audiodatei bleibt beim gesamten Bearbeiten unverändert. `Loop speichern` persistiert weiterhin ausschließlich Start, Ende, Aktivstatus und Marker als Metadaten. Sowohl **Loop speichern** als auch **Loop löschen** verlangen vor der Änderung eine Bestätigung.
+
+## Abgeschlossene Gruppenwiedergabe
+
+`Gruppe abspielen` erzeugt eine eigene Song-ID-Queue ausschließlich aus der gewählten Liedgruppe und ihren echten Untergruppen. Die Queue folgt der gemischten Reihenfolge aus direkten Liedern und Untergruppen innerhalb dieser Gruppe. Eine aktive Gruppenwiedergabe wird durch `groupPlaybackIds !== null` erkannt; auch eine leere oder am Ende angekommene Gruppenqueue darf deshalb niemals auf Bibliothek, Playlist oder Tag-Queue zurückfallen. Vor/Zurück, Shuffle und Listen-Wiederholung verwenden währenddessen ausschließlich diese Gruppenqueue.
 
 ## Player-Stabilität bei Song-Metadaten
 
