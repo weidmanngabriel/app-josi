@@ -76,7 +76,7 @@ type PendingGroupCreate = { kind: GroupKind; sourceIds: string[]; parentGroupId?
 type CreationPlacement = { kind: GroupKind; id: string; name: string } | null
 type LayoutPreset = { sidebarWidth: number; playerSplitLeft: number; playerSplitRight: number }
 type ImportDraftItem = { id: string; file: File; name: string; originalIndex: number }
-type ImportDraftSnapshot = { items: Array<{ id: string; name: string; originalIndex: number }>; selectedIds: string[]; sortMode: SortMode }
+type ImportDraftSnapshot = { items: Array<{ id: string; name: string; originalIndex: number }>; selectedIds: string[]; sortMode: SortMode; placement: ImportLibraryPlacement }
 type ImportDraftConfirmation = 'finish' | 'cancel' | null
 type ImportMoveStep = 'select' | 'review' | 'place' | null
 type ImportLibraryPlacement = { draftIds: string[]; targetIndex: number } | null
@@ -555,8 +555,8 @@ function App() {
   }, [searchedVisibleSongs, sortMode, sortDirection])
 
   const normalPlayerQueue = view === 'tag' && activeTag ? tagSongQueue : activePlaylist ? manualQueue : [...songs].sort((a, b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt))
-  const groupPlayerQueue = groupPlaybackIds ? groupPlaybackIds.map((id) => songs.find((song) => song.id === id)).filter((song): song is Song => Boolean(song)) : []
-  const playerQueue = groupPlayerQueue.length ? groupPlayerQueue : normalPlayerQueue
+  const groupPlayerQueue = groupPlaybackIds !== null ? groupPlaybackIds.map((id) => songs.find((song) => song.id === id)).filter((song): song is Song => Boolean(song)) : []
+  const playerQueue = groupPlaybackIds !== null ? groupPlayerQueue : normalPlayerQueue
   const currentSongPlaylists = useMemo(() => currentSong ? playlists.filter((playlist) => playlist.songIds.includes(currentSong.id)) : [], [currentSong, playlists])
   const currentSongTags = useMemo(() => currentSong ? tags.filter((tag) => tag.songIds.includes(currentSong.id)) : [], [currentSong, tags])
   const taggedPlaylists = useMemo(() => activeTag ? activeTag.playlistIds.map((id) => playlists.find((playlist) => playlist.id === id)).filter((playlist): playlist is Playlist => Boolean(playlist)) : [], [activeTag, playlists])
@@ -771,6 +771,7 @@ function App() {
     items: importDraftItems.map((item) => ({ id: item.id, name: item.name, originalIndex: item.originalIndex })),
     selectedIds: [...importDraftSelectedIds],
     sortMode: importDraftSortMode,
+    placement: importLibraryPlacement ? { ...importLibraryPlacement, draftIds: [...importLibraryPlacement.draftIds] } : null,
   })
   const restoreImportDraftSnapshot = (target: ImportDraftSnapshot) => {
     const fileById = new Map(importDraftItems.map((item) => [item.id, item.file]))
@@ -778,6 +779,7 @@ function App() {
     setImportDraftItems(target.items.map((item) => ({ ...item, file: fileById.get(item.id)! })).filter((item) => Boolean(item.file)))
     setImportDraftSelectedIds(new Set(target.selectedIds))
     setImportDraftSortMode(target.sortMode)
+    setImportLibraryPlacement(target.placement ? { ...target.placement, draftIds: [...target.placement.draftIds] } : null)
   }
   const recordImportDraftHistory = () => {
     setImportDraftUndoStack((items) => [...items, importDraftSnapshot()].slice(-50))
@@ -844,6 +846,10 @@ function App() {
       setImportDraftReorderMode(false)
       setImportDraftMoveMode(false)
       setImportDraftSortMode('manual')
+      setImportMoveStep(null)
+      setImportMoveReviewIds([])
+      setImportLibraryTargetIndex(null)
+      setImportLibraryPlacement(lastCommittedImportDraft.placement ? { ...lastCommittedImportDraft.placement, draftIds: [...lastCommittedImportDraft.placement.draftIds] } : null)
       setImportDraftConfirmation(null)
       setImportDraftUndoStack([...lastCommittedImportDraft.undo])
       setImportDraftRedoStack([...lastCommittedImportDraft.redo])
@@ -1041,6 +1047,7 @@ function App() {
   }
   const confirmImportLibraryPlacement = () => {
     if (importLibraryTargetIndex === null || !importMoveReviewIds.length) return
+    recordImportDraftHistory()
     setImportLibraryPlacement({ draftIds: [...importMoveReviewIds], targetIndex: importLibraryTargetIndex })
     setImportMoveStep(null)
     setImportDraftMoveMode(false)
@@ -2449,11 +2456,27 @@ function App() {
     setGroupDeleteTargetId(null); setOverflowMenu(null)
     setMessage('Gruppe und enthaltene Objekte wurden in den Papierkorb verschoben.')
   }
-  const groupPlaybackSongIds = (group: ObjectGroup): string[] => {
-    if (group.kind !== 'song') return []
-    const direct = orderedGroupItems(group, songs).map((item) => item.id)
-    const nested = sortedGroupsFor('song', songs, group.id).flatMap((child) => groupPlaybackSongIds(child))
-    return [...direct, ...nested].filter((id) => songs.some((song) => song.id === id && song.file?.size))
+  const groupPlaybackSongIds = (group: ObjectGroup, seen = new Set<string>()): string[] => {
+    if (group.kind !== 'song' || seen.has(group.id)) return []
+    const nextSeen = new Set(seen); nextSeen.add(group.id)
+    const children = sortedGroupsFor('song', songs, group.id)
+    const items = orderedGroupItems(group, songs) as Song[]
+    const baseTokens = [
+      ...children.filter((child) => !child.afterItems).map((child) => groupToken(child.id)),
+      ...items.map((item) => itemToken(item.id)),
+      ...children.filter((child) => child.afterItems).map((child) => groupToken(child.id)),
+    ]
+    const order = orderedTokensForContainer(groupContainerKey('song', group.id), baseTokens, containerManualMode('song', group.id))
+    const childMap = new Map(children.map((child) => [child.id, child]))
+    const itemMap = new Map(items.map((item) => [item.id, item]))
+    return order.flatMap((token) => {
+      if (isGroupToken(token)) {
+        const child = childMap.get(tokenId(token))
+        return child ? groupPlaybackSongIds(child, nextSeen) : []
+      }
+      const item = itemMap.get(tokenId(token))
+      return item?.file?.size ? [item.id] : []
+    })
   }
   const startGroupPlayback = (groups: ObjectGroup[]) => {
     const ids = groups.flatMap((group) => groupPlaybackSongIds(group))
@@ -2697,7 +2720,7 @@ function App() {
       {trashedTags.map((tag) => <article className="trash-item" key={`trash-tag-${tag.id}`}><div><small>TAG</small><strong><i className="tag-dot" style={{ background: tag.color }} /> {tag.name}</strong><span>{tag.trashedAt ? formatDate(tag.trashedAt) : ''}</span></div><button type="button" onClick={() => void restoreTrashedTag(tag)}>Wiederherstellen</button></article>)}
       {songs.filter((song) => song.trashedLoop).map((song) => <article className="trash-item" key={`trash-loop-${song.id}`}><div><small>LOOP</small><strong>{song.name}</strong><span>{song.trashedLoop ? `${formatPrecise(song.trashedLoop.start)} – ${formatPrecise(song.trashedLoop.end)}` : ''}</span></div><button type="button" onClick={() => void restoreTrashedLoop(song)}>Wiederherstellen</button></article>)}
       {!trashCount && <div className="empty-state trash-empty"><div className="empty-icon">⌫</div><h2>Der Papierkorb ist leer.</h2></div>}
-    </div> : (visibleSongs.length || songGroups.length) ? <div className="song-list grouped-song-list">{songRootOrder.map((token, index) => <Fragment key={token}>{renderImportLibraryDropZone(index)}{renderSingleMoveZone('song', undefined, index)}{isGroupToken(token) ? renderSongGroup(songGroupMap.get(tokenId(token))!, 0, songRootKey, songRootBaseTokens) : renderSongRow(songItemMap.get(tokenId(token))!, index, undefined, songRootKey, songRootBaseTokens)}</Fragment>)}{renderImportLibraryDropZone(songRootOrder.length)}{renderSingleMoveZone('song', undefined, songRootOrder.length)}</div> : <div className="empty-state"><div className="empty-icon">♫</div><h2>{view === 'library' && searchQuery.trim() ? 'Keine Treffer.' : view === 'loops' ? 'Noch keine Loops gespeichert.' : view === 'history' ? 'Keine neuen Importe.' : 'Noch keine Musik hier.'}</h2></div>}
+    </div> : (visibleSongs.length || songGroups.length || importMoveStep === 'place') ? <div className="song-list grouped-song-list">{songRootOrder.map((token, index) => <Fragment key={token}>{renderImportLibraryDropZone(index)}{renderSingleMoveZone('song', undefined, index)}{isGroupToken(token) ? renderSongGroup(songGroupMap.get(tokenId(token))!, 0, songRootKey, songRootBaseTokens) : renderSongRow(songItemMap.get(tokenId(token))!, index, undefined, songRootKey, songRootBaseTokens)}</Fragment>)}{renderImportLibraryDropZone(songRootOrder.length)}{renderSingleMoveZone('song', undefined, songRootOrder.length)}</div> : <div className="empty-state"><div className="empty-icon">♫</div><h2>{view === 'library' && searchQuery.trim() ? 'Keine Treffer.' : view === 'loops' ? 'Noch keine Loops gespeichert.' : view === 'history' ? 'Keine neuen Importe.' : 'Noch keine Musik hier.'}</h2></div>}
     </section></main>}
 
     {view === 'playlistOverview' && <section className="playlist-overview"><div className="playlist-overview-heading"><p className="eyebrow">DEINE MUSIK</p><h1>Playlists</h1><p>{playlists.length} Playlists</p></div>{playlistGroups.map((group) => renderPlaylistOverviewGroup(group))}<div className="playlist-grid">{ungroupedSidebarPlaylists.map(renderPlaylistCard)}</div></section>}
