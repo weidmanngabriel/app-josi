@@ -1442,6 +1442,42 @@ function App() {
     setSortSaveName('')
     setMessage(`„${name}“ wurde gespeichert.`)
   }
+  const openSortSaveRename = (save: SortSave) => {
+    setSortSaveRenameId(save.id)
+    setSortSaveRenameValue(save.name)
+    setSortMenuOpen(false)
+  }
+  const confirmSortSaveRename = (event: React.FormEvent) => {
+    event.preventDefault()
+    const value = sortSaveRenameValue.trim()
+    const save = sortSaves.find((item) => item.id === sortSaveRenameId)
+    if (!save || !value) return
+    if (sortSavesFor(save.kind).some((item) => item.id !== save.id && item.name.localeCompare(value, 'de', { sensitivity: 'base' }) === 0)) {
+      setMessage(`Ein Save mit dem Namen „${value}“ existiert bereits.`)
+      return
+    }
+    setSortSaves((current) => current.map((item) => item.id === save.id ? { ...item, name: value } : item))
+    setSortSaveRenameId(null)
+    setSortSaveRenameValue('')
+  }
+  const beginSortSaveHold = (save: SortSave) => {
+    if (sortSaveHoldTimerRef.current !== null) window.clearTimeout(sortSaveHoldTimerRef.current)
+    sortSaveLongPressRef.current = false
+    sortSaveHoldTimerRef.current = window.setTimeout(() => {
+      sortSaveLongPressRef.current = true
+      openSortSaveRename(save)
+      sortSaveHoldTimerRef.current = null
+    }, 650)
+  }
+  const endSortSaveHold = () => {
+    if (sortSaveHoldTimerRef.current !== null) window.clearTimeout(sortSaveHoldTimerRef.current)
+    sortSaveHoldTimerRef.current = null
+  }
+  const activateSortSaveButton = (save: SortSave) => {
+    if (sortSaveLongPressRef.current) { sortSaveLongPressRef.current = false; return }
+    applySortSave(save.kind, save.id)
+  }
+
 
   const globalSortForKind = (kind: GroupKind) => kind === 'song' ? { mode: sortMode, direction: sortDirection } : kind === 'playlist' ? { mode: playlistSortMode, direction: playlistSortDirection } : { mode: tagSortMode, direction: tagSortDirection }
   const itemDuration = (kind: GroupKind, id: string) => {
