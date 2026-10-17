@@ -1782,31 +1782,48 @@ function App() {
   const renderBundleBadge = (kind: GroupKind, containerKey: string, baseTokens: string[], token: string) => !reorderActiveForKind(kind) && bundleInfo(containerKey, baseTokens, token).bundled ? <span className="bundle-static-lock" title="Sortierbund" aria-label="Sortierbund"><span aria-hidden="true" /></span> : null
 
   const createEmptyObjectGroup = (kind: GroupKind, parentGroupId?: string) => {
-    const id = crypto.randomUUID()
-    recordHistory()
-    setObjectGroups((current) => {
-      const siblings = current.filter((group) => group.kind === kind && (group.parentGroupId ?? null) === (parentGroupId ?? null))
-      const minOrder = Math.min(0, ...siblings.map((group) => group.sortOrder))
-      return [{ id, kind, name: 'Unbenannt', itemIds: [], createdAt: Date.now(), sortOrder: minOrder - 1, sortMode: 'general', sortDirection: 'down', parentGroupId, afterItems: parentGroupId ? false : undefined }, ...current]
-    })
+    setPendingGroupCreate({ kind, sourceIds: [], parentGroupId, name: 'Unbenannt', moveAfterCreate: false })
+    setGroupCreateMenuOpen(false)
     setOverflowMenu(null); setSortMenuOpen(false); setGroupNestingTarget(null)
-    setMessage('Leere Gruppe wurde erstellt.')
-    return id
   }
   const createObjectGroup = (kind: GroupKind, sourceIds: string[]) => {
     const valid = [...new Set(sourceIds)].filter((id) => Boolean(objectFor(kind, id)))
     if (valid.length < 2) { setMessage('Wähle mindestens zwei Objekte zum Gruppieren aus.'); return }
-    setObjectGroups((current) => {
-      const directParents = current.filter((group) => group.kind === kind && valid.every((id) => group.itemIds.includes(id)))
-      const parent = directParents.sort((a, b) => groupDescendantIds(a.id).length - groupDescendantIds(b.id).length).at(-1)
-      const parentId = parent?.id
-      const siblings = current.filter((group) => group.kind === kind && (group.parentGroupId ?? null) === (parentId ?? null))
-      const minOrder = Math.min(0, ...siblings.map((group) => group.sortOrder))
-      const next = current.map((group) => parentId && group.id === parentId ? { ...group, itemIds: group.itemIds.filter((id) => !valid.includes(id)) } : group)
-      return [{ id: crypto.randomUUID(), kind, name: 'Unbenannt', itemIds: valid, createdAt: Date.now(), sortOrder: minOrder - 1, sortMode: 'general', sortDirection: 'down', parentGroupId: parentId, afterItems: parentId ? false : undefined }, ...next]
-    })
-    if (kind === 'song') stopSelection()
+    const directParents = objectGroups.filter((group) => group.kind === kind && valid.every((id) => group.itemIds.includes(id)))
+    const parent = directParents.sort((a, b) => groupDescendantIds(a.id).length - groupDescendantIds(b.id).length).at(-1)
+    setPendingGroupCreate({ kind, sourceIds: valid, parentGroupId: parent?.id, name: 'Unbenannt', moveAfterCreate: false })
+    setGroupCreateMenuOpen(false)
+    setOverflowMenu(null); setSelectionMenuOpen(false); setSidebarSelectionMenuOpen(false)
+  }
+  const finalizePendingGroupCreate = () => {
+    const draft = pendingGroupCreate
+    if (!draft) return
+    const id = crypto.randomUUID()
+    const name = draft.name.trim() || 'Unbenannt'
+    const siblings = objectGroups.filter((group) => group.kind === draft.kind && (group.parentGroupId ?? null) === (draft.parentGroupId ?? null))
+    const minOrder = Math.min(0, ...siblings.map((group) => group.sortOrder))
+    const nextGroup: ObjectGroup = { id, kind: draft.kind, name, itemIds: [...draft.sourceIds], createdAt: Date.now(), sortOrder: minOrder - 1, sortMode: 'general', sortDirection: 'down', parentGroupId: draft.parentGroupId, afterItems: draft.parentGroupId ? false : undefined }
+    recordHistory()
+    setObjectGroups((current) => [nextGroup, ...current.map((group) => draft.parentGroupId && group.id === draft.parentGroupId ? { ...group, itemIds: group.itemIds.filter((itemId) => !draft.sourceIds.includes(itemId)) } : group)])
+    const key = draft.parentGroupId ? groupContainerKey(draft.kind, draft.parentGroupId) : rootContainerKey(draft.kind)
+    const base = containerBaseTokensFor(draft.kind, draft.parentGroupId)
+    const currentOrder = orderedTokensForContainer(key, base, containerManualMode(draft.kind, draft.parentGroupId))
+    const nextOrder = [groupToken(id), ...currentOrder.filter((token) => token !== groupToken(id))]
+    const manual = sortModeFor(draft.kind) === 'manual'
+    if (manual || draft.moveAfterCreate) {
+      setMixedOrders((current) => ({ ...current, [key]: nextOrder }))
+      const active = activeSortSave(draft.kind)
+      if (active) setSortSaves((current) => current.map((save) => save.id === active.id ? { ...save, orders: { ...save.orders, [key]: nextOrder } } : save))
+    }
+    if (draft.moveAfterCreate) {
+      setSortModeFor(draft.kind, 'manual')
+      setSingleMoveTarget({ kind: 'group', id, parentGroupId: draft.parentGroupId, targetIndex: null })
+      setMessage('Gruppe erstellt. Zielstrich wählen und doppelt antippen.')
+    } else setMessage(`Gruppe „${name}“ wurde erstellt.`)
+    if (draft.kind === 'song') stopSelection()
     else { setSidebarSelectionKind(null); setSelectedPlaylistIds(new Set()); setSelectedTagIds(new Set()); setSidebarSelectionMenuOpen(false) }
+    setPendingGroupCreate(null)
+    setGroupCreateMenuOpen(false)
   }
   const startSidebarSelection = (kind: 'playlist' | 'tag') => { setSidebarSelectionKind(kind); setSelectedPlaylistIds(new Set()); setSelectedTagIds(new Set()); setSidebarSelectionMenuOpen(false); setOverflowMenu(null) }
   const selectAllPlaylists = () => { setSidebarSelectionKind('playlist'); setSelectedPlaylistIds(new Set(sidebarPlaylists.map((playlist) => playlist.id))); setSelectedTagIds(new Set()); setSidebarSelectionMenuOpen(false); setOverflowMenu(null) }
