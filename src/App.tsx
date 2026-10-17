@@ -73,7 +73,7 @@ type SortSaveKind = 'song' | 'playlist' | 'tag'
 type SortSave = { id: string; kind: SortSaveKind; name: string; orders: Record<string, string[]>; createdAt: number }
 type SingleMoveTarget = { kind: GroupKind | 'group'; id: string; parentGroupId?: string; targetIndex: number | null } | null
 type PendingGroupCreate = { kind: GroupKind; sourceIds: string[]; parentGroupId?: string; name: string; moveAfterCreate: boolean } | null
-type CreationPlacement = { kind: 'song' | 'playlist'; id: string; name: string } | null
+type CreationPlacement = { kind: GroupKind; id: string; name: string } | null
 type OverflowMenu = { kind: 'song' | 'songDetail' | 'playlist' | 'playlists' | 'tag' | 'tags' | 'group'; id?: string; parentGroupId?: string } | null
 type SidebarSortTarget = 'tags' | 'playlists' | null
 type RepeatSetting = { kind: 'infinite' } | { kind: 'count'; count: number } | null
@@ -248,6 +248,8 @@ function App() {
   const [pendingGroupCreate, setPendingGroupCreate] = useState<PendingGroupCreate>(null)
   const [groupCreateMenuOpen, setGroupCreateMenuOpen] = useState(false)
   const [creationPlacement, setCreationPlacement] = useState<CreationPlacement>(null)
+  const [creationPlacementQueue, setCreationPlacementQueue] = useState<Array<NonNullable<CreationPlacement>>>([])
+  const [creationPlacementMenuOpen, setCreationPlacementMenuOpen] = useState(false)
   const [tagSortMode, setTagSortMode] = useState<SortMode>(() => (localStorage.getItem('josi-tag-sort-mode') as SortMode) || 'manual')
   const [tagSortDirection, setTagSortDirection] = useState<SortDirection>(() => (localStorage.getItem('josi-tag-sort-direction') as SortDirection) || 'down')
   const [playlistSortMode, setPlaylistSortMode] = useState<SortMode>(() => (localStorage.getItem('josi-playlist-sort-mode') as SortMode) || 'manual')
