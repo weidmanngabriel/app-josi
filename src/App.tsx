@@ -455,6 +455,14 @@ function App() {
     return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop); window.removeEventListener('pointercancel', stop) }
   }, [layoutDrag, playerSplitLeft, playerSplitRight])
 
+  const finishLayoutEditing = () => {
+    localStorage.setItem('josi-sidebar-width', String(sidebarWidth))
+    localStorage.setItem('josi-player-split-left', String(playerSplitLeft))
+    localStorage.setItem('josi-player-split-right', String(playerSplitRight))
+    setLayoutDrag(null)
+    setLayoutEditMode(false)
+  }
+
   useEffect(() => localStorage.setItem('josi-sort-saves', JSON.stringify(sortSaves)), [sortSaves])
   useEffect(() => localStorage.setItem('josi-active-sort-saves', JSON.stringify(activeSortSaveIds)), [activeSortSaveIds])
   useEffect(() => localStorage.setItem('josi-side-pane-scroll-locked', sidePaneScrollLocked ? '1' : '0'), [sidePaneScrollLocked])
@@ -2509,7 +2517,7 @@ function App() {
   return <div className={`app-shell${sidePaneScrollLocked ? ' side-pane-scroll-locked' : ''}`}>
     <header className="site-header">
       <div className="history-controls" aria-label="Navigation und Verlauf"><button className="home-button" type="button" onClick={goHome} aria-label="Bibliothek">⌂</button><button className="settings-button" type="button" onClick={() => setSettingsOpen(true)} aria-label="Einstellungen">⚙</button><button type="button" onClick={navigateBack} disabled={navigationIndex === 0 && !loopEditorSongId}>‹</button><button type="button" onClick={navigateForward} disabled={navigationIndex >= navigation.length - 1 || Boolean(loopEditorSongId)}>›</button><button type="button" onClick={() => void undo()} disabled={!undoStack.length || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↶</button><button type="button" onClick={() => void redo()} disabled={(!redoStack.length && !cancelledDuplicateAction) || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↷</button>{moveCandidate && <><button className="confirm-move" type="button" onClick={() => void confirmPendingMove()} disabled={moveCandidate.targetIndex === null}>✓</button><button className="cancel-move" type="button" onClick={() => setMoveCandidate(null)}>×</button></>}</div>
-      <div className="header-right-actions">{layoutEditMode && <button className="layout-finish-button" type="button" onClick={() => { setLayoutEditMode(false); setLayoutDrag(null) }}>Layout fertig</button>}<button className="import-button" type="button" onClick={openImportPicker}>+ Musik importieren</button></div><input ref={fileInputRef} className="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac" multiple onChange={(event) => void importFiles(event.target.files)} /><input ref={coverInputRef} className="file-input" type="file" accept="image/*" onChange={(event) => void changePlaylistCover(event.target.files)} />
+      <div className="header-right-actions">{layoutEditMode && <button className="layout-finish-button" type="button" onClick={finishLayoutEditing}>Layout fertig</button>}<button className="import-button" type="button" onClick={openImportPicker}>+ Musik importieren</button></div><input ref={fileInputRef} className="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac" multiple onChange={(event) => void importFiles(event.target.files)} /><input ref={coverInputRef} className="file-input" type="file" accept="image/*" onChange={(event) => void changePlaylistCover(event.target.files)} />
     </header>
     {overlayWindowOpen && <div className="dialog-history-controls"><button type="button" onClick={() => void undo()} disabled={importDraftItems.length ? !importDraftUndoStack.length && !undoStack.length : !undoStack.length || Boolean(moveCandidate)}>↶</button><button type="button" onClick={() => void redo()} disabled={importDraftItems.length ? !importDraftRedoStack.length && !redoStack.length : !redoStack.length && !cancelledDuplicateAction}>↷</button></div>}
     {importDraftItems.length > 0 && (() => {
@@ -2520,10 +2528,9 @@ function App() {
         <div className="import-workspace-topbar">
           <div className="import-history-spacer" aria-hidden="true" />
           {modeActive && <button className="import-mode-cancel" type="button" onClick={() => {
-            if (importDraftRenameOpen && importDraftUndoStack.length) undoImportDraft()
-            setImportDraftRenameOpen(false)
+            if (importDraftRenameOpen) { setImportDraftRenameOpen(false); return }
             cancelImportDraftMode()
-          }}>Abbrechen</button>}
+          }}>{importDraftRenameOpen ? 'Fertig' : 'Abbrechen'}</button>}
           <div className="import-workspace-title"><small>MUSIK IMPORTIEREN</small><strong>{importDraftItems.length} {importDraftItems.length === 1 ? 'Lied' : 'Lieder'}</strong></div>
         </div>
         <div className="import-workspace-toolbar">
