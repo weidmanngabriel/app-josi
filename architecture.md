@@ -140,7 +140,7 @@ Auch die Hauptoberfläche passt sich jetzt vor einem Überlauf an: Header, Bibli
 
 Die linke Seitenleiste und der rechte Bibliotheksbereich besitzen zusätzlich eigenständiges vertikales Touch-Scrolling. In **Einstellungen → Seitliche Bereiche sperren** kann dieses vertikale unabhängige Scrollen deaktiviert werden; der horizontale Pan-Fallback für nicht verkleinerbare Inhalte bleibt verfügbar. Die Einstellung wird lokal gespeichert.
 
-Der Modus **Leisten verschieben** speichert Sidebar-Breite und beide Player-Trennwerte fortlaufend in `localStorage`. **Layout fertig** schreibt dieselben aktuellen Werte erneut und beendet ausschließlich den Bearbeitungsmodus. Die fertige Ansicht erhält die drei Spaltenwerte zusätzlich direkt als Inline-Grid-Definitionen; responsive `!important`-Regeln dürfen diese Werte außerhalb des Bearbeitungsmodus nicht mehr überschreiben. Nur der Knopf **Standard** in den Einstellungen verändert die Werte zurück auf die persönliche Standardbasis.
+Der Modus **Leisten verschieben** speichert Sidebar-Breite und beide Player-Trennwerte fortlaufend in `localStorage`. **Layout fertig** schreibt dieselben aktuellen Werte erneut und beendet ausschließlich den Bearbeitungsmodus. Bibliothek und Player tragen dauerhaft eine `custom-layout`-Klasse, deren Grid-Definitionen auch außerhalb des Bearbeitungsmodus mit höherer CSS-Priorität dieselben gespeicherten Werte verwenden. Responsive Ersatzspalten dürfen die Nutzerwerte deshalb nach **Layout fertig** nicht mehr überschreiben. Nur der Knopf **Standard** in den Einstellungen verändert die Werte zurück auf die persönliche Standardbasis.
 
 ## Undo/Redo in Fenstern
 
@@ -169,7 +169,7 @@ Die Audiodatei bleibt beim gesamten Bearbeiten unverändert. `Loop speichern` pe
 
 ## Abgeschlossene Gruppenwiedergabe
 
-`Gruppe abspielen` erzeugt eine eigene Song-ID-Queue ausschließlich aus der gewählten Liedgruppe und ihren echten Untergruppen. Die Queue folgt der gemischten Reihenfolge aus direkten Liedern und Untergruppen innerhalb dieser Gruppe. Eine aktive Gruppenwiedergabe wird durch `groupPlaybackIds !== null` erkannt; auch eine leere oder am Ende angekommene Gruppenqueue darf deshalb niemals auf Bibliothek, Playlist oder Tag-Queue zurückfallen. Vor/Zurück, Shuffle und Listen-Wiederholung verwenden währenddessen ausschließlich diese Gruppenqueue.
+`Gruppe abspielen` erzeugt eine eigene Song-ID-Queue ausschließlich aus der gewählten Liedgruppe und ihren echten Untergruppen. Die Queue folgt der gemischten Reihenfolge aus direkten Liedern und Untergruppen innerhalb dieser Gruppe. Eine aktive Gruppenwiedergabe wird durch `groupPlaybackIds !== null` erkannt und zusätzlich synchron in `groupPlaybackIdsRef` gespiegelt. Liedwechsel lesen bei aktiver Gruppenwiedergabe direkt aus dieser abgeschlossenen ID-Liste, damit auch zwischen zwei React-Renders kein Rückfall auf Bibliothek, Playlist oder Tag-Queue möglich ist. Vor/Zurück, Shuffle und Listen-Wiederholung verwenden währenddessen ausschließlich diese Gruppenqueue.
 
 ## Player-Stabilität bei Song-Metadaten
 

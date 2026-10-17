@@ -351,6 +351,7 @@ function App() {
   const repeatHoldTimerRef = useRef<number | null>(null)
   const repeatHoldTriggeredRef = useRef(false)
   const repeatRemainingRef = useRef<number | null>(null)
+  const groupPlaybackIdsRef = useRef<string[] | null>(null)
 
   const currentPlaybackAudio = () => playbackAudioRef.current ?? audioRef.current
   const otherPlaybackAudio = (audio: HTMLAudioElement) => audio === audioRef.current ? overlapAudioRef.current : audioRef.current
@@ -897,7 +898,10 @@ function App() {
   const toggleSelected = (id: string) => setSelectedSongIds((current) => { const next = new Set(current); if (next.has(id)) next.delete(id); else next.add(id); return next })
   const playSong = (id: string, remember = true, preserveGroupQueue = false) => {
     if (selectionMode) return toggleSelected(id)
-    if (!preserveGroupQueue) setGroupPlaybackIds(null)
+    if (!preserveGroupQueue) {
+      groupPlaybackIdsRef.current = null
+      setGroupPlaybackIds(null)
+    }
     const song = songs.find((item) => item.id === id)
     if (!song?.file || song.file.size === 0) { setMessage('Diese Audiodatei ist lokal nicht mehr verfügbar. Bitte importiere sie erneut.'); return }
     if (id === currentSongId && currentPlaybackAudio()) return void currentPlaybackAudio()?.play().catch(() => setMessage(`„${song.name}“ konnte nicht gestartet werden.`))
@@ -914,17 +918,21 @@ function App() {
     playSong(song.id, true, true)
   }
   const moveSong = (direction: 1 | -1) => {
-    if (!playerQueue.length) return
-    const queue = playerQueue
+    const lockedGroupIds = groupPlaybackIdsRef.current
+    const queue = lockedGroupIds !== null
+      ? lockedGroupIds.map((id) => songs.find((song) => song.id === id)).filter((song): song is Song => Boolean(song))
+      : playerQueue
+    if (!queue.length) return
     const currentIndex = queue.findIndex((song) => song.id === currentSongId)
-    if (shuffle && direction === 1 && playerQueue.length > 1) {
-      const options = playerQueue.filter((song) => song.id !== currentSongId && song.file?.size)
-      if (options.length) return playSong(options[Math.floor(Math.random() * options.length)].id, true, true)
+    if (shuffle && direction === 1 && queue.length > 1) {
+      const options = queue.filter((song) => song.id !== currentSongId && song.file?.size)
+      if (options.length) return playSong(options[Math.floor(Math.random() * options.length)].id, true, lockedGroupIds !== null)
     }
     const nextIndex = currentIndex < 0 ? (direction === 1 ? 0 : queue.length - 1) : currentIndex + direction
-    if (nextIndex >= 0 && nextIndex < queue.length) return playQueueSong(queue[nextIndex])
-    if (repeatQueue) return playSong(playerQueue[direction === 1 ? 0 : playerQueue.length - 1].id, true, true)
-    shouldAutoPlayRef.current = false; setIsPlaying(false)
+    if (nextIndex >= 0 && nextIndex < queue.length) return playSong(queue[nextIndex].id, true, lockedGroupIds !== null)
+    if (repeatQueue) return playSong(queue[direction === 1 ? 0 : queue.length - 1].id, true, lockedGroupIds !== null)
+    shouldAutoPlayRef.current = false
+    setIsPlaying(false)
   }
   const togglePlayback = () => {
     const audio = currentPlaybackAudio()
@@ -940,7 +948,13 @@ function App() {
     setCurrentTime(next); if (loopEditorSongId) setLoopCursor(next)
   }
   const skipSeconds = (seconds: number) => seek(currentTime + seconds)
-  const playPreviousFromHistory = () => { const previous = playHistory.at(-1); if (!previous) return; setPlayHistory((items) => items.slice(0, -1)); playSong(previous, false) }
+  const playPreviousFromHistory = () => {
+    if (groupPlaybackIdsRef.current !== null) { moveSong(-1); return }
+    const previous = playHistory.at(-1)
+    if (!previous) return
+    setPlayHistory((items) => items.slice(0, -1))
+    playSong(previous, false)
+  }
 
   useEffect(() => {
     if (!('mediaSession' in navigator)) return
@@ -2490,6 +2504,7 @@ function App() {
   const startGroupPlayback = (groups: ObjectGroup[]) => {
     const ids = groups.flatMap((group) => groupPlaybackSongIds(group))
     if (!ids.length) { setMessage('In der Auswahl befinden sich keine abspielbaren Lieder.'); return }
+    groupPlaybackIdsRef.current = ids
     setGroupPlaybackIds(ids)
     setGroupPlaybackChooserOpen(false)
     setChooserSearch('')
@@ -2701,7 +2716,7 @@ function App() {
     {sidebarMoveKind && <div className="single-move-hint persistent-move-hint"><span>Bewegen bleibt aktiv.</span><button type="button" onClick={() => { setSidebarMoveKind(null); setChooserSearch('') }}>Abbrechen</button></div>}
     {bulkMoveMode && <div className="single-move-hint persistent-move-hint"><span>Bewegen bleibt aktiv.</span><button type="button" onClick={() => setBulkMoveMode(false)}>Abbrechen</button></div>}
 
-    {view !== 'playlistOverview' && <main className={`music-layout${layoutEditMode ? ' layout-editing' : ''}`} style={{ display: 'grid', gridTemplateColumns: `${sidebarWidth}px minmax(0,1fr)`, '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}><aside className="sidebar">
+    {view !== 'playlistOverview' && <main className={`music-layout custom-layout${layoutEditMode ? ' layout-editing' : ''}`} style={{ display: 'grid', gridTemplateColumns: `${sidebarWidth}px minmax(360px,1fr)`, '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}><aside className="sidebar">
       <button className={`nav-item${view === 'library' && !activePlaylistId ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'library', playlistId: null, detailOpen: false })}><span>Bibliothek</span><strong>{songs.length}</strong></button>
       <button className={`nav-item history-nav${view === 'history' ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'history', playlistId: null, detailOpen: false })}><span>Importverlauf</span><strong><span className="new-count-blue">{newImportCount}</span>/{songs.length}</strong></button>
       <button className={`nav-item history-nav${view === 'loops' ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'loops', playlistId: null, detailOpen: false })}><span>Loops</span><strong>{songs.filter((song) => song.loopStart !== undefined && song.loopEnd !== undefined).length}</strong></button>
@@ -2734,7 +2749,7 @@ function App() {
 
     {view === 'playlistOverview' && <section className="playlist-overview"><div className="playlist-overview-heading"><p className="eyebrow">DEINE MUSIK</p><h1>Playlists</h1><p>{playlists.length} Playlists</p></div>{playlistGroups.map((group) => renderPlaylistOverviewGroup(group))}<div className="playlist-grid">{ungroupedSidebarPlaylists.map(renderPlaylistCard)}</div></section>}
 
-    <section className={`player${currentSong ? ' visible' : ''}${layoutEditMode ? ' layout-editing' : ''}`} style={{ gridTemplateColumns: `${playerSplitLeft}% ${Math.max(12, playerSplitRight - playerSplitLeft)}% ${Math.max(12, 100 - playerSplitRight)}%`, '--player-left': `${playerSplitLeft}%`, '--player-middle': `${Math.max(12, playerSplitRight - playerSplitLeft)}%`, '--player-right': `${Math.max(12, 100 - playerSplitRight)}%` } as React.CSSProperties}><audio ref={audioRef} src={currentUrl ?? undefined} playsInline preload="auto" onTimeUpdate={(event) => handleAudioTimeUpdate(event.currentTarget)} onLoadedMetadata={(event) => { const value = event.currentTarget.duration; setDuration(value); if (currentSong && Number.isFinite(value) && (!currentSong.duration || Math.abs(currentSong.duration - value) > .5)) void updateSong({ ...currentSong, duration: value }) }} onPlay={() => { playbackAudioRef.current ??= audioRef.current; setIsPlaying(true) }} onPause={() => requestAnimationFrame(updatePlayingState)} onError={() => currentSong && setMessage(`„${currentSong.name}“ kann aus dem lokalen Speicher nicht geladen werden.`)} onEnded={(event) => handleAudioEnded(event.currentTarget)} /><audio ref={overlapAudioRef} src={currentUrl ?? undefined} playsInline preload="auto" onTimeUpdate={(event) => handleAudioTimeUpdate(event.currentTarget)} onPlay={() => setIsPlaying(true)} onPause={() => requestAnimationFrame(updatePlayingState)} onEnded={(event) => handleAudioEnded(event.currentTarget)} />{layoutEditMode && <><button className="player-layout-handle player-layout-handle-left" style={{ left: `${playerSplitLeft}%` }} type="button" aria-label="Erste Player-Leiste verschieben" onPointerDown={(event) => { event.preventDefault(); setLayoutDrag('playerLeft') }} /><button className="player-layout-handle player-layout-handle-right" style={{ left: `${playerSplitRight}%` }} type="button" aria-label="Zweite Player-Leiste verschieben" onPointerDown={(event) => { event.preventDefault(); setLayoutDrag('playerRight') }} /></>}
+    <section className={`player custom-layout${currentSong ? ' visible' : ''}${layoutEditMode ? ' layout-editing' : ''}`} style={{ gridTemplateColumns: `${playerSplitLeft}% ${Math.max(12, playerSplitRight - playerSplitLeft)}% ${Math.max(12, 100 - playerSplitRight)}%`, '--player-left': `${playerSplitLeft}%`, '--player-middle': `${Math.max(12, playerSplitRight - playerSplitLeft)}%`, '--player-right': `${Math.max(12, 100 - playerSplitRight)}%` } as React.CSSProperties}><audio ref={audioRef} src={currentUrl ?? undefined} playsInline preload="auto" onTimeUpdate={(event) => handleAudioTimeUpdate(event.currentTarget)} onLoadedMetadata={(event) => { const value = event.currentTarget.duration; setDuration(value); if (currentSong && Number.isFinite(value) && (!currentSong.duration || Math.abs(currentSong.duration - value) > .5)) void updateSong({ ...currentSong, duration: value }) }} onPlay={() => { playbackAudioRef.current ??= audioRef.current; setIsPlaying(true) }} onPause={() => requestAnimationFrame(updatePlayingState)} onError={() => currentSong && setMessage(`„${currentSong.name}“ kann aus dem lokalen Speicher nicht geladen werden.`)} onEnded={(event) => handleAudioEnded(event.currentTarget)} /><audio ref={overlapAudioRef} src={currentUrl ?? undefined} playsInline preload="auto" onTimeUpdate={(event) => handleAudioTimeUpdate(event.currentTarget)} onPlay={() => setIsPlaying(true)} onPause={() => requestAnimationFrame(updatePlayingState)} onEnded={(event) => handleAudioEnded(event.currentTarget)} />{layoutEditMode && <><button className="player-layout-handle player-layout-handle-left" style={{ left: `${playerSplitLeft}%` }} type="button" aria-label="Erste Player-Leiste verschieben" onPointerDown={(event) => { event.preventDefault(); setLayoutDrag('playerLeft') }} /><button className="player-layout-handle player-layout-handle-right" style={{ left: `${playerSplitRight}%` }} type="button" aria-label="Zweite Player-Leiste verschieben" onPointerDown={(event) => { event.preventDefault(); setLayoutDrag('playerRight') }} /></>}
       <button className="now-playing" type="button" onClick={() => currentSong && navigateTo({ view, playlistId: activePlaylistId, tagId: activeTagId, detailOpen: true })} disabled={!currentSong}><span className="cover-placeholder">♫</span><span className="now-playing-copy"><small>JETZT</small><span className="marquee"><strong>{currentSong?.name ?? 'Kein Song ausgewählt'}</strong></span></span></button>
       <div className="transport"><div className="transport-buttons"><button className={shuffle ? 'active-control' : ''} onClick={() => setShuffle((value) => !value)} aria-label="Shuffle">⇄</button><button onClick={() => moveSong(-1)} aria-label="Vorheriges Lied">⏮</button><button onClick={() => skipSeconds(-seekSeconds)} aria-label={`${seekSeconds} Sekunden zurück`}>⏪</button><button className="play-button" onClick={togglePlayback}>{isPlaying ? '❚❚' : '▶'}</button><button onClick={() => skipSeconds(seekSeconds)} aria-label={`${seekSeconds} Sekunden vor`}>⏩</button><button onClick={() => moveSong(1)} aria-label="Nächstes Lied">⏭</button><button className={repeatQueue || repeatSetting ? 'active-control repeat-control' : 'repeat-control'} onPointerDown={beginRepeatHold} onPointerUp={endRepeatHold} onPointerCancel={endRepeatHold} onContextMenu={(event) => event.preventDefault()} onClick={handleRepeatClick} aria-label={repeatBadge ? `Wiederholung ${repeatBadge}` : 'Liste wiederholen'}><span className="repeat-symbol">↻{repeatBadge && <b>{repeatBadge}</b>}</span></button></div><div className="progress-row"><span>{formatTime(currentTime)}</span><input type="range" min="0" max={duration || 0} step="0.1" value={Math.min(currentTime, duration || 0)} onChange={(event) => seek(Number(event.target.value))} /><span>{formatTime(duration)}</span></div></div>
       <div className="quick-playlists library-quick-actions"><div className="quick-selection-summary">{selectedSongIds.size ? <button type="button" onClick={() => { setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setSelectedSongsListOpen(true) }}><span>{selectedSongIds.size === 1 ? songs.find((song) => selectedSongIds.has(song.id))?.name ?? '1 Lied ausgewählt' : `${selectedSongIds.size} Lieder ausgewählt`}</span><strong>▾</strong></button> : <span className="quick-selection-empty">Kein Lied ausgewählt</span>}</div><div className="library-bottom-menu-wrap"><button className={`library-bottom-menu-button${selectedSongIds.size ? ' has-selection' : ''}`} type="button" onClick={() => { setSortMenuOpen((value) => !value); setLibrarySortPickerOpen(false) }} aria-label="Weitere Bibliotheksaktionen">•••</button>{sortMenuOpen && <><button className="selection-menu-shield" type="button" onClick={() => setSortMenuOpen(false)} /><div className="library-bottom-action-menu"><button type="button" disabled={selectionMode || view === 'trash'} onClick={() => { startSelection(); setSortMenuOpen(false) }}>Auswählen</button><button type="button" disabled={view !== 'library'} onClick={() => { beginReorder(activePlaylist ? 'playlist' : 'library'); setSortMenuOpen(false) }}>Reihenfolge ändern</button><div className="library-bottom-menu-divider" /><button className={selectedSongIds.size ? 'playlist-action-ready' : ''} type="button" disabled={!selectedSongIds.size} onClick={() => { setChooserSortMode('manual'); setChooserSortDirection('down'); setChooserSearch(''); setPlaylistChooserMode('bulk'); setSortMenuOpen(false) }}>Alle Playlists</button><button type="button" onClick={() => createEmptyObjectGroup('song')}>Leere Gruppe erstellen</button><button type="button" onClick={openGroupPlaybackChooser}>Weitere Gruppen abspielen</button><button type="button" disabled={view !== 'library'} onClick={() => openSortSaveDialog('song')}>Aktuelle Sortierung speichern</button>{selectionMode && <><div className="library-bottom-menu-divider" /><button type="button" onClick={() => createObjectGroup('song', [...selectedSongIds])} disabled={selectedSongIds.size < 2}>Gruppieren</button><button type="button" onClick={() => openTagChooser('song', [...selectedSongIds])} disabled={!selectedSongIds.size}>Tags</button>{selectionContainsOnlyLoops && <><button type="button" onClick={() => void requestManualLoopChange([...selectedSongIds], true)}>Alle Loops aktivieren</button><button type="button" onClick={() => void requestManualLoopChange([...selectedSongIds], false)}>Alle Loops deaktivieren</button></>}<button className="danger-menu-action" type="button" onClick={() => { setSortMenuOpen(false); setSelectionConfirmation('deleteSelected') }} disabled={!selectedSongIds.size}>Alle löschen</button></>}</div></>}</div></div>

@@ -185,7 +185,7 @@ Die nähere Songansicht besitzt ein eigenes `•••` mit songbezogenen Aktion
 
 ## Bildschirmfeste Bedienelemente
 
-Menüs und Dialoge dürfen nicht aus dem sichtbaren Bildschirm hinausragen. Der frei eingestellte Bibliotheks-/Player-Schnitt bleibt auch nach **Layout fertig** bestehen; dieser Knopf speichert die aktuellen Werte und beendet nur die Bearbeitung. Die fertige Ansicht verwendet die gespeicherten Spalten direkt und lässt sie nicht mehr von responsiven Ersatzspalten überschreiben. Ein Rücksprung zur persönlichen Standardbasis erfolgt ausschließlich über **Standard** in den Einstellungen. Linker Seitenbereich und Bibliotheksbereich können unabhängig vertikal gescrollt werden; **Seitliche Bereiche sperren** schaltet dieses vertikale Scrollen ab, nicht den horizontalen Notfall-Pan.
+Menüs und Dialoge dürfen nicht aus dem sichtbaren Bildschirm hinausragen. Der frei eingestellte Bibliotheks-/Player-Schnitt bleibt auch nach **Layout fertig** bestehen; dieser Knopf speichert die aktuellen Werte und beendet nur die Bearbeitung. Die fertige Ansicht verwendet dieselben Nutzer-Spalten mit Vorrang vor responsiven Ersatzspalten, sodass sich das Layout beim Beenden optisch nicht zurückstellt. Ein Rücksprung zur persönlichen Standardbasis erfolgt ausschließlich über **Standard** in den Einstellungen. Linker Seitenbereich und Bibliotheksbereich können unabhängig vertikal gescrollt werden; **Seitliche Bereiche sperren** schaltet dieses vertikale Scrollen ab, nicht den horizontalen Notfall-Pan.
 
 ## Reihenfolge ändern und Sortierbünde
 
