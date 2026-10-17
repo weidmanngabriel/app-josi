@@ -2450,6 +2450,14 @@ function App() {
       setTrashedTags((items) => [...moving, ...items.filter((item) => !idSet.has(item.id))])
       if (activeTagId && idSet.has(activeTagId)) goHome()
     }
+    const tagGroupUpdates = tags
+      .filter((tag) => (tag.groupIds ?? []).some((id) => groupIds.has(id)))
+      .map((tag) => ({ ...tag, groupIds: (tag.groupIds ?? []).filter((id) => !groupIds.has(id)) }))
+    if (tagGroupUpdates.length) {
+      await Promise.all(tagGroupUpdates.map(saveTag))
+      const updates = new Map(tagGroupUpdates.map((tag) => [tag.id, tag]))
+      setTags((current) => current.map((tag) => updates.get(tag.id) ?? tag))
+    }
     const deletedObjects = new Set(objectIds)
     setObjectGroups((current) => current.filter((group) => !groupIds.has(group.id)).map((group) => group.kind === target.kind ? { ...group, itemIds: group.itemIds.filter((id) => !deletedObjects.has(id)) } : group))
     setCollapsedGroupIds((current) => { const next = new Set(current); groupIds.forEach((id) => next.delete(id)); return next })
