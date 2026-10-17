@@ -1009,12 +1009,6 @@ input, textarea {
   .header-right-actions {
     margin-left: auto;
   }
-  .music-layout {
-    grid-template-columns: minmax(170px, 34vw) minmax(0,1fr) !important;
-  }
-  .player {
-    grid-template-columns: minmax(0,1fr) minmax(0,1fr) !important;
-  }
   .quick-playlists {
     grid-column: 1 / -1;
   }
@@ -1030,9 +1024,6 @@ input, textarea {
     justify-content: flex-start;
     flex-wrap: nowrap;
   }
-  .music-layout {
-    display: block;
-  }
   .sidebar {
     width: 100%;
     max-width: 100vw;
@@ -1042,7 +1033,6 @@ input, textarea {
     max-width: 100vw;
   }
   .player {
-    grid-template-columns: minmax(0,1fr) !important;
     max-width: 100vw;
   }
   .quick-playlists {
