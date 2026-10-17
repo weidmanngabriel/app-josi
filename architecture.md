@@ -92,7 +92,11 @@ Der frühere Tab „Verlauf“ heißt „Importverlauf“. Er zeigt alle aktiven
 
 ## Sortierung
 
-Alle Songlisten unterstützen `Manuell`, `A–Z Anfang`, `A–Z Ende`, `Anzahl des Hörens`, `Dauer` und `Chronik`. Die Sortieransicht verändert die manuelle Reihenfolge nicht. Die gewählte Ansicht und Richtung werden in `localStorage` gespeichert. Neben Sortierbox und Richtungspfeil liegt ein `•••`. In Bibliothek bzw. geöffneter Playlist kann die aktuelle nicht-manuelle Sortierung inklusive Pfeilrichtung nach Bestätigung einmalig als neue manuelle Reihenfolge gespeichert werden; danach wird auf Manuell gewechselt und es gibt keine automatische Nachsortierung.
+Songlisten bieten die automatischen Modi `A–Z Anfang`, `A–Z Ende`, `Anzahl des Hörens`, `Dauer` und `Chronik`. Die frühere sichtbare Option `Manuell` wurde durch benannte **Saves** ersetzt. Bestehende manuelle Reihenfolgen werden beim Umstieg als **Save 1** weitergeführt, damit keine vorhandene Reihenfolge verloren geht.
+
+Über **Aktuelle Sortierung speichern** kann die aktuell sichtbare Reihenfolge als neuer Save gesichert und optional benannt werden. Bleibt der Name leer, verwendet Josi die erste freie Bezeichnung `Save N`. Saves stehen in der Auswahl immer unter den automatischen Modi und werden untereinander nach Namen sortiert. Ein Save speichert die gemischte Reihenfolge aus normalen Objekten und Gruppen; beim Bearbeiten über **Reihenfolge ändern** wird der aktive Save fortgeschrieben. Für Songlisten gelten die Save-Reihenfolgen auch für den jeweiligen Bibliotheks-/Playlist-Kontext.
+
+Playlists und Tags besitzen dieselbe Save-Logik in ihrem **Sortieren**-Dialog. Neben Richtungspfeil bzw. Gedankenstrich steht dort **Aktuelle Sortierung speichern**. Die Save-Daten und die aktive Auswahl liegen lokal in `localStorage`.
 
 ## Reihenfolge ändern und Sortierbünde
 
@@ -101,6 +105,10 @@ Im Modus **Reihenfolge ändern** werden benannte Gruppen und einzelne Objekte ni
 Jeder Eintrag erhält im Bearbeitungsmodus zusätzlich ein Schloss. Offen bedeutet ungebunden. Geschlossene, direkt benachbarte Einträge bilden einen namenlosen **Sortierbund**. Ein solcher Bund kann aus normalen Objekten und benannten Gruppen bestehen. Er wird beim Verschieben als Einheit behandelt; die interne Reihenfolge bleibt dabei unverändert. Bei zwei oder mehr benachbarten geschlossenen Einträgen erscheint je Eintrag ein Kreis. Der rot markierte Kreis bestimmt den Sortieranker des Bundes für automatische Sortierungen. Ohne gewählten Anker dient der erste Eintrag als Anker.
 
 Sortierbünde sind keine Objektgruppen: Sie haben keinen Namen, kein Gruppenmenü und können nur im Modus **Reihenfolge ändern** bearbeitet werden. Außerhalb des Modus zeigt jedes Bund-Mitglied ein kleines geschlossenes Schloss neben `•••` und eine sehr dezente helle Umrandung. Einzelne geschlossene Schlösser ohne direkt benachbartes weiteres geschlossenes Element werden beim Klick auf **Fertig** automatisch wieder geöffnet.
+
+## Bildschirmgrenzen für Dialoge und Menüs
+
+Dialoge, Auswahlfenster, Drei-Punkte-Menüs, Sortiermenüs und Farbauswahlen werden auf die aktuelle Viewport-Größe inklusive Safe-Area begrenzt. Solange ihr Inhalt hineinpasst, entsteht keine zusätzliche Scrollfläche. Erst wenn Breite oder Höhe nicht ausreichen, wird innerhalb des betroffenen Kastens gescrollt. Dadurch dürfen Bedienelemente auch auf kleinen iPad-/Mobilansichten nicht außerhalb des sichtbaren Bildschirms liegen.
 
 ## Präziser Loop-Editor
 
@@ -161,7 +169,7 @@ Songzeilen zeigen Tags platzsparend nur als farbige Punkte vor der Playlist-Zuor
 
 ## Seitenleisten-Sortierung, Detailmenü und Navigation
 
-Die Sortierfelder für Tags und Playlists stehen nicht dauerhaft in der Seitenleiste. Bei einem einzelnen Tag bzw. einer Playlist liegt direkt unter `Umbenennen` die Aktion `Sortieren`; sie öffnet einen kompakten Dialog für Sortiermodus und Richtung. Beide Listen speichern ihre Auswahl separat. Die Song-Detailansicht besitzt ein eigenes `•••` mit nur songbezogenen Aktionen inklusive Tags; globale Listen-Sortierung erscheint dort nicht. `Home` schließt den Loop-Editor explizit, bevor zur Bibliothek navigiert wird, damit ein bereits aktiver Bibliotheks-Navigationseintrag den Editor nicht offen hält.
+Die Sortierfelder für Tags und Playlists stehen nicht dauerhaft in der Seitenleiste. Bei einem einzelnen Tag bzw. einer Playlist liegt direkt unter `Umbenennen` die Aktion `Sortieren`; sie öffnet einen kompakten Dialog mit automatischen Modi, Richtung, **Aktuelle Sortierung speichern** und den alphabetisch darunter gelisteten Saves. Beide Listen speichern ihre Auswahl separat. Die Song-Detailansicht besitzt ein eigenes `•••` mit nur songbezogenen Aktionen inklusive Tags; globale Listen-Sortierung erscheint dort nicht. `Home` schließt den Loop-Editor explizit, bevor zur Bibliothek navigiert wird, damit ein bereits aktiver Bibliotheks-Navigationseintrag den Editor nicht offen hält.
 
 
 ## Objektgruppen und Farbfeld

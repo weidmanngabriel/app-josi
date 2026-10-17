@@ -69,6 +69,8 @@ type Snapshot = { songs: Song[]; playlists: Playlist[]; tags: Tag[]; objectGroup
 type PlaylistChooserMode = 'current' | 'bulk' | null
 type SortMode = 'manual' | 'azStart' | 'azEnd' | 'plays' | 'duration' | 'chronology'
 type SortDirection = 'down' | 'up'
+type SortSaveKind = 'song' | 'playlist' | 'tag'
+type SortSave = { id: string; kind: SortSaveKind; name: string; orders: Record<string, string[]>; createdAt: number }
 type OverflowMenu = { kind: 'song' | 'songDetail' | 'playlist' | 'playlists' | 'tag' | 'tags' | 'group'; id?: string } | null
 type SidebarSortTarget = 'tags' | 'playlists' | null
 type RepeatSetting = { kind: 'infinite' } | { kind: 'count'; count: number } | null
@@ -210,7 +212,30 @@ function App() {
   const [selectionConfirmation, setSelectionConfirmation] = useState<SelectionConfirmation>(null)
   const [trashConfirmation, setTrashConfirmation] = useState(false)
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
-  const [sortConfirmation, setSortConfirmation] = useState(false)
+  const [sortSaves, setSortSaves] = useState<SortSave[]>(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('josi-sort-saves') ?? '[]')
+      if (Array.isArray(stored) && stored.length) return stored
+    } catch { /* use migration defaults */ }
+    return [
+      { id: 'legacy-song-save-1', kind: 'song', name: 'Save 1', orders: {}, createdAt: 1 },
+      { id: 'legacy-playlist-save-1', kind: 'playlist', name: 'Save 1', orders: {}, createdAt: 1 },
+      { id: 'legacy-tag-save-1', kind: 'tag', name: 'Save 1', orders: {}, createdAt: 1 },
+    ]
+  })
+  const [activeSortSaveIds, setActiveSortSaveIds] = useState<Record<SortSaveKind, string>>(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('josi-active-sort-saves') ?? '{}')
+      if (stored && typeof stored === 'object') return {
+        song: typeof stored.song === 'string' ? stored.song : 'legacy-song-save-1',
+        playlist: typeof stored.playlist === 'string' ? stored.playlist : 'legacy-playlist-save-1',
+        tag: typeof stored.tag === 'string' ? stored.tag : 'legacy-tag-save-1',
+      }
+    } catch { /* use defaults */ }
+    return { song: 'legacy-song-save-1', playlist: 'legacy-playlist-save-1', tag: 'legacy-tag-save-1' }
+  })
+  const [sortSaveDialogTarget, setSortSaveDialogTarget] = useState<SortSaveKind | null>(null)
+  const [sortSaveName, setSortSaveName] = useState('')
   const [tagSortMode, setTagSortMode] = useState<SortMode>(() => (localStorage.getItem('josi-tag-sort-mode') as SortMode) || 'manual')
   const [tagSortDirection, setTagSortDirection] = useState<SortDirection>(() => (localStorage.getItem('josi-tag-sort-direction') as SortDirection) || 'down')
   const [playlistSortMode, setPlaylistSortMode] = useState<SortMode>(() => (localStorage.getItem('josi-playlist-sort-mode') as SortMode) || 'manual')
@@ -379,6 +404,8 @@ function App() {
     return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop); window.removeEventListener('pointercancel', stop) }
   }, [layoutDrag, playerSplitLeft, playerSplitRight])
 
+  useEffect(() => localStorage.setItem('josi-sort-saves', JSON.stringify(sortSaves)), [sortSaves])
+  useEffect(() => localStorage.setItem('josi-active-sort-saves', JSON.stringify(activeSortSaveIds)), [activeSortSaveIds])
   useEffect(() => localStorage.setItem('josi-mixed-orders', JSON.stringify(mixedOrders)), [mixedOrders])
   useEffect(() => localStorage.setItem('josi-bundle-locks', JSON.stringify(bundleLocks)), [bundleLocks])
   useEffect(() => localStorage.setItem('josi-bundle-anchors', JSON.stringify(bundleAnchors)), [bundleAnchors])
@@ -1156,7 +1183,13 @@ function App() {
   const confirmDeletePlaylist = async () => { if (!playlistToDelete) return; const trashed = { ...playlistToDelete, trashedAt: Date.now() }; await savePlaylist(trashed); setPlaylists((items) => items.filter((playlist) => playlist.id !== playlistToDelete.id)); setTrashedPlaylists((items) => [trashed, ...items.filter((playlist) => playlist.id !== trashed.id)]); if (activePlaylistId === playlistToDelete.id) navigateTo({ view: 'library', playlistId: null, detailOpen: false }); setPlaylistToDelete(null) }
 
   const beginReorder = (scope: Exclude<ReorderScope, null>) => { if (scope === 'library' || scope === 'playlist') setSearchQuery(''); if (scope === 'sidebar') { setPlaylistsCollapsed(false); setPlaylistSortMode('manual') } if (scope === 'tags') { setTagsCollapsed(false); setTagSortMode('manual') } setReorderScope(scope); setMoveCandidate(null); setOverflowMenu(null); if (scope !== 'tags' && scope !== 'sidebar') setSortMode('manual') }
-  const finishReorder = () => { cleanupBundleSingletons(); setReorderScope(null); setMoveCandidate(null) }
+  const finishReorder = () => {
+    cleanupBundleSingletons()
+    if (reorderScope === 'sidebar') snapshotActiveSortSave('playlist')
+    else if (reorderScope === 'tags') snapshotActiveSortSave('tag')
+    else if (reorderScope === 'library' || reorderScope === 'playlist') snapshotActiveSortSave('song')
+    setReorderScope(null); setMoveCandidate(null)
+  }
   const reorderIds = (ids: string[], sourceId: string, targetIndex: number) => { const sourceIndex = ids.indexOf(sourceId); if (sourceIndex < 0) return ids; const next = [...ids]; const [moved] = next.splice(sourceIndex, 1); next.splice(Math.max(0, Math.min(targetIndex > sourceIndex ? targetIndex - 1 : targetIndex, next.length)), 0, moved); return next }
   const confirmPendingMove = async () => {
     if (!moveCandidate || moveCandidate.targetIndex === null) return; recordHistory()
@@ -1323,22 +1356,78 @@ function App() {
     setSongs((items) => items.map((song) => song.trashedLoop ? { ...song, trashedLoop: undefined } : song))
     setTrashedSongs([]); setTrashedPlaylists([]); setTrashedTags([]); setTrashConfirmation(false)
   }
-  const applyCurrentSortAsManual = async () => {
-    if (view !== 'library' || sortMode === 'manual') { setSortConfirmation(false); return }
-    const source = activePlaylist ? [...manualQueue] : [...songs].sort((a, b) => (a.libraryOrder ?? a.addedAt) - (b.libraryOrder ?? b.addedAt))
-    const direction = sortDirection === 'down' ? 1 : -1
-    const compare = (a: Song, b: Song) => {
-      if (sortMode === 'azStart') return a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' })
-      if (sortMode === 'azEnd') return reverseText(a.name).localeCompare(reverseText(b.name), 'de', { numeric: true, sensitivity: 'base' })
-      if (sortMode === 'plays') return (a.completedPlays ?? 0) - (b.completedPlays ?? 0) || a.name.localeCompare(b.name, 'de')
-      if (sortMode === 'duration') return (a.duration ?? Number.MAX_SAFE_INTEGER) - (b.duration ?? Number.MAX_SAFE_INTEGER) || a.name.localeCompare(b.name, 'de')
-      return a.addedAt - b.addedAt
+  const sortSavesFor = (kind: SortSaveKind) => sortSaves.filter((save) => save.kind === kind).sort((a, b) => a.name.localeCompare(b.name, 'de', { numeric: true, sensitivity: 'base' }))
+  const activeSortSave = (kind: SortSaveKind) => sortSavesFor(kind).find((save) => save.id === activeSortSaveIds[kind]) ?? sortSavesFor(kind)[0] ?? null
+  const sortModeFor = (kind: SortSaveKind) => kind === 'song' ? sortMode : kind === 'playlist' ? playlistSortMode : tagSortMode
+  const setSortModeFor = (kind: SortSaveKind, mode: SortMode) => {
+    if (kind === 'song') setSortMode(mode)
+    else if (kind === 'playlist') setPlaylistSortMode(mode)
+    else setTagSortMode(mode)
+  }
+  const nextSortSaveName = (kind: SortSaveKind) => {
+    const used = new Set(sortSavesFor(kind).map((save) => {
+      const match = save.name.trim().match(/^Save\s+(\d+)$/i)
+      return match ? Number(match[1]) : 0
+    }).filter(Boolean))
+    let value = 1
+    while (used.has(value)) value += 1
+    return `Save ${value}`
+  }
+  const currentRootOrderFor = (kind: SortSaveKind) => kind === 'song' ? songRootOrder : kind === 'playlist' ? playlistRootOrder : tagRootOrder
+  const captureSortOrders = (kind: SortSaveKind) => {
+    const prefix = `${kind}:`
+    const orders = Object.fromEntries(Object.entries(mixedOrders).filter(([key]) => key.startsWith(prefix)).map(([key, value]) => [key, [...value]]))
+    orders[rootContainerKey(kind)] = [...currentRootOrderFor(kind)]
+    return orders
+  }
+  const snapshotActiveSortSave = (kind: SortSaveKind) => {
+    if (sortModeFor(kind) !== 'manual') return
+    const active = activeSortSave(kind)
+    if (!active) return
+    const orders = captureSortOrders(kind)
+    setSortSaves((current) => current.map((save) => save.id === active.id ? { ...save, orders } : save))
+  }
+  const applySortSave = (kind: SortSaveKind, saveId: string) => {
+    const save = sortSaves.find((item) => item.kind === kind && item.id === saveId)
+    if (!save) return
+    if (sortModeFor(kind) === 'manual' && activeSortSave(kind)?.id !== saveId) snapshotActiveSortSave(kind)
+    setActiveSortSaveIds((current) => ({ ...current, [kind]: saveId }))
+    setMixedOrders((current) => {
+      const next = Object.fromEntries(Object.entries(current).filter(([key]) => !key.startsWith(`${kind}:`)))
+      return { ...next, ...Object.fromEntries(Object.entries(save.orders).map(([key, value]) => [key, [...value]])) }
+    })
+    setSortModeFor(kind, 'manual')
+  }
+  const changeSortSelection = (kind: SortSaveKind, value: string) => {
+    if (value.startsWith('save:')) { applySortSave(kind, value.slice(5)); return }
+    if (sortModeFor(kind) === 'manual') snapshotActiveSortSave(kind)
+    setSortModeFor(kind, value.replace('auto:', '') as SortMode)
+  }
+  const openSortSaveDialog = (kind: SortSaveKind) => {
+    setSortSaveName('')
+    setSortSaveDialogTarget(kind)
+    setSortMenuOpen(false)
+    setSidebarSortTarget(null)
+  }
+  const saveCurrentSort = () => {
+    const kind = sortSaveDialogTarget
+    if (!kind) return
+    if (sortModeFor(kind) === 'manual') snapshotActiveSortSave(kind)
+    const requested = sortSaveName.trim()
+    const name = requested || nextSortSaveName(kind)
+    if (sortSavesFor(kind).some((save) => save.name.localeCompare(name, 'de', { sensitivity: 'base' }) === 0)) {
+      setMessage(`Ein Save mit dem Namen „${name}“ existiert bereits.`)
+      return
     }
-    const ordered = source.sort((a, b) => compare(a, b) * direction)
-    recordHistory()
-    if (activePlaylist) await updatePlaylist({ ...activePlaylist, songIds: ordered.map((song) => song.id), lastUsedAt: Date.now() })
-    else { const updated = ordered.map((song, index) => ({ ...song, libraryOrder: index })); setSongs(updated); await saveSongOrder(updated) }
-    setSortMode('manual'); setSortConfirmation(false); setSortMenuOpen(false)
+    const orders = captureSortOrders(kind)
+    const save: SortSave = { id: crypto.randomUUID(), kind, name, orders, createdAt: Date.now() }
+    setSortSaves((current) => [...current, save])
+    setActiveSortSaveIds((current) => ({ ...current, [kind]: save.id }))
+    setMixedOrders((current) => ({ ...current, ...orders }))
+    setSortModeFor(kind, 'manual')
+    setSortSaveDialogTarget(null)
+    setSortSaveName('')
+    setMessage(`„${name}“ wurde gespeichert.`)
   }
 
   const globalSortForKind = (kind: GroupKind) => kind === 'song' ? { mode: sortMode, direction: sortDirection } : kind === 'playlist' ? { mode: playlistSortMode, direction: playlistSortDirection } : { mode: tagSortMode, direction: tagSortDirection }
@@ -1926,7 +2015,7 @@ function App() {
   const newImportCount = songs.filter((song) => song.isNew).length
   const title = view === 'history' ? 'Importverlauf' : view === 'loops' ? 'Loops' : view === 'trash' ? 'Papierkorb' : view === 'tag' ? activeTag?.name ?? 'Tag' : activePlaylist?.name ?? 'Bibliothek'
   const trashCount = trashedSongs.length + trashedPlaylists.length + trashedTags.length + songs.filter((song) => song.trashedLoop).length
-  const sortLabels: Record<SortMode, string> = { manual: 'Manuell', azStart: 'A–Z Anfang', azEnd: 'A–Z Ende', plays: 'Anzahl des Hörens', duration: 'Dauer', chronology: 'Chronik' }
+  const sortLabels: Record<SortMode, string> = { manual: 'Eigene Reihenfolge', azStart: 'A–Z Anfang', azEnd: 'A–Z Ende', plays: 'Anzahl des Hörens', duration: 'Dauer', chronology: 'Chronik' }
   const tagSortLabels: Record<SortMode, string> = { ...sortLabels, duration: 'Anzahl der Lieder' }
   const playlistSortLabels: Record<SortMode, string> = { ...sortLabels, duration: 'Anzahl der Lieder' }
   const loopLeft = editorDuration ? (loopDraftStart / editorDuration) * 100 : 0
@@ -1978,12 +2067,12 @@ function App() {
 
     <section className="library-panel"><div className={`library-heading${activePlaylist ? ' playlist-heading' : ''}`}>
       {activePlaylist && view === 'library' && <button className="playlist-cover" type="button" onClick={() => openPlaylistCoverPicker(activePlaylist.id)}>{coverUrls[activePlaylist.id] ? <img src={coverUrls[activePlaylist.id]} alt="" /> : <span>+ Bild</span>}</button>}
-      <div className="library-title"><p className="eyebrow">{view === 'history' ? 'IMPORTVERLAUF' : view === 'loops' ? 'GESPEICHERTE LOOPS' : view === 'trash' ? 'PAPIERKORB' : view === 'tag' ? 'TAG' : activePlaylist ? 'PLAYLIST' : 'DEINE MUSIK'}</p>{activePlaylist && view === 'library' && isEditingPlaylist ? <form className="rename-playlist" onSubmit={savePlaylistName}><input value={editingName} onChange={(event) => setEditingName(event.target.value)} autoFocus /><button type="submit">Speichern</button><button type="button" onClick={() => setIsEditingPlaylist(false)}>Abbrechen</button></form> : <h1>{title}</h1>}<p>{view === 'history' ? <><span className="new-count-blue">{newImportCount}</span>/{songs.length} neue Importe</> : view === 'trash' ? `${trashCount} ${trashCount === 1 ? 'Eintrag' : 'Einträge'}` : view === 'tag' && activeTag ? `${activeTag.songIds.filter((id) => songs.some((song) => song.id === id)).length} Lieder · ${taggedPlaylists.length} Playlists` : `${visibleSongs.length} ${visibleSongs.length === 1 ? 'Lied' : 'Lieder'}`}</p></div>
+      <div className="library-title">{!(view === 'library' && !activePlaylist) && <p className="eyebrow">{view === 'history' ? 'IMPORTVERLAUF' : view === 'loops' ? 'GESPEICHERTE LOOPS' : view === 'trash' ? 'PAPIERKORB' : view === 'tag' ? 'TAG' : 'PLAYLIST'}</p>}{activePlaylist && view === 'library' && isEditingPlaylist ? <form className="rename-playlist" onSubmit={savePlaylistName}><input value={editingName} onChange={(event) => setEditingName(event.target.value)} autoFocus /><button type="submit">Speichern</button><button type="button" onClick={() => setIsEditingPlaylist(false)}>Abbrechen</button></form> : <h1>{title}</h1>}<p>{view === 'history' ? <><span className="new-count-blue">{newImportCount}</span>/{songs.length} neue Importe</> : view === 'trash' ? `${trashCount} ${trashCount === 1 ? 'Eintrag' : 'Einträge'}` : view === 'tag' && activeTag ? `${activeTag.songIds.filter((id) => songs.some((song) => song.id === id)).length} Lieder · ${taggedPlaylists.length} Playlists` : `${visibleSongs.length} ${visibleSongs.length === 1 ? 'Lied' : 'Lieder'}`}</p></div>
       <div className="playlist-actions">{!selectionMode && view !== 'trash' && <button type="button" onClick={startSelection}>Auswählen</button>}{view === 'trash' && <button className="danger-button" type="button" onClick={() => setTrashConfirmation(true)} disabled={!trashCount}>Papierkorb leeren</button>}{selectionMode && <><button type="button" onClick={selectAllVisible}>Alle</button><button type="button" onClick={stopSelection}>Abbrechen</button></>}{activePlaylist && view === 'library' && !selectionMode && <><button type="button" onClick={startEditingPlaylist}>Name ändern</button><button type="button" onClick={() => openPlaylistCoverPicker(activePlaylist.id)}>Bild ändern</button><button type="button" onClick={() => reorderScope === 'playlist' ? finishReorder() : beginReorder('playlist')}>{reorderScope === 'playlist' ? 'Fertig' : 'Reihenfolge ändern'}</button></>}{!activePlaylist && view === 'library' && !selectionMode && <button type="button" onClick={() => reorderScope === 'library' ? finishReorder() : beginReorder('library')}>{reorderScope === 'library' ? 'Fertig' : 'Reihenfolge ändern'}</button>}</div>
     </div>
     {view === 'tag' && taggedPlaylists.length > 0 && <div className="tagged-playlists-strip"><span>PLAYLISTS</span>{taggedPlaylists.map((playlist) => <button key={playlist.id} type="button" onClick={() => void openPlaylist(playlist.id)}><span className="nav-tag-dots">{playlistTags(playlist.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} />)}</span>{playlist.name}</button>)}</div>}
     {view === 'library' && <div className="search-bar"><span aria-hidden="true">⌕</span><input type="search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} placeholder={activePlaylist ? 'Playlist durchsuchen' : 'Bibliothek durchsuchen'} aria-label={activePlaylist ? 'Playlist durchsuchen' : 'Bibliothek durchsuchen'} />{searchQuery && <button type="button" onClick={() => setSearchQuery('')} aria-label="Suche leeren">×</button>}</div>}
-    {view !== 'trash' && <div className="sort-bar"><span>Sortierung</span><select value={sortMode} onChange={(event) => setSortMode(event.target.value as SortMode)}>{(Object.keys(sortLabels) as SortMode[]).map((mode) => <option key={mode} value={mode}>{sortLabels[mode]}</option>)}</select><button type="button" className="sort-direction" disabled={sortMode === 'manual'} onClick={() => setSortDirection((value) => value === 'down' ? 'up' : 'down')}>{sortMode === 'manual' ? '—' : sortDirection === 'down' ? '↓' : '↑'}</button><div className="sort-more-wrap"><button className="sort-more-button" type="button" onClick={() => setSortMenuOpen((value) => !value)} aria-label="Weitere Sortieraktionen">•••</button>{sortMenuOpen && <div className="sort-action-menu"><button type="button" onClick={() => createEmptyObjectGroup('song')}>Leere Gruppe erstellen</button><button type="button" onClick={openGroupPlaybackChooser}>Weitere Gruppen abspielen</button><button type="button" disabled={sortMode === 'manual' || view !== 'library'} onClick={() => { setSortMenuOpen(false); setSortConfirmation(true) }}>Aktuelle Sortierung als Manuell übernehmen</button></div>}</div></div>}
+    {view !== 'trash' && <div className="sort-bar"><span>Sortierung</span><select value={sortMode === 'manual' ? `save:${activeSortSave('song')?.id ?? ''}` : `auto:${sortMode}`} onChange={(event) => changeSortSelection('song', event.target.value)}>{(Object.keys(sortLabels) as SortMode[]).filter((mode) => mode !== 'manual').map((mode) => <option key={mode} value={`auto:${mode}`}>{sortLabels[mode]}</option>)}{sortSavesFor('song').map((save) => <option key={save.id} value={`save:${save.id}`}>{save.name}</option>)}</select><button type="button" className="sort-direction" disabled={sortMode === 'manual'} onClick={() => setSortDirection((value) => value === 'down' ? 'up' : 'down')}>{sortMode === 'manual' ? '—' : sortDirection === 'down' ? '↓' : '↑'}</button><div className="sort-more-wrap"><button className="sort-more-button" type="button" onClick={() => setSortMenuOpen((value) => !value)} aria-label="Weitere Sortieraktionen">•••</button>{sortMenuOpen && <div className="sort-action-menu"><button type="button" onClick={() => createEmptyObjectGroup('song')}>Leere Gruppe erstellen</button><button type="button" onClick={openGroupPlaybackChooser}>Weitere Gruppen abspielen</button><button type="button" disabled={view !== 'library'} onClick={() => openSortSaveDialog('song')}>Aktuelle Sortierung speichern</button></div>}</div></div>}
     {message && <div className="message">{message}</div>}{selectionMode && <div className="selection-hint">{bulkMoveMode ? 'Zielposition in der Liste antippen.' : `${selectedSongIds.size} ausgewählt. Playlists und weitere Aktionen findest du unten rechts.`}</div>}
     {view === 'trash' ? <div className="trash-list">
       {trashedSongs.map((song) => <article className="trash-item" key={`trash-song-${song.id}`}><div><small>LIED</small><strong>{song.name}</strong><span>{song.trashedAt ? formatDate(song.trashedAt) : ''}</span></div><button type="button" onClick={() => void restoreTrashedSong(song)}>Wiederherstellen</button></article>)}
@@ -2053,7 +2142,7 @@ function App() {
 
     {sidebarSelectionKind && <div className="sidebar-selection-dock"><strong>{sidebarSelectionKind === 'playlist' ? selectedPlaylistIds.size : selectedTagIds.size} ausgewählt</strong><button type="button" onClick={stopSidebarSelection}>Abbrechen</button><div className="selection-more-wrap"><button className="selection-more-button" type="button" onClick={() => setSidebarSelectionMenuOpen((value) => !value)}>•••</button>{sidebarSelectionMenuOpen && <><button className="selection-menu-shield" type="button" onClick={() => setSidebarSelectionMenuOpen(false)} /><div className="selection-action-menu sidebar-selection-action-menu"><button type="button" disabled={(sidebarSelectionKind === 'playlist' ? selectedPlaylistIds.size : selectedTagIds.size) < 2} onClick={() => createObjectGroup(sidebarSelectionKind, [...(sidebarSelectionKind === 'playlist' ? selectedPlaylistIds : selectedTagIds)])}>Gruppieren</button><button type="button" disabled={!(sidebarSelectionKind === 'playlist' ? selectedPlaylistIds.size : selectedTagIds.size)} onClick={beginSidebarSelectionMove}>Bewegen</button><button type="button" disabled={!(sidebarSelectionKind === 'playlist' ? selectedPlaylistIds.size : selectedTagIds.size)} onClick={() => void copySelectedSidebarObjects()}>Kopieren</button><button className="danger-menu-action" type="button" disabled={!(sidebarSelectionKind === 'playlist' ? selectedPlaylistIds.size : selectedTagIds.size)} onClick={() => { setSidebarSelectionMenuOpen(false); setSidebarSelectionConfirmation('delete') }}>Alle löschen</button></div></>}</div></div>}
     {sidebarMoveKind && (() => { const source = sidebarMoveKind === 'playlist' ? sidebarPlaylists : sidebarTags; const selected = new Set(selectedSidebarIds(sidebarMoveKind)); const remaining = source.filter((item) => !selected.has(item.id)); const filteredRemaining = remaining.filter((item) => fuzzyMatch(item.name, chooserSearch)); return <div className="modal-backdrop sidebar-move-backdrop" onClick={() => { setSidebarMoveKind(null); setChooserSearch('') }}><div className="confirm-dialog sidebar-move-dialog" onClick={(event) => event.stopPropagation()}><h2>{sidebarMoveKind === 'playlist' ? 'Playlists' : 'Tags'} bewegen</h2><p>Wähle die Zielposition für die gesamte Auswahl.</p><div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Suchen" /></div><div className="sidebar-move-targets"><button type="button" onClick={() => void applySidebarSelectionMove(0)}>Ganz nach oben</button>{filteredRemaining.map((item) => <button type="button" key={item.id} onClick={() => void applySidebarSelectionMove(remaining.findIndex((candidate) => candidate.id === item.id))}>Vor „{item.name}“</button>)}<button type="button" onClick={() => void applySidebarSelectionMove(remaining.length)}>Ganz nach unten</button></div><div className="dialog-actions"><button type="button" onClick={() => setSidebarMoveKind(null)}>Abbrechen</button></div></div></div> })()}
-    {sidebarSelectionConfirmation === 'switchManualMove' && sidebarSelectionKind && <div className="modal-backdrop" onClick={() => setSidebarSelectionConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Auf „Manuell“ umschalten?</h2><p>Die Auswahl kann nur in der manuellen {sidebarSelectionKind === 'playlist' ? 'Playlist-' : 'Tag-'}Reihenfolge bewegt werden.</p><div className="dialog-actions"><button type="button" onClick={() => setSidebarSelectionConfirmation(null)}>Nein</button><button type="button" onClick={() => { const kind = sidebarSelectionKind; if (kind === 'playlist') setPlaylistSortMode('manual'); else setTagSortMode('manual'); setSidebarSelectionConfirmation(null); setSidebarMoveKind(kind) }}>Ja, umschalten</button></div></div></div>}
+    {sidebarSelectionConfirmation === 'switchManualMove' && sidebarSelectionKind && (() => { const kind: SortSaveKind = sidebarSelectionKind === 'playlist' ? 'playlist' : 'tag'; const saveName = activeSortSave(kind)?.name ?? 'Save'; return <div className="modal-backdrop" onClick={() => setSidebarSelectionConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Zu „{saveName}“ wechseln?</h2><p>Die Auswahl kann nur innerhalb einer gespeicherten {sidebarSelectionKind === 'playlist' ? 'Playlist-' : 'Tag-'}Reihenfolge bewegt werden.</p><div className="dialog-actions"><button type="button" onClick={() => setSidebarSelectionConfirmation(null)}>Nein</button><button type="button" onClick={() => { if (kind === 'playlist') setPlaylistSortMode('manual'); else setTagSortMode('manual'); setSidebarSelectionConfirmation(null); setSidebarMoveKind(sidebarSelectionKind) }}>Ja, wechseln</button></div></div></div> })()}
     {sidebarSelectionConfirmation === 'delete' && sidebarSelectionKind && <div className="modal-backdrop" onClick={() => setSidebarSelectionConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Auswahl löschen?</h2><p>{selectedSidebarIds(sidebarSelectionKind).length} {sidebarSelectionKind === 'playlist' ? 'Playlists' : 'Tags'} werden in den Papierkorb verschoben.</p><div className="dialog-actions"><button type="button" onClick={() => setSidebarSelectionConfirmation(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void deleteSelectedSidebarObjects()}>In Papierkorb</button></div></div></div>}
         {groupRenameId && <div className="modal-backdrop" onClick={() => setGroupRenameId(null)}><form className="confirm-dialog rename-dialog" onSubmit={saveGroupRename} onClick={(event) => event.stopPropagation()}><h2>Gruppe umbenennen</h2><input value={groupRenameValue} onChange={(event) => setGroupRenameValue(event.target.value)} autoFocus /><div className="dialog-actions"><button type="button" onClick={() => setGroupRenameId(null)}>Abbrechen</button><button type="submit" disabled={!groupRenameValue.trim()}>Speichern</button></div></form></div>}
     {groupSortId && (() => { const group = objectGroups.find((item) => item.id === groupSortId); if (!group) return null; const labels = group.kind === 'song' ? sortLabels : group.kind === 'playlist' ? playlistSortLabels : tagSortLabels; return <div className="modal-backdrop" onClick={() => setGroupSortId(null)}><div className="confirm-dialog group-sort-dialog" onClick={(event) => event.stopPropagation()}><h2>Gruppe sortieren</h2><div className="sidebar-sort-controls"><select value={group.sortMode} onChange={(event) => updateObjectGroup(group.id, (item) => ({ ...item, sortMode: event.target.value as GroupSortMode }))}><option value="general">Allgemeine Sortierung</option>{(Object.keys(labels) as SortMode[]).map((mode) => <option key={mode} value={mode}>{labels[mode]}</option>)}</select><button type="button" disabled={group.sortMode === 'general' || group.sortMode === 'manual'} onClick={() => updateObjectGroup(group.id, (item) => ({ ...item, sortDirection: item.sortDirection === 'down' ? 'up' : 'down' }))}>{group.sortMode === 'general' || group.sortMode === 'manual' ? '—' : group.sortDirection === 'down' ? '↓' : '↑'}</button></div><p>„Allgemeine Sortierung“ übernimmt automatisch die Sortierung der gesamten Liste.</p><div className="dialog-actions"><button type="button" onClick={() => setGroupSortId(null)}>Fertig</button></div></div></div> })()}
@@ -2077,7 +2166,7 @@ function App() {
     {colorPickerTarget && <ColorSpectrumPicker title="Tag-Farbe wählen" initialColor={colorPickerTarget === 'create' ? tagColor : renameTagColor} onCancel={() => setColorPickerTarget(null)} onDone={(color) => { if (colorPickerTarget === 'create') setTagColor(color); else setRenameTagColor(color); setColorPickerTarget(null) }} />}
     {appearanceColorTarget && <ColorSpectrumPicker title="Farbe ändern" initialColor={appearanceInitialColor()} onCancel={() => setAppearanceColorTarget(null)} onDone={applyAppearanceColor} />}
     {repeatMenuOpen && <div className="modal-backdrop repeat-choice-backdrop" onClick={() => setRepeatMenuOpen(false)}><div className="confirm-dialog repeat-choice-dialog" onClick={(event) => event.stopPropagation()}><h2>Wiederholung</h2><p>Unendlich wiederholen oder eine feste Anzahl wählen. Bei einem aktiven Loop zählt die Zahl pro Loop-Durchlauf herunter.</p><div className="repeat-choice-options"><button className="repeat-infinity-option" type="button" onClick={chooseInfiniteRepeat}><span>∞</span><strong>Unendlich</strong></button><div className="repeat-count-option"><input type="number" min="1" max="9999" inputMode="numeric" value={repeatCountInput} onChange={(event) => setRepeatCountInput(event.target.value)} aria-label="Anzahl Wiederholungen" /><button type="button" onClick={chooseCountRepeat}>Anwenden</button></div></div><div className="dialog-actions"><button type="button" onClick={() => setRepeatMenuOpen(false)}>Abbrechen</button></div></div></div>}
-    {sidebarSortTarget && <div className="modal-backdrop sidebar-sort-backdrop" onClick={() => setSidebarSortTarget(null)}><div className="confirm-dialog sidebar-sort-dialog" onClick={(event) => event.stopPropagation()}><h2>{sidebarSortTarget === 'tags' ? 'Tags sortieren' : 'Playlists sortieren'}</h2><div className="sidebar-sort-controls"><select value={sidebarSortTarget === 'tags' ? tagSortMode : playlistSortMode} onChange={(event) => sidebarSortTarget === 'tags' ? setTagSortMode(event.target.value as SortMode) : setPlaylistSortMode(event.target.value as SortMode)}>{(Object.keys(sidebarSortTarget === 'tags' ? tagSortLabels : playlistSortLabels) as SortMode[]).map((mode) => <option key={mode} value={mode}>{(sidebarSortTarget === 'tags' ? tagSortLabels : playlistSortLabels)[mode]}</option>)}</select><button type="button" disabled={(sidebarSortTarget === 'tags' ? tagSortMode : playlistSortMode) === 'manual'} onClick={() => sidebarSortTarget === 'tags' ? setTagSortDirection((value) => value === 'down' ? 'up' : 'down') : setPlaylistSortDirection((value) => value === 'down' ? 'up' : 'down')}>{(sidebarSortTarget === 'tags' ? tagSortMode : playlistSortMode) === 'manual' ? '—' : (sidebarSortTarget === 'tags' ? tagSortDirection : playlistSortDirection) === 'down' ? '↓' : '↑'}</button></div><p>Die Sortierung wird für diese Seitenleisten-Liste gespeichert. „Manuell“ verwendet die verschiebbare Reihenfolge.</p><div className="dialog-actions"><button type="button" onClick={() => setSidebarSortTarget(null)}>Fertig</button></div></div></div>}
+    {sidebarSortTarget && (() => { const kind: SortSaveKind = sidebarSortTarget === 'tags' ? 'tag' : 'playlist'; const mode = kind === 'tag' ? tagSortMode : playlistSortMode; const direction = kind === 'tag' ? tagSortDirection : playlistSortDirection; const labels = kind === 'tag' ? tagSortLabels : playlistSortLabels; return <div className="modal-backdrop sidebar-sort-backdrop" onClick={() => setSidebarSortTarget(null)}><div className="confirm-dialog sidebar-sort-dialog" onClick={(event) => event.stopPropagation()}><h2>{kind === 'tag' ? 'Tags sortieren' : 'Playlists sortieren'}</h2><div className="sidebar-sort-controls"><select value={mode === 'manual' ? `save:${activeSortSave(kind)?.id ?? ''}` : `auto:${mode}`} onChange={(event) => changeSortSelection(kind, event.target.value)}>{(Object.keys(labels) as SortMode[]).filter((item) => item !== 'manual').map((item) => <option key={item} value={`auto:${item}`}>{labels[item]}</option>)}{sortSavesFor(kind).map((save) => <option key={save.id} value={`save:${save.id}`}>{save.name}</option>)}</select><button type="button" disabled={mode === 'manual'} onClick={() => kind === 'tag' ? setTagSortDirection((value) => value === 'down' ? 'up' : 'down') : setPlaylistSortDirection((value) => value === 'down' ? 'up' : 'down')}>{mode === 'manual' ? '—' : direction === 'down' ? '↓' : '↑'}</button><button className="save-current-sort-button" type="button" onClick={() => openSortSaveDialog(kind)}>Aktuelle Sortierung speichern</button></div><p>Automatische Sortierungen stehen oben. Deine Saves werden darunter alphabetisch angezeigt.</p><div className="dialog-actions"><button type="button" onClick={() => setSidebarSortTarget(null)}>Fertig</button></div></div></div> })()}
     {duplicateConflict && <div className="modal-backdrop duplicate-conflict-backdrop" onClick={cancelDuplicateConflict}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Gleicher Name bereits vorhanden</h2><p>{duplicateConflict.names.length === 1 ? `„${duplicateConflict.names[0]}“ ist am Ziel bereits vorhanden.` : `${duplicateConflict.names.length} gleichnamige Einträge sind am Ziel bereits vorhanden.`} Was soll Josi tun?</p><div className="dialog-actions duplicate-actions"><button type="button" onClick={cancelDuplicateConflict}>Abbrechen</button><button type="button" onClick={() => resolveDuplicateConflict('both')}>Beide einfügen</button><button type="button" onClick={() => resolveDuplicateConflict('replace')}>Ersetzen</button></div></div></div>}
     {tagToDelete && <div className="modal-backdrop" onClick={() => setTagToDelete(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Tag löschen?</h2><p>„{tagToDelete.name}“ wird in den Papierkorb verschoben. Songs und Playlists selbst bleiben erhalten.</p><div className="dialog-actions"><button type="button" onClick={() => setTagToDelete(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void confirmDeleteTag()}>In Papierkorb</button></div></div></div>}
 
@@ -2086,9 +2175,9 @@ function App() {
     {loopConfirmation === 'deleteMarkers' && <div className="modal-backdrop" onClick={() => setLoopConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Alle Markierungen löschen?</h2><p>Alle orangefarbenen Markierungen dieses Loop-Entwurfs werden entfernt.</p><div className="dialog-actions"><button type="button" onClick={() => setLoopConfirmation(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={deleteAllMarkers}>Alle löschen</button></div></div></div>}
 
     {trashConfirmation && <div className="modal-backdrop" onClick={() => setTrashConfirmation(false)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Papierkorb endgültig leeren?</h2><p>{trashCount} {trashCount === 1 ? 'Eintrag wird' : 'Einträge werden'} dauerhaft gelöscht. Audiodateien im Papierkorb können danach nicht wiederhergestellt werden.</p><div className="dialog-actions"><button type="button" onClick={() => setTrashConfirmation(false)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void emptyTrash()}>Endgültig leeren</button></div></div></div>}
-    {sortConfirmation && <div className="modal-backdrop" onClick={() => setSortConfirmation(false)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Sortierung einmalig übernehmen?</h2><p>Die aktuelle Sortierung „{sortLabels[sortMode]}“ mit der Richtung {sortDirection === 'down' ? '↓' : '↑'} wird als neue manuelle Reihenfolge gespeichert. Danach ändert sie sich nicht automatisch weiter.</p><div className="dialog-actions"><button type="button" onClick={() => setSortConfirmation(false)}>Abbrechen</button><button type="button" onClick={() => void applyCurrentSortAsManual()}>Übernehmen</button></div></div></div>}
+    {sortSaveDialogTarget && <div className="modal-backdrop" onClick={() => setSortSaveDialogTarget(null)}><form className="confirm-dialog sort-save-dialog" onSubmit={(event) => { event.preventDefault(); saveCurrentSort() }} onClick={(event) => event.stopPropagation()}><h2>Aktuelle Sortierung speichern</h2><p>Gib dem Save einen Namen. Ohne Namen verwendet Josi automatisch die erste freie Nummer.</p><input value={sortSaveName} onChange={(event) => setSortSaveName(event.target.value)} placeholder={nextSortSaveName(sortSaveDialogTarget)} autoFocus /><div className="dialog-actions"><button type="button" onClick={() => setSortSaveDialogTarget(null)}>Abbrechen</button><button type="submit">Speichern</button></div></form></div>}
     {settingsOpen && <div className="modal-backdrop settings-backdrop" onClick={() => setSettingsOpen(false)}><div className="confirm-dialog settings-dialog" onClick={(event) => event.stopPropagation()}><h2>Einstellungen</h2><div className="settings-row"><div><strong>Spulweite</strong><small>Für ⏪/⏩ und die Detailansicht.</small></div><select value={seekSeconds} onChange={(event) => setSeekSeconds(Number(event.target.value))}>{SEEK_SECOND_OPTIONS.map((value) => <option key={value} value={value}>{value} Sekunden</option>)}</select></div><div className="settings-row"><div><strong>Loops</strong><small>Bestimmt global, ob vorhandene Loops automatisch an, aus oder pro Lied manuell gesteuert werden.</small></div><select value={loopActivationMode} onChange={(event) => { const next = event.target.value as LoopActivationMode; if (next === 'disabled') cancelLoopTransition(); setLoopActivationMode(next) }}><option value="enabled">Aktiviert</option><option value="disabled">Deaktiviert</option><option value="manual">Manuell</option></select></div><div className="settings-row settings-info-row"><div><strong>Loop-Übergang</strong><small>Josi überlappt Loop-Ende und Loop-Anfang kurz. Falls der zweite Wiedergabekanal technisch nicht startet, wird lokal nach einem ähnlichen Verbindungspunkt gesucht.</small></div><span className="settings-info-value">Automatisch</span></div><div className="settings-row layout-settings-row"><div><strong>Bibliotheks-Interface</strong><small>Im Bearbeitungsmodus lassen sich die Trennleisten verschieben. Außerhalb davon sind sie gesperrt.</small></div><div className="layout-settings-actions"><button type="button" onClick={() => { setSettingsOpen(false); setLayoutEditMode(true) }}>Leisten verschieben</button><button type="button" onClick={() => { setSidebarWidth(240); setPlayerSplitLeft(27); setPlayerSplitRight(68) }}>Standard</button></div></div><div className="dialog-actions"><button type="button" onClick={() => setSettingsOpen(false)}>Fertig</button></div></div></div>}
-    {selectionConfirmation === 'switchManual' && <div className="modal-backdrop selection-confirm-backdrop" onClick={() => setSelectionConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Auf „Manuell“ umschalten?</h2><p>Ausgewählte Lieder können nur innerhalb der gespeicherten manuellen Reihenfolge bewegt werden.</p><div className="dialog-actions"><button type="button" onClick={() => setSelectionConfirmation(null)}>Nein</button><button type="button" onClick={() => { setSortMode('manual'); setSelectionConfirmation(null); setBulkMoveMode(true) }}>Ja, umschalten</button></div></div></div>}
+    {selectionConfirmation === 'switchManual' && <div className="modal-backdrop selection-confirm-backdrop" onClick={() => setSelectionConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Zu „{activeSortSave('song')?.name ?? 'Save'}“ wechseln?</h2><p>Ausgewählte Lieder können nur innerhalb einer gespeicherten Reihenfolge bewegt werden.</p><div className="dialog-actions"><button type="button" onClick={() => setSelectionConfirmation(null)}>Nein</button><button type="button" onClick={() => { setSortMode('manual'); setSelectionConfirmation(null); setBulkMoveMode(true) }}>Ja, wechseln</button></div></div></div>}
     {selectionConfirmation === 'deleteSelected' && <div className="modal-backdrop selection-confirm-backdrop" onClick={() => setSelectionConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>{selectedSongIds.size} ausgewählte Lieder löschen?</h2><p>Die ausgewählten Lieder werden in den Papierkorb verschoben und aus allen Playlists entfernt.</p><div className="dialog-actions"><button type="button" onClick={() => setSelectionConfirmation(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void deleteSelectedSongs()}>In Papierkorb</button></div></div></div>}
     {loopManualRequest && <div className="modal-backdrop" onClick={() => setLoopManualRequest(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Auf „Manuell“ umschalten?</h2><p>Die globale Loop-Einstellung steht aktuell auf „{loopActivationMode === 'enabled' ? 'Aktiviert' : 'Deaktiviert'}“. Um {loopManualRequest.ids.length === 1 ? 'diesen Loop' : 'diese Loops'} individuell {loopManualRequest.enabled ? 'zu aktivieren' : 'zu deaktivieren'}, muss Josi auf „Manuell“ wechseln.</p><div className="dialog-actions"><button type="button" onClick={() => setLoopManualRequest(null)}>Nein</button><button type="button" onClick={() => { const request = loopManualRequest; setLoopActivationMode('manual'); setLoopManualRequest(null); void applyManualLoopChange(request.ids, request.enabled) }}>Ja, auf Manuell</button></div></div></div>}
     {renameTarget && <div className="modal-backdrop" onClick={() => setRenameTarget(null)}><form className="confirm-dialog rename-dialog" onSubmit={confirmRename} onClick={(event) => event.stopPropagation()}><h2>Umbenennen</h2><input value={renameValue} onChange={(event) => setRenameValue(event.target.value)} autoFocus />{renameTarget.kind === 'tag' && <div className="rename-tag-color"><span>Farbe</span><div className="tag-color-picker-wrap rainbow-ring"><button className="tag-color-trigger" type="button" style={{ background: renameTagColor }} onClick={() => setColorPickerTarget('rename')} aria-label="Tag-Farbe wählen" /></div></div>}<div className="dialog-actions"><button type="button" onClick={() => setRenameTarget(null)}>Abbrechen</button><button type="submit" disabled={!renameValue.trim()}>Speichern</button></div></form></div>}

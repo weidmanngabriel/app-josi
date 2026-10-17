@@ -82,16 +82,11 @@ Der frühere „Verlauf“-Tab heißt **Importverlauf** und zeigt alle aktiven S
 
 ## Sortierung
 
-Alle Songlisten bieten:
+Die automatischen Sortierungen bleiben **A–Z Anfang**, **A–Z Ende**, **Anzahl des Hörens**, **Dauer** und **Chronik**. Die frühere Auswahl **Manuell** wird durch benannte **Saves** ersetzt. Eine bestehende manuelle Reihenfolge bleibt als **Save 1** erhalten.
 
-- **Manuell**
-- **A–Z Anfang**
-- **A–Z Ende**
-- **Anzahl des Hörens**
-- **Dauer**
-- **Chronik**
+Über **Aktuelle Sortierung speichern** lässt sich die sichtbare Reihenfolge sichern. Der Save kann benannt werden; ohne Eingabe verwendet Josi die erste freie Nummer wie **Save 1**, **Save 2** usw. Automatische Sortierungen stehen zuerst, alle Saves darunter alphabetisch. Wird ein Save ausgewählt und anschließend über **Reihenfolge ändern** bearbeitet, bleibt diese neue Reihenfolge in diesem Save erhalten.
 
-Der Pfeil kehrt die Sortierung um. Die manuelle Reihenfolge bleibt separat gespeichert und wird durch andere Sortierungen nicht verändert. Über `•••` neben der Sortierung kann eine aktuelle nicht-manuelle Reihenfolge inklusive Pfeilrichtung nach Bestätigung **einmalig** als neue manuelle Reihenfolge übernommen werden. Danach bleibt sie statisch.
+Playlists und Tags erhalten dieselbe Funktion in **Sortieren**. Dort steht **Aktuelle Sortierung speichern** direkt neben den Sortier-Steuerelementen.
 
 ## Papierkorb
 
@@ -171,6 +166,10 @@ Beim Taggen oder Einfügen eines Objekts mit einem Namen, der am Ziel bereits vo
 
 Die nähere Songansicht besitzt ein eigenes `•••` mit songbezogenen Aktionen wie Umbenennen, Kopieren/Einfügen, Tags, Teilen und Loop-Funktionen. Listenweite Aktionen wie das Sortieren von Tags oder Playlists werden dort bewusst nicht gezeigt. In der Tag-Zuordnung bedeutet `+` hinzufügen und `−` entfernen; eine teilweise Mehrfachzuordnung bleibt als `±` sichtbar. Home schließt auch aus dem Loop-Editor zuverlässig den Editor und öffnet die Bibliothek.
 
+
+## Bildschirmfeste Bedienelemente
+
+Menüs und Dialoge dürfen nicht aus dem sichtbaren Bildschirm hinausragen. Sie passen sich zuerst an die verfügbare Größe an. Nur wenn der Inhalt trotzdem nicht vollständig hineinpasst, wird der jeweilige Kasten intern scrollbar.
 
 ## Reihenfolge ändern und Sortierbünde
 
