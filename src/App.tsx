@@ -2822,8 +2822,28 @@ function App() {
     const childMap = new Map(children.map((child) => [child.id, child])); const itemMap = new Map(items.map((item) => [item.id, item]))
     return <section className={`object-group sidebar-object-group${depth ? ' nested-object-group' : ''}${parentBundleClass}`} key={group.id}>{renderGroupHeader(group, sidebarTags, parentContainerKey, parentBaseTokens)}{!collapsedGroupIds.has(group.id) && <>{order.map((token, index) => <Fragment key={token}>{renderSingleMoveZone('tag', group.id, index)}{isGroupToken(token) ? renderTagGroup(childMap.get(tokenId(token))!, depth + 1, containerKey, baseTokens) : renderTagRow(itemMap.get(tokenId(token))!, index, group.id, containerKey, baseTokens)}</Fragment>)}{renderSingleMoveZone('tag', group.id, order.length)}</>}</section>
   }
-  const renderPlaylistOverviewGroup = (group: ObjectGroup, depth = 0): React.ReactNode => { const children = sortedGroupsFor('playlist', sidebarPlaylists, group.id); return <section className={`object-group overview-object-group${depth ? ' nested-object-group' : ''}`} key={group.id}>{renderGroupHeader(group, sidebarPlaylists)}{!collapsedGroupIds.has(group.id) && <>{children.filter((child) => !child.afterItems).map((child) => renderPlaylistOverviewGroup(child, depth + 1))}<div className="playlist-grid">{orderedGroupItems(group, sidebarPlaylists).map((item) => renderPlaylistCard(item as Playlist))}</div>{children.filter((child) => child.afterItems).map((child) => renderPlaylistOverviewGroup(child, depth + 1))}</>}</section> }
-  const renderTagOverviewGroup = (group: ObjectGroup, depth = 0): React.ReactNode => { const children = sortedGroupsFor('tag', sidebarTags, group.id); return <section className={`object-group overview-object-group tag-overview-group${depth ? ' nested-object-group' : ''}`} key={group.id}>{renderGroupHeader(group, sidebarTags)}{!collapsedGroupIds.has(group.id) && <>{children.filter((child) => !child.afterItems).map((child) => renderTagOverviewGroup(child, depth + 1))}<div className="playlist-grid">{orderedGroupItems(group, sidebarTags).map((item) => renderTagCard(item as Tag))}</div>{children.filter((child) => child.afterItems).map((child) => renderTagOverviewGroup(child, depth + 1))}</>}</section> }
+  const renderPlaylistOverviewGroup = (group: ObjectGroup, depth = 0, inheritedMatch = false): React.ReactNode => {
+    const query = playlistOverviewSearch.trim()
+    const groupMatch = Boolean(query) && searchIncludesGroups && fuzzyMatch(group.name, query)
+    const includeAll = !query || inheritedMatch || groupMatch
+    const children = sortedGroupsFor('playlist', sidebarPlaylists, group.id)
+    const before = children.filter((child) => !child.afterItems).map((child) => renderPlaylistOverviewGroup(child, depth + 1, includeAll)).filter(Boolean)
+    const after = children.filter((child) => child.afterItems).map((child) => renderPlaylistOverviewGroup(child, depth + 1, includeAll)).filter(Boolean)
+    const items = (orderedGroupItems(group, sidebarPlaylists) as Playlist[]).filter((item) => includeAll || fuzzyMatch(item.name, query))
+    if (query && !groupMatch && !items.length && !before.length && !after.length) return null
+    return <section className={`object-group overview-object-group${depth ? ' nested-object-group' : ''}`} key={group.id}>{renderGroupHeader(group, sidebarPlaylists)}{!collapsedGroupIds.has(group.id) && <>{before}<div className="playlist-grid">{items.map(renderPlaylistCard)}</div>{after}</>}</section>
+  }
+  const renderTagOverviewGroup = (group: ObjectGroup, depth = 0, inheritedMatch = false): React.ReactNode => {
+    const query = tagOverviewSearch.trim()
+    const groupMatch = Boolean(query) && searchIncludesGroups && fuzzyMatch(group.name, query)
+    const includeAll = !query || inheritedMatch || groupMatch
+    const children = sortedGroupsFor('tag', sidebarTags, group.id)
+    const before = children.filter((child) => !child.afterItems).map((child) => renderTagOverviewGroup(child, depth + 1, includeAll)).filter(Boolean)
+    const after = children.filter((child) => child.afterItems).map((child) => renderTagOverviewGroup(child, depth + 1, includeAll)).filter(Boolean)
+    const items = (orderedGroupItems(group, sidebarTags) as Tag[]).filter((item) => includeAll || fuzzyMatch(item.name, query))
+    if (query && !groupMatch && !items.length && !before.length && !after.length) return null
+    return <section className={`object-group overview-object-group tag-overview-group${depth ? ' nested-object-group' : ''}`} key={group.id}>{renderGroupHeader(group, sidebarTags)}{!collapsedGroupIds.has(group.id) && <>{before}<div className="playlist-grid">{items.map(renderTagCard)}</div>{after}</>}</section>
+  }
   const repeatBadge = repeatSetting?.kind === 'infinite' ? '∞' : repeatSetting?.kind === 'count' ? String(repeatRemaining ?? repeatSetting.count) : null
   const overflowMenuOnLeftSide = Boolean(overflowMenu && (
     overflowMenu.kind === 'playlists' || overflowMenu.kind === 'playlist' || overflowMenu.kind === 'tags' || overflowMenu.kind === 'tag' ||
