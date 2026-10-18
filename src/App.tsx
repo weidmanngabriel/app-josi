@@ -3115,8 +3115,7 @@ function App() {
     </aside>}
     {singleMoveTarget && <aside className="inline-mode-guide">
       <strong>Bewegen</strong>
-      <p>Ein Klick auf eine passende Gruppe bewegt die Datei direkt hinein.</p>
-      <p>Doppelklick auf eine Gruppe öffnet oder schließt sie. Danach kannst du innerhalb der Gruppe weiter positionieren.</p>
+      {singleMoveTarget.kind === 'group' ? <p>Diese Gruppe wird mit den roten Zielstrichen auf ihrer aktuellen Ebene bewegt. Gruppen werden hier nicht per Klick ineinander verschachtelt.</p> : <><p>Ein Klick auf eine passende Gruppe bewegt die Datei direkt hinein.</p><p>Doppelklick auf eine Gruppe öffnet oder schließt sie. Danach kannst du innerhalb der Gruppe weiter positionieren.</p></>}
       <p>Rote Striche wählen die genaue Position; ein Doppelklick auf den Strich bestätigt sie.</p>
       <button type="button" onClick={cancelSingleMove}>Abbrechen</button>
     </aside>}
