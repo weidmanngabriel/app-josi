@@ -934,6 +934,18 @@ function App() {
   const navigateBack = () => { if (loopEditorSongId) { setLoopEditorSongId(null); return } if (navigationIndex <= 0) return; const next = navigationIndex - 1; setNavigationIndex(next); applyNavigation(navigation[next]) }
   const navigateForward = () => { if (navigationIndex >= navigation.length - 1) return; const next = navigationIndex + 1; setNavigationIndex(next); applyNavigation(navigation[next]) }
   const goHome = () => { setSettingsOpen(false); setLoopEditorSongId(null); setDetailOpen(false); setActiveTagId(null); setActivePlaylistId(null); navigateTo({ view: 'library', playlistId: null, detailOpen: false }) }
+  const openOverviewSearch = (kind: 'playlist' | 'tag') => {
+    setOverflowMenu(null)
+    if (kind === 'playlist') {
+      setPlaylistOverviewSearch('')
+      navigateTo({ view: 'playlistOverview', playlistId: activePlaylistId, detailOpen: false })
+      requestAnimationFrame(() => requestAnimationFrame(() => playlistOverviewSearchRef.current?.focus()))
+    } else {
+      setTagOverviewSearch('')
+      navigateTo({ view: 'tagOverview', playlistId: null, tagId: null, detailOpen: false })
+      requestAnimationFrame(() => requestAnimationFrame(() => tagOverviewSearchRef.current?.focus()))
+    }
+  }
 
   const updateSong = async (updated: Song, addHistory = false) => { if (addHistory) recordHistory(); setSongs((items) => items.map((song) => song.id === updated.id ? updated : song)); await saveSong(updated) }
   const updatePlaylist = async (updated: Playlist, addHistory = false) => { if (addHistory) recordHistory(); setPlaylists((items) => items.map((playlist) => playlist.id === updated.id ? updated : playlist)); await savePlaylist(updated) }
