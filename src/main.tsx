@@ -4,7 +4,8 @@ import { registerSW } from 'virtual:pwa-register'
 import App from './App'
 import './styles.css'
 
-const updateSW = registerSW({
+let updateSW: (reloadPage?: boolean) => Promise<void> = async () => undefined
+updateSW = registerSW({
   immediate: true,
   onNeedRefresh() {
     void updateSW(true)
