@@ -340,6 +340,8 @@ function App() {
   const [playlistsCollapsed, setPlaylistsCollapsed] = useState(() => localStorage.getItem('josi-playlists-collapsed') === '1')
   const [tagsCollapsed, setTagsCollapsed] = useState(() => localStorage.getItem('josi-tags-collapsed') === '1')
   const [tagChooserTarget, setTagChooserTarget] = useState<TagChooserTarget>(null)
+  const [tagChooserOriginalSnapshot, setTagChooserOriginalSnapshot] = useState<Snapshot | null>(null)
+  const [tagChooserDirty, setTagChooserDirty] = useState(false)
   const [clipboard, setClipboard] = useState<ClipboardItem | null>(null)
   const [duplicateConflict, setDuplicateConflict] = useState<DuplicateConflict>(null)
   const [cancelledDuplicateAction, setCancelledDuplicateAction] = useState<DuplicateAction | null>(null)
@@ -1676,19 +1678,27 @@ function App() {
   const songTags = (songId: string) => tags.filter((tag) => tag.songIds.includes(songId))
   const playlistTags = (playlistId: string) => tags.filter((tag) => tag.playlistIds.includes(playlistId))
   const groupTags = (groupId: string) => tags.filter((tag) => (tag.groupIds ?? []).includes(groupId))
-  const openTagChooser = (kind: 'song' | 'playlist' | 'group', ids: string[]) => { setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setTagChooserTarget({ kind, ids }); setOverflowMenu(null); setSortMenuOpen(false) }
+  const openTagChooser = (kind: 'song' | 'playlist' | 'group', ids: string[]) => { setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setTagChooserOriginalSnapshot(snapshot()); setTagChooserDirty(false); setTagChooserTarget({ kind, ids }); setOverflowMenu(null); setSortMenuOpen(false) }
+  const closeTagChooser = async (apply: boolean) => {
+    const original = tagChooserOriginalSnapshot
+    if (!apply && tagChooserDirty && original) await restoreSnapshot(original)
+    if (apply && tagChooserDirty && original) { setUndoStack((items) => [...items, original].slice(-50)); setRedoStack([]) }
+    setTagChooserTarget(null); setTagChooserOriginalSnapshot(null); setTagChooserDirty(false); setChooserSearch('')
+  }
   const toggleTargetTag = async (tag: Tag) => {
     if (!tagChooserTarget?.ids.length) return
     const memberIds = tagChooserTarget.kind === 'song' ? tag.songIds : tagChooserTarget.kind === 'playlist' ? tag.playlistIds : (tag.groupIds ?? [])
     const allAssigned = tagChooserTarget.ids.every((id) => memberIds.includes(id))
     if (tagChooserTarget.kind === 'group') {
       const nextIds = allAssigned ? memberIds.filter((id) => !tagChooserTarget.ids.includes(id)) : [...new Set([...memberIds, ...tagChooserTarget.ids])]
-      await updateTag({ ...tag, groupIds: nextIds, lastUsedAt: Date.now() }, true)
+      setTagChooserDirty(true)
+      await updateTag({ ...tag, groupIds: nextIds, lastUsedAt: Date.now() })
       return
     }
     if (allAssigned) {
-      if (tagChooserTarget.kind === 'song') await updateTag({ ...tag, songIds: tag.songIds.filter((id) => !tagChooserTarget.ids.includes(id)), lastUsedAt: Date.now() }, true)
-      else await updateTag({ ...tag, playlistIds: tag.playlistIds.filter((id) => !tagChooserTarget.ids.includes(id)), lastUsedAt: Date.now() }, true)
+      setTagChooserDirty(true)
+      if (tagChooserTarget.kind === 'song') await updateTag({ ...tag, songIds: tag.songIds.filter((id) => !tagChooserTarget.ids.includes(id)), lastUsedAt: Date.now() })
+      else await updateTag({ ...tag, playlistIds: tag.playlistIds.filter((id) => !tagChooserTarget.ids.includes(id)), lastUsedAt: Date.now() })
       return
     }
     const ids = tagChooserTarget.ids.filter((id) => !memberIds.includes(id))
