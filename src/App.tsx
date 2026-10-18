@@ -2987,7 +2987,7 @@ function App() {
     (overflowMenu.kind === 'group' && objectGroups.find((group) => group.id === overflowMenu.id)?.kind !== 'song')
   ))
   const overlayWindowOpen = Boolean(
-    importDraftItems.length || selectedSongsListOpen || selectionSourceKind || selectionObjectEditMode || coverEditorDraft || playlistChooserMode || tagChooserTarget || sidebarMoveKind || sidebarSelectionConfirmation ||
+    importDraftItems.length || selectedSongsListOpen || selectionObjectEditMode || coverEditorDraft || playlistChooserMode || tagChooserTarget || sidebarMoveKind || sidebarSelectionConfirmation ||
     pendingGroupCreate || groupRenameId || groupSortId || groupDeleteTargetId || groupNestingTarget || groupMembershipTarget ||
     groupPlaybackChooserOpen || repeatMenuOpen || sidebarSortTarget || duplicateConflict || tagToDelete || loopConfirmation ||
     trashConfirmation || sortSaveDialogTarget || sortSaveRenameId || settingsOpen || selectionConfirmation || loopManualRequest ||
@@ -3183,24 +3183,6 @@ function App() {
         <div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Lieder oder Gruppen suchen" /><button className={`search-group-toggle${searchIncludesGroups ? ' active' : ''}`} type="button" onClick={() => setSearchIncludesGroups((value) => !value)}>{searchIncludesGroups ? 'Gruppen ✓' : 'Gruppen'}</button></div>
         {renderChooserSortControls('song')}
         <div className="selected-songs-list">{selectedSongs.map((song, index) => <button className={`selected-song-list-item${focusId === song.id ? ' active' : ''}`} type="button" aria-pressed={focusId === song.id} key={song.id} onClick={() => { setSelectedSongsFocusId(song.id); setSelectedSongsMenuOpen(false) }}><span>{index + 1}.</span><strong>{song.name}</strong><small>{formatTime(song.duration)}</small></button>)}{!selectedSongs.length && <p>Keine passenden Lieder.</p>}</div>
-      </section></div>
-    })()}
-    {selectionSourceKind && (() => {
-      const groupCandidates = selectionSourceKind === 'group' ? sortChooserGroups('song', flattenedGroupsFor('song', songs), songs).filter((item) => fuzzyMatch(item.name, chooserSearch)) : []
-      const objectCandidates = selectionSourceKind === 'playlist'
-        ? sortChooserObjects('playlist', sidebarPlaylists).filter((item) => fuzzyMatch(item.name, chooserSearch))
-        : selectionSourceKind === 'tag' ? sortChooserObjects('tag', sidebarTags).filter((item) => fuzzyMatch(item.name, chooserSearch)) : []
-      const label = selectionSourceKind === 'group' ? 'Gruppe' : selectionSourceKind === 'playlist' ? 'Playlist' : 'Tag'
-      return <div className="playlist-chooser-backdrop selection-source-backdrop"><section className="playlist-chooser selection-source-dialog" onClick={(event) => event.stopPropagation()}>
-        <div className="playlist-chooser-heading"><div><p className="eyebrow">AUSWAHL</p><h2>Alles aus {label} auswählen</h2></div></div>
-        <div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder={label + ' suchen'} /></div>
-        {renderChooserSortControls(selectionSourceKind === 'group' ? 'song' : selectionSourceKind)}
-        <div className="group-membership-list">{selectionSourceKind === 'group'
-          ? groupCandidates.map((group) => <button type="button" key={group.id} onClick={() => setSelectionSourceId(group.id)}><span>{group.name}</span><strong>{selectionSourceId === group.id ? '✓' : '+'}</strong></button>)
-          : objectCandidates.map((item) => <button type="button" key={item.id} onClick={() => setSelectionSourceId(item.id)}><span>{item.name}</span><strong>{selectionSourceId === item.id ? '✓' : '+'}</strong></button>)}
-          {!groupCandidates.length && !objectCandidates.length && <p>Keine passenden Einträge.</p>}
-        </div>
-        <div className="dialog-actions"><button type="button" onClick={() => { setSelectionSourceKind(null); setSelectionSourceId(null); setChooserSearch('') }}>Abbrechen</button><button type="button" disabled={!selectionSourceId} onClick={applySelectionSource}>Fertig</button></div>
       </section></div>
     })()}
     {selectionObjectEditMode && (() => {
