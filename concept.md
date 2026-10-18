@@ -54,7 +54,7 @@ Eine kopierte Playlist verweist auf dieselben Songs; Audiodateien werden nicht v
 
 Der bisherige separate Löschknopf in einer geöffneten Playlist entfällt. Die Nachfrage „wirklich löschen?“ bleibt erhalten.
 
-Das `•••` neben der Überschrift „Playlists“ bietet **Auswählen**, **Bearbeiten** und **Übersicht**. Während der Auswahl erscheint der zusätzliche Drei-Punkte-Knopf unten rechts.
+Das `•••` neben der Überschrift „Playlists“ bietet **Auswählen**, **Reihenfolge ändern** und **Übersicht**. Während der Auswahl erscheint der zusätzliche Drei-Punkte-Knopf über der linken Playlist-/Tag-Spalte; seine Funktionsliste öffnet rechts im Bildschirm.
 
 ## Import und lokale Dateien
 
