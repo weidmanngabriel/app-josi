@@ -312,7 +312,7 @@ html, body, #root { overscroll-behavior-y: none; }
 .sidebar-selection-dock { position:fixed; bottom:182px; z-index:175; display:flex; align-items:center; gap:9px; max-width:216px; padding:9px 10px 9px 14px; border:1px solid #475569; border-radius:999px; background:#171b24; box-shadow:0 16px 44px rgba(0,0,0,.45); }
 .sidebar-selection-dock > strong { font-size:12px; }
 .sidebar-selection-dock > button { min-height:38px; padding:0 11px; border:1px solid #3b4354; border-radius:999px; background:#252a36; cursor:pointer; }
-.sidebar-selection-action-menu { bottom:56px; }
+.sidebar-selection-action-menu { position:fixed; top:76px; right:18px; bottom:auto; left:auto; width:min(300px,calc(100vw - 36px)); max-height:calc(100dvh - 94px); overflow-y:auto; }
 .group-membership-dialog { max-height:min(720px,82dvh); }
 .group-membership-list { display:grid; max-height:600px; overflow:auto; padding:12px; }
 .group-membership-list > button { display:flex; align-items:center; justify-content:space-between; min-height:46px; padding:0 12px; border:0; border-radius:9px; background:transparent; text-align:left; cursor:pointer; }
@@ -1846,3 +1846,6 @@ input, textarea {
     min-width: 720px;
   }
 }
+
+.selection-mode-hint { gap:8px; }
+.selection-mode-hint span { font-weight:750; }
