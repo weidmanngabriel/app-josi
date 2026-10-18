@@ -1626,7 +1626,7 @@ function App() {
   }
   const removeSongFromActiveTag = async (songId: string) => { if (!activeTag) return; await updateTag({ ...activeTag, songIds: activeTag.songIds.filter((id) => id !== songId), lastUsedAt: Date.now() }, true) }
   const startSelection = (initialIds: string[] = []) => { setSelectionMode(true); setSelectedSongIds(new Set(initialIds)); setSortMenuOpen(false); setBulkMoveMode(false); setBulkMoveContext(null) }
-  const finishSelection = () => { setSelectionMode(false); setSelectedSongsListOpen(false); setSelectedSongsMenuOpen(false); setSelectionObjectEditMode(null); setSelectionObjectDraftIds(new Set()); setSortMenuOpen(false) }
+  const finishSelection = () => { setSelectionMode(false); setSelectedSongsListOpen(false); setSelectedSongsMenuOpen(false); setSelectionObjectEditMode(null); setSelectionObjectDraftIds(new Set()); setSortMenuOpen(false); setChooserSearch('') }
   const stopSelection = () => { setSelectionMode(false); setSelectedSongIds(new Set()); setPlaylistChooserMode(null); setSelectedSongsListOpen(false); setSelectedSongsMenuOpen(false); setSelectionObjectEditMode(null); setSelectionObjectDraftIds(new Set()); setSortMenuOpen(false); setBulkMoveMode(false); setBulkMoveContext(null); setSelectionConfirmation(null) }
   const openSelectionSource = (kind: Exclude<SelectionSourceKind, null>) => { setSelectionSourceKind(kind); setSelectionSourceId(null); setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setSortMenuOpen(false) }
   const applySelectionSource = () => {
@@ -2814,6 +2814,7 @@ function App() {
     {singleMoveTarget && <div className="single-move-hint"><span>Zielstrich wählen und doppelt antippen. Der Modus bleibt aktiv.</span><button type="button" onClick={cancelSingleMove}>Abbrechen</button></div>}
     {sidebarMoveKind && <div className="single-move-hint persistent-move-hint"><span>Bewegen bleibt aktiv.</span><button type="button" onClick={() => { setSidebarMoveKind(null); setChooserSearch('') }}>Abbrechen</button></div>}
     {bulkMoveMode && <div className="single-move-hint persistent-move-hint"><span>Rote Striche verschieben die Auswahl als Block.</span><button type="button" onClick={() => { setBulkMoveMode(false); setBulkMoveContext(null) }}>Abbrechen</button><button type="button" onClick={finishSelectedMove}>Fertig</button></div>}
+    {selectionMode && !bulkMoveMode && !selectedSongsListOpen && <div className="single-move-hint selection-mode-hint"><span>{selectedSongIds.size ? `${selectedSongIds.size} ausgewählt` : 'Dateien auswählen'}</span><button type="button" onClick={stopSelection}>Abbrechen</button><button type="button" onClick={finishSelection}>Fertig</button></div>}
 
     {view !== 'playlistOverview' && <main className={`music-layout custom-layout${layoutEditMode ? ' layout-editing' : ''}`} style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}><aside className="sidebar">
       <button className={`nav-item${view === 'library' && !activePlaylistId ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'library', playlistId: null, detailOpen: false })}><span>Bibliothek</span><strong>{songs.length}</strong></button>
