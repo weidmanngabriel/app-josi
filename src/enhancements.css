@@ -2142,11 +2142,12 @@ input, textarea {
 /* Non-modal editing modes explain themselves at the side instead of covering the working area. */
 .inline-mode-guide {
   position: fixed;
-  top: 88px;
+  top: 50%;
   right: 12px;
+  transform: translateY(-50%);
   z-index: 155;
   width: min(250px, calc(100vw - 28px));
-  max-height: calc(100dvh - 176px);
+  max-height: 46dvh;
   overflow: auto;
   padding: 12px;
   border: 1px solid rgba(148,163,184,.32);
@@ -2206,6 +2207,7 @@ input, textarea {
     top: auto;
     right: 8px;
     bottom: 86px;
+    transform: none;
     width: min(230px, 48vw);
     max-height: 38dvh;
     padding: 10px;
