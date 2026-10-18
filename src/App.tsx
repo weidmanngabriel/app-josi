@@ -2555,6 +2555,38 @@ function App() {
   }
   const selectedSidebarIds = (kind: 'playlist' | 'tag') => [...(kind === 'playlist' ? selectedPlaylistIds : selectedTagIds)]
   const copyNameForSelection = (base: string, used: Set<string>) => { let suffix = 1; let value = `${base} Kopie`; while (used.has(value.toLocaleLowerCase('de-DE'))) { suffix += 1; value = `${base} Kopie ${suffix}` } used.add(value.toLocaleLowerCase('de-DE')); return value }
+  const copySelectedSongs = async () => {
+    const selected = songs.filter((song) => selectedSongIds.has(song.id))
+    if (!selected.length) return
+    const available = selected.filter((song) => song.file && song.file.size > 0)
+    if (!available.length) { setMessage('Die ausgewählten Dateien können nicht kopiert werden, weil die lokalen Audiodateien fehlen.'); return }
+    recordHistory()
+    const now = Date.now()
+    const used = new Set(songs.map((song) => song.name.toLocaleLowerCase('de-DE')))
+    const copies = available.map((source, index): Song => ({
+      ...source,
+      id: crypto.randomUUID(),
+      name: copyNameForSelection(source.name, used),
+      addedAt: now + index,
+      libraryOrder: now + index,
+      importBatchId: crypto.randomUUID(),
+      isNew: false,
+      completedPlays: 0,
+      loopMarkers: source.loopMarkers ? [...source.loopMarkers] : undefined,
+      trashedAt: undefined,
+      trashPlaylistIds: undefined,
+      trashedLoop: undefined,
+    }))
+    await Promise.all(copies.map(saveSong))
+    setSongs((current) => [...current, ...copies])
+    if (activePlaylist && view === 'library') {
+      const updated = { ...activePlaylist, songIds: [...activePlaylist.songIds, ...copies.map((song) => song.id)], lastUsedAt: Date.now() }
+      setPlaylists((current) => current.map((playlist) => playlist.id === updated.id ? updated : playlist))
+      await savePlaylist(updated)
+    }
+    setMessage(`${copies.length} ${copies.length === 1 ? 'Lied wurde' : 'Lieder wurden'} kopiert.`)
+    stopSelection()
+  }
   const copySelectedSidebarObjects = async () => {
     if (!sidebarSelectionKind) return
     const ids = selectedSidebarIds(sidebarSelectionKind); if (!ids.length) return
