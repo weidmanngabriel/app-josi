@@ -1721,20 +1721,38 @@ function App() {
     if (action === 'arrow') beginReorder(activePlaylist ? 'playlist' : 'library')
     else beginSelectedMove(focused)
   }
-  const openSelectionSource = (kind: Exclude<SelectionSourceKind, null>) => { setSelectionSourceKind(kind); setSelectionSourceId(null); setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setSortMenuOpen(false) }
-  const applySelectionSource = () => {
-    if (!selectionSourceKind || !selectionSourceId) return
+  const restoreSelectionSourceView = () => {
+    if (!selectionSourceReturn) return
+    setView(selectionSourceReturn.view)
+    setActivePlaylistId(selectionSourceReturn.playlistId)
+    setActiveTagId(selectionSourceReturn.tagId ?? null)
+    setDetailOpen(selectionSourceReturn.detailOpen)
+    setSelectionSourceReturn(null)
+  }
+  const closeSelectionSource = () => {
+    setSelectionSourceKind(null); setSelectionSourceId(null); setChooserSearch('')
+    restoreSelectionSourceView()
+  }
+  const openSelectionSource = (kind: Exclude<SelectionSourceKind, null>) => {
+    setSelectionSourceReturn({ view, playlistId: activePlaylistId, tagId: activeTagId, detailOpen })
+    setSelectionSourceKind(kind); setSelectionSourceId(null); setChooserSearch(''); setSortMenuOpen(false)
+    if (kind === 'group') { setView('library'); setActivePlaylistId(null); setActiveTagId(null); setDetailOpen(false) }
+    if (kind === 'playlist') setPlaylistsCollapsed(false)
+    if (kind === 'tag') setTagsCollapsed(false)
+  }
+  const applySelectionSourceById = (kind: Exclude<SelectionSourceKind, null>, id: string) => {
     const existingIds = new Set(songs.map((song) => song.id))
     let ids: string[] = []
-    if (selectionSourceKind === 'group') {
-      const group = objectGroups.find((item) => item.id === selectionSourceId && item.kind === 'song')
+    if (kind === 'group') {
+      const group = objectGroups.find((item) => item.id === id && item.kind === 'song')
       if (group) ids = deepGroupItemIds(group)
-    } else if (selectionSourceKind === 'playlist') ids = playlists.find((item) => item.id === selectionSourceId)?.songIds ?? []
-    else ids = tags.find((item) => item.id === selectionSourceId)?.songIds ?? []
-    const selected = [...new Set(ids.filter((id) => existingIds.has(id)))]
+    } else if (kind === 'playlist') ids = playlists.find((item) => item.id === id)?.songIds ?? []
+    else ids = tags.find((item) => item.id === id)?.songIds ?? []
+    const selected = [...new Set(ids.filter((songId) => existingIds.has(songId)))]
     setSelectionMode(true)
     setSelectedSongIds(new Set(selected))
     setSelectionSourceKind(null); setSelectionSourceId(null); setChooserSearch('')
+    restoreSelectionSourceView()
     setMessage(selected.length ? `${selected.length} ${selected.length === 1 ? 'Lied wurde' : 'Lieder wurden'} ausgewählt.` : 'Daraus gibt es keine vorhandenen Lieder.')
   }
   const openSelectionObjectEdit = (mode: Exclude<SelectionObjectEditMode, null>) => { setSelectionObjectEditMode(mode); setSelectionObjectDraftIds(new Set()); setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setSelectedSongsMenuOpen(false) }
