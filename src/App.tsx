@@ -1668,6 +1668,8 @@ function App() {
     setSortMenuOpen(false); setSelectedSongsMenuOpen(false); setSelectedSongsListOpen(false)
     if (!selectedSongIds.size || view !== 'library') return
     if (searchQuery.trim()) setSearchQuery('')
+    const visibleIds = new Set(visibleSongs.map((song) => song.id))
+    if ([...selectedSongIds].some((id) => !visibleIds.has(id))) { setMessage('Zum gemeinsamen Bewegen müssen alle ausgewählten Lieder in der aktuell geöffneten Liste sichtbar sein.'); return }
     const context = selectedMoveParent()
     if (!context.valid) { setMessage('Die ausgewählten Lieder liegen auf verschiedenen Gruppenebenen. Wähle für einen gemeinsamen Strich nur Lieder derselben Ebene.'); return }
     if (context.parentGroupId) updateObjectGroup(context.parentGroupId, (group) => ({ ...group, sortMode: 'manual' }))
@@ -2937,7 +2939,7 @@ function App() {
       </section></div>
     })()}
     {selectionObjectEditMode && (() => {
-      const candidates = sortChooserObjects('song', visibleSongs.filter((song) => selectionObjectEditMode === 'add' ? !selectedSongIds.has(song.id) : selectedSongIds.has(song.id))).filter((song) => fuzzyMatch(song.name, chooserSearch))
+      const candidates = sortChooserObjects('song', songs.filter((song) => selectionObjectEditMode === 'add' ? !selectedSongIds.has(song.id) : selectedSongIds.has(song.id))).filter((song) => fuzzyMatch(song.name, chooserSearch))
       return <div className="playlist-chooser-backdrop selection-object-edit-backdrop"><section className="playlist-chooser selection-object-edit-dialog" onClick={(event) => event.stopPropagation()}>
         <div className="playlist-chooser-heading"><div><p className="eyebrow">AUSWAHL</p><h2>{selectionObjectEditMode === 'add' ? 'Objekte hinzufügen' : 'Objekte entfernen'}</h2></div></div>
         <div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Lieder suchen" /></div>
