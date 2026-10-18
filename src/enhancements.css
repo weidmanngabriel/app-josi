@@ -1923,3 +1923,217 @@ input, textarea {
     width: 100%;
   }
 }
+
+
+/* Dialog actions stay reachable without scrolling. */
+.confirm-dialog,
+.playlist-chooser {
+  display: flex;
+  flex-direction: column;
+}
+.confirm-dialog > .dialog-actions,
+.playlist-chooser > .dialog-actions {
+  order: -50;
+  position: sticky;
+  top: 0;
+  z-index: 8;
+  flex: 0 0 auto;
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border: 1px solid #303746;
+  border-radius: 12px;
+  background: rgba(20,24,33,.98);
+  backdrop-filter: blur(10px);
+}
+.playlist-chooser > .dialog-actions {
+  margin: 10px 12px 0;
+}
+.dialog-actions-top {
+  justify-content: flex-end;
+}
+
+/* Selected-song workspace. */
+.selected-songs-list > .selected-song-list-item {
+  display: grid;
+  grid-template-columns: 32px minmax(0,1fr) auto;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-bottom-color: #252c38;
+  border-radius: 9px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.selected-songs-list > .selected-song-list-item span,
+.selected-songs-list > .selected-song-list-item small {
+  color: #8d96a6;
+}
+.selected-songs-list > .selected-song-list-item strong {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.selected-songs-list > .selected-song-list-item.active {
+  border-color: #8b5cf6;
+  background: rgba(124,58,237,.18);
+  box-shadow: inset 3px 0 0 #8b5cf6;
+}
+.selected-songs-action-menu-fixed {
+  position: fixed !important;
+  z-index: 1810 !important;
+  top: 84px !important;
+  right: 18px !important;
+  left: auto !important;
+  bottom: auto !important;
+  width: min(320px, calc(100vw - 36px));
+  max-height: calc(100dvh - 104px);
+  overflow-y: auto;
+}
+.selected-songs-heading small {
+  display: block;
+  max-width: 430px;
+  margin-top: 5px;
+  color: #8d96a6;
+  font-size: 11px;
+}
+
+/* Cover editor and persisted cover framing. */
+.cover-media {
+  position: relative;
+  overflow: hidden;
+}
+.cover-media .positioned-cover-image {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: contain;
+  transform-origin: center;
+  user-select: none;
+  pointer-events: none;
+}
+.playlist-mini-cover.cover-media {
+  display: inline-block;
+  flex: 0 0 auto;
+}
+.cover-editor-backdrop {
+  z-index: 1650;
+}
+.cover-editor-dialog {
+  width: min(620px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  overflow-y: auto;
+}
+.cover-editor-heading h2 {
+  margin: 0 0 6px;
+}
+.cover-editor-heading p {
+  margin: 0 0 14px;
+}
+.cover-editor-frame {
+  position: relative;
+  width: min(360px, 72vw);
+  aspect-ratio: 1;
+  align-self: center;
+  overflow: hidden;
+  border: 2px solid #475569;
+  border-radius: 18px;
+  touch-action: none;
+  cursor: move;
+}
+.cover-editor-frame img {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  object-fit: contain;
+  transform-origin: center;
+  pointer-events: none;
+  user-select: none;
+}
+.cover-editor-controls {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+.cover-editor-controls label {
+  display: grid;
+  grid-template-columns: 110px minmax(0,1fr);
+  align-items: center;
+  gap: 12px;
+  color: #cbd5e1;
+  font-size: 12px;
+}
+.cover-editor-controls input[type="range"] {
+  width: 100%;
+}
+.cover-background-button {
+  display: inline-flex;
+  align-items: center;
+  justify-self: start;
+  gap: 8px;
+  min-height: 42px;
+  padding: 0 12px;
+  border: 1px solid #3b4352;
+  border-radius: 10px;
+  background: #1a1f2a;
+  cursor: pointer;
+}
+.cover-background-button i {
+  width: 20px;
+  height: 20px;
+  border: 1px solid #64748b;
+  border-radius: 50%;
+}
+
+/* Search controls shared by library and overview pages. */
+.search-group-toggle {
+  flex: 0 0 auto;
+  min-height: 34px !important;
+  padding: 0 10px !important;
+  border: 1px solid #384152 !important;
+  border-radius: 9px !important;
+  background: #171b24 !important;
+  color: #9aa4b5 !important;
+  font-size: 11px !important;
+  white-space: nowrap;
+}
+.search-group-toggle.active {
+  border-color: #7657d7 !important;
+  background: rgba(109,75,209,.18) !important;
+  color: #ddd6fe !important;
+}
+.overview-search-bar {
+  margin-top: 16px;
+  max-width: 720px;
+}
+.object-group-detail-line,
+.card-group-membership {
+  color: #94a3b8 !important;
+}
+.object-group-detail-line {
+  margin-top: 6px !important;
+  font-size: 11px;
+}
+.card-group-membership {
+  display: block;
+  min-height: 2.2em;
+  line-height: 1.1;
+}
+
+@media (max-width: 620px) {
+  .cover-editor-controls label {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+  .selected-songs-action-menu-fixed {
+    top: 72px !important;
+    right: 12px !important;
+    width: min(320px, calc(100vw - 24px));
+  }
+}
