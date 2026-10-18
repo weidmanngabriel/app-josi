@@ -59,7 +59,7 @@ function fuzzyMatch(value: string, query: string) {
   return index === needle.length
 }
 
-type View = 'library' | 'history' | 'loops' | 'trash' | 'tag' | 'playlistOverview'
+type View = 'library' | 'history' | 'loops' | 'trash' | 'tag' | 'playlistOverview' | 'tagOverview'
 type NavigationEntry = { view: View; playlistId: string | null; tagId?: string | null; detailOpen: boolean }
 type ReorderScope = 'library' | 'playlist' | 'sidebar' | 'tags' | null
 type MoveCandidate = { kind: 'song' | 'playlist' | 'tag'; id: string; targetIndex: number | null } | null
@@ -149,6 +149,7 @@ function App() {
   const [currentSongId, setCurrentSongId] = useState<string | null>(null)
   const [currentUrl, setCurrentUrl] = useState<string | null>(null)
   const [coverUrls, setCoverUrls] = useState<Record<string, string>>({})
+  const [tagCoverUrls, setTagCoverUrls] = useState<Record<string, string>>({})
   const [isPlaying, setIsPlaying] = useState(false)
   const [repeatQueue, setRepeatQueue] = useState(false)
   const [repeatSetting, setRepeatSetting] = useState<RepeatSetting>(null)
@@ -239,6 +240,7 @@ function App() {
   const [loopManualRequest, setLoopManualRequest] = useState<LoopManualRequest>(null)
   const [searchQuery, setSearchQuery] = useState('')
   const [playlistCoverTargetId, setPlaylistCoverTargetId] = useState<string | null>(null)
+  const [tagCoverTargetId, setTagCoverTargetId] = useState<string | null>(null)
   const [selectedSongsListOpen, setSelectedSongsListOpen] = useState(false)
   const [selectedSongsMenuOpen, setSelectedSongsMenuOpen] = useState(false)
   const [selectionSourceKind, setSelectionSourceKind] = useState<SelectionSourceKind>(null)
@@ -581,6 +583,13 @@ function App() {
     setCoverUrls(urls)
     return () => Object.values(urls).forEach((url) => URL.revokeObjectURL(url))
   }, [playlists])
+
+  useEffect(() => {
+    const urls: Record<string, string> = {}
+    tags.forEach((tag) => { if (tag.cover) urls[tag.id] = URL.createObjectURL(tag.cover) })
+    setTagCoverUrls(urls)
+    return () => Object.values(urls).forEach((url) => URL.revokeObjectURL(url))
+  }, [tags])
 
   useEffect(() => {
     const next = repeatSetting?.kind === 'count' ? repeatSetting.count : null
@@ -1577,8 +1586,21 @@ function App() {
   const removeSongFromActivePlaylist = async (songId: string) => { if (!activePlaylist) return; await updatePlaylist({ ...activePlaylist, songIds: activePlaylist.songIds.filter((id) => id !== songId), lastUsedAt: Date.now() }, true) }
   const startEditingPlaylist = () => { if (!activePlaylist) return; setEditingName(activePlaylist.name); setIsEditingPlaylist(true) }
   const savePlaylistName = async (event: React.FormEvent) => { event.preventDefault(); if (!activePlaylist || !editingName.trim()) return; await updatePlaylist({ ...activePlaylist, name: editingName.trim(), lastUsedAt: Date.now() }, true); setIsEditingPlaylist(false) }
-  const openPlaylistCoverPicker = (id: string) => { setPlaylistCoverTargetId(id); setOverflowMenu(null); requestAnimationFrame(() => { if (!coverInputRef.current) return; coverInputRef.current.value = ''; coverInputRef.current.click() }) }
-  const changePlaylistCover = async (files: FileList | null) => { const playlist = playlists.find((item) => item.id === playlistCoverTargetId); if (!playlist || !files?.[0] || !files[0].type.startsWith('image/')) return; await updatePlaylist({ ...playlist, cover: files[0], lastUsedAt: Date.now() }, true); setPlaylistCoverTargetId(null); if (coverInputRef.current) coverInputRef.current.value = '' }
+  const openPlaylistCoverPicker = (id: string) => { setPlaylistCoverTargetId(id); setTagCoverTargetId(null); setOverflowMenu(null); requestAnimationFrame(() => { if (!coverInputRef.current) return; coverInputRef.current.value = ''; coverInputRef.current.click() }) }
+  const openTagCoverPicker = (id: string) => { setTagCoverTargetId(id); setPlaylistCoverTargetId(null); setOverflowMenu(null); requestAnimationFrame(() => { if (!coverInputRef.current) return; coverInputRef.current.value = ''; coverInputRef.current.click() }) }
+  const changeObjectCover = async (files: FileList | null) => {
+    const file = files?.[0]
+    if (!file || !file.type.startsWith('image/')) return
+    if (playlistCoverTargetId) {
+      const playlist = playlists.find((item) => item.id === playlistCoverTargetId)
+      if (playlist) await updatePlaylist({ ...playlist, cover: file, lastUsedAt: Date.now() }, true)
+    } else if (tagCoverTargetId) {
+      const tag = tags.find((item) => item.id === tagCoverTargetId)
+      if (tag) await updateTag({ ...tag, cover: file, lastUsedAt: Date.now() }, true)
+    }
+    setPlaylistCoverTargetId(null); setTagCoverTargetId(null)
+    if (coverInputRef.current) coverInputRef.current.value = ''
+  }
   const confirmDeletePlaylist = async () => { if (!playlistToDelete) return; const trashed = { ...playlistToDelete, trashedAt: Date.now() }; await savePlaylist(trashed); setPlaylists((items) => items.filter((playlist) => playlist.id !== playlistToDelete.id)); setTrashedPlaylists((items) => [trashed, ...items.filter((playlist) => playlist.id !== trashed.id)]); if (activePlaylistId === playlistToDelete.id) navigateTo({ view: 'library', playlistId: null, detailOpen: false }); setPlaylistToDelete(null) }
 
   const beginReorder = (scope: Exclude<ReorderScope, null>) => { if (scope === 'library' || scope === 'playlist') setSearchQuery(''); if (scope === 'sidebar') { setPlaylistsCollapsed(false); setPlaylistSortMode('manual') } if (scope === 'tags') { setTagsCollapsed(false); setTagSortMode('manual') } setReorderScope(scope); setMoveCandidate(null); setOverflowMenu(null); if (scope !== 'tags' && scope !== 'sidebar') setSortMode('manual') }
@@ -2772,7 +2794,7 @@ function App() {
   return <div className={`app-shell${sidePaneScrollLocked ? ' side-pane-scroll-locked' : ''}`}>
     <header className="site-header">
       <div className="history-controls" aria-label="Navigation und Verlauf"><button className="home-button" type="button" onClick={goHome} aria-label="Bibliothek">⌂</button><button className="settings-button" type="button" onClick={() => setSettingsOpen(true)} aria-label="Einstellungen">⚙</button><button type="button" onClick={navigateBack} disabled={navigationIndex === 0 && !loopEditorSongId}>‹</button><button type="button" onClick={navigateForward} disabled={navigationIndex >= navigation.length - 1 || Boolean(loopEditorSongId)}>›</button><button type="button" onClick={() => void undo()} disabled={!undoStack.length || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↶</button><button type="button" onClick={() => void redo()} disabled={(!redoStack.length && !cancelledDuplicateAction) || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↷</button>{moveCandidate && <><button className="confirm-move" type="button" onClick={() => void confirmPendingMove()} disabled={moveCandidate.targetIndex === null}>✓</button><button className="cancel-move" type="button" onClick={() => setMoveCandidate(null)}>×</button></>}</div>
-      <div className="header-right-actions">{layoutEditMode && <button className="layout-finish-button" type="button" onClick={finishLayoutEditing}>Layout fertig</button>}<button className="import-button" type="button" onClick={openImportPicker}>+ Musik importieren</button></div><input ref={fileInputRef} className="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac" multiple onChange={(event) => void importFiles(event.target.files)} /><input ref={coverInputRef} className="file-input" type="file" accept="image/*" onChange={(event) => void changePlaylistCover(event.target.files)} />
+      <div className="header-right-actions">{layoutEditMode && <button className="layout-finish-button" type="button" onClick={finishLayoutEditing}>Layout fertig</button>}<button className="import-button" type="button" onClick={openImportPicker}>+ Musik importieren</button></div><input ref={fileInputRef} className="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac" multiple onChange={(event) => void importFiles(event.target.files)} /><input ref={coverInputRef} className="file-input" type="file" accept="image/*" onChange={(event) => void changeObjectCover(event.target.files)} />
     </header>
     {overlayWindowOpen && <div className="dialog-history-controls"><button type="button" onClick={() => void undo()} disabled={importDraftItems.length ? !importDraftUndoStack.length : !undoStack.length || Boolean(moveCandidate)}>↶</button><button type="button" onClick={() => void redo()} disabled={importDraftItems.length ? !importDraftRedoStack.length && !redoStack.length : !redoStack.length && !cancelledDuplicateAction}>↷</button></div>}
     {importDraftItems.length > 0 && (() => {
