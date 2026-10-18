@@ -2344,7 +2344,15 @@ function App() {
     setPendingGroupCreate(null)
     setGroupCreateMenuOpen(false)
   }
-  const startSidebarSelection = (kind: 'playlist' | 'tag') => { setSidebarSelectionKind(kind); setSelectedPlaylistIds(new Set()); setSelectedTagIds(new Set()); setSidebarSelectionMenuOpen(false); setOverflowMenu(null) }
+  const startSidebarSelection = (kind: 'playlist' | 'tag', initialIds: string[] = []) => { setSidebarSelectionKind(kind); setSelectedPlaylistIds(kind === 'playlist' ? new Set(initialIds) : new Set()); setSelectedTagIds(kind === 'tag' ? new Set(initialIds) : new Set()); setSidebarSelectionMenuOpen(false); setOverflowMenu(null) }
+  const selectGroupObjects = (group: ObjectGroup) => {
+    const ids = deepGroupItemIds(group)
+    if (group.kind === 'song') {
+      const visibleIds = new Set(visibleSongs.map((song) => song.id))
+      startSelection(ids.filter((id) => visibleIds.has(id)))
+    } else startSidebarSelection(group.kind, ids)
+    setOverflowMenu(null)
+  }
   const selectAllPlaylists = () => { setSidebarSelectionKind('playlist'); setSelectedPlaylistIds(new Set(sidebarPlaylists.map((playlist) => playlist.id))); setSelectedTagIds(new Set()); setSidebarSelectionMenuOpen(false); setOverflowMenu(null) }
   const stopSidebarSelection = () => { setSidebarSelectionKind(null); setSelectedPlaylistIds(new Set()); setSelectedTagIds(new Set()); setSidebarSelectionMenuOpen(false) }
   const toggleSidebarSelected = (kind: 'playlist' | 'tag', id: string) => {
