@@ -68,7 +68,7 @@ Dateien, die bereits vor dieser Änderung beschädigt oder leer geworden sind, k
 
 ## Mehrfachauswahl
 
-„Auswählen“ funktioniert in Bibliothek, Playlist, Importverlauf und Loops. Die Auswahl kann außerdem direkt aus einer **Gruppe**, **Playlist** oder einem **Tag** übernommen werden. Dazu stehen unter **Auswählen** die drei Aktionen **Alles aus Gruppe auswählen**, **Alles aus Playlist auswählen** und **Alles aus Tag auswählen**. Eine Quelle wird erst mit **Fertig** übernommen.
+„Auswählen“ funktioniert in Bibliothek, Playlist, Importverlauf und Loops. Die Auswahl kann außerdem direkt aus einer **Gruppe**, **Playlist** oder einem **Tag** übernommen werden. Dazu stehen unter **Auswählen** die drei Aktionen **Alles aus Gruppe auswählen**, **Alles aus Playlist auswählen** und **Alles aus Tag auswählen**. Eine Quelle wird erst mit **Fertig** übernommen; dabei werden alle noch vorhandenen Lieder dieser Quelle markiert, auch wenn sie in der momentan geöffneten Liste nicht sichtbar sind.
 
 Playlists und Tags erhalten weiterhin ihren eigenen Auswahlmodus. Der schwebende Auswahlknopf liegt über der linken Playlist-/Tag-Spalte; Aktionslisten von dort öffnen auf der rechten Bildschirmseite und verdecken dadurch nicht die linke Navigation.
 
@@ -96,7 +96,7 @@ Bei **Bewegen** ist zunächst keine Datei markiert. Neben **Alles auswählen** s
 
 Der frühere sichtbare Knopf **Alle Playlists** wird im Player-Bereich durch einen großen `•••`-Knopf ersetzt. Im Menü stehen **Auswählen**, danach **Alles aus Gruppe auswählen**, **Alles aus Playlist auswählen**, **Alles aus Tag auswählen** und anschließend **Reihenfolge ändern**. Danach folgen die übrigen Bibliotheksaktionen; **Alle Playlists** ist nur bei vorhandener Song-Auswahl aktiv.
 
-Direkt über diesem Knopf zeigt Josi die aktuelle Auswahl. Ohne Auswahl steht dort kurz **„Mit ‚Auswählen‘ Dateien wählen“**. Bei einem oder mehreren ausgewählten Liedern öffnet ein Tipp die Auswahlbox. Ihr `•••` enthält **Auswählen**, **Bewegen**, **Reihenfolge verändern (Pfeil)**, **Reihenfolge verändern (Strich)**, **Objekte hinzufügen**, **Objekte entfernen**, **Abbrechen** und **Fertig**. Hinzufügen und Entfernen sind Entwürfe; erst **Fertig** übernimmt die vorgemerkten Änderungen. Die Auswahlbox selbst sowie der normale Auswahlmodus besitzen ebenfalls **Abbrechen** und **Fertig**.
+Direkt über diesem Knopf zeigt Josi die aktuelle Auswahl. Ohne Auswahl steht dort kurz **„Mit ‚Auswählen‘ Dateien wählen“**. Bei einem oder mehreren ausgewählten Liedern öffnet ein Tipp die Auswahlbox. Ihr `•••` enthält **Auswählen**, **Bewegen**, **Reihenfolge verändern (Pfeil)**, **Reihenfolge verändern (Strich)**, **Objekte hinzufügen**, **Objekte entfernen**, **Abbrechen** und **Fertig**. Hinzufügen und Entfernen sind Entwürfe; erst **Fertig** übernimmt die vorgemerkten Änderungen. Die Auswahlbox selbst sowie der normale Auswahlmodus besitzen ebenfalls **Abbrechen** und **Fertig**. Der Pfeil-Reihenfolge-Modus zeigt diese beiden Abschlüsse ebenfalls dauerhaft.
 
 ## Sortierung
 
