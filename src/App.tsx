@@ -108,6 +108,7 @@ type LoopConfirmation = 'save' | 'delete' | 'deleteMarkers' | null
 type SelectionConfirmation = 'switchManual' | 'deleteSelected' | null
 type SelectionSourceKind = 'group' | 'playlist' | 'tag' | null
 type SelectionObjectEditMode = 'add' | 'remove' | null
+type BulkMoveContext = { parentGroupId?: string } | null
 type RenameTarget = { kind: 'song' | 'playlist' | 'tag'; id: string } | null
 type ShareNavigator = Navigator & {
   share?: (data: { title?: string; text?: string; files?: File[] }) => Promise<void>
@@ -245,6 +246,7 @@ function App() {
   const [selectionObjectEditMode, setSelectionObjectEditMode] = useState<SelectionObjectEditMode>(null)
   const [selectionObjectDraftIds, setSelectionObjectDraftIds] = useState<Set<string>>(new Set())
   const [bulkMoveMode, setBulkMoveMode] = useState(false)
+  const [bulkMoveContext, setBulkMoveContext] = useState<BulkMoveContext>(null)
   const [selectionConfirmation, setSelectionConfirmation] = useState<SelectionConfirmation>(null)
   const [trashConfirmation, setTrashConfirmation] = useState(false)
   const [sortMenuOpen, setSortMenuOpen] = useState(false)
