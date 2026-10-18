@@ -129,6 +129,8 @@ const LOOP_PREVIEW_OPTIONS = [0.05, 0.1, 0.25, 0.5, 1, 2, 3, 5, 10] as const
 const SEEK_SECOND_OPTIONS = [5, 10, 15, 30, 60] as const
 const LOOP_OVERLAP_SECONDS = .18
 const AUTO_LOOP_SEARCH_RADIUS_SECONDS = .6
+const GROUP_NESTING_NEW_DRAFT_ID = '__new-empty-group__'
+const GROUP_NESTING_PASTE_DRAFT_ID = '__paste-copied-group__'
 
 function App() {
   const [songs, setSongs] = useState<Song[]>([])
@@ -2370,11 +2372,6 @@ function App() {
       return current
     })
   }
-  const moveGroupItem = (groupId: string, itemId: string, delta: -1 | 1) => updateObjectGroup(groupId, (group) => { const ids = [...group.itemIds]; const index = ids.indexOf(itemId); const other = index + delta; if (index < 0 || other < 0 || other >= ids.length) return group; [ids[index], ids[other]] = [ids[other], ids[index]]; return { ...group, itemIds: ids, sortMode: 'manual' } })
-  const addItemToGroup = (groupId: string, itemId: string) => {
-    const target = objectGroups.find((group) => group.id === groupId); if (!target || !objectFor(target.kind, itemId)) return
-    updateObjectGroup(groupId, (group) => group.itemIds.includes(itemId) ? group : { ...group, itemIds: [...group.itemIds, itemId] })
-  }
   const closeGroupMembershipDraft = () => { setGroupMembershipDraftIds(new Set()); setGroupMembershipTarget(null); setChooserSearch('') }
   const openGroupMembership = (groupId: string, mode: 'add' | 'remove') => { setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setGroupMembershipDraftIds(new Set()); setGroupMembershipTarget({ groupId, mode }); setOverflowMenu(null) }
   const toggleGroupMembershipDraft = (itemId: string) => setGroupMembershipDraftIds((current) => { const next = new Set(current); next.has(itemId) ? next.delete(itemId) : next.add(itemId); return next })
@@ -2416,14 +2413,40 @@ function App() {
     if (groupNestingTarget.mode === 'add') {
       const descendants = new Set(groupDescendantIds(target.id))
       const selected = [...groupNestingDraftIds].filter((id) => {
+        if (id === GROUP_NESTING_NEW_DRAFT_ID || id === GROUP_NESTING_PASTE_DRAFT_ID) return false
         const child = objectGroups.find((group) => group.id === id)
         return Boolean(child && child.kind === target.kind && child.id !== target.id && !descendants.has(child.id) && child.parentGroupId !== target.id && !groupDescendantIds(child!.id).includes(target.id))
       })
-      if (selected.length) {
+      const addEmpty = groupNestingDraftIds.has(GROUP_NESTING_NEW_DRAFT_ID)
+      const pasteClipboard = groupNestingDraftIds.has(GROUP_NESTING_PASTE_DRAFT_ID) && groupClipboard?.kind === target.kind ? groupClipboard : null
+      if (selected.length || addEmpty || pasteClipboard) {
         recordHistory()
         const selectedSet = new Set(selected)
-        setObjectGroups((current) => current.map((group) => selectedSet.has(group.id) ? { ...group, parentGroupId: target.id, afterItems: false } : group))
-        setMessage(`${selected.length} ${selected.length === 1 ? 'Gruppe wurde' : 'Gruppen wurden'} hinzugefügt.`)
+        const childOrders = directChildGroups(target.id).map((group) => group.sortOrder)
+        let nextRootOrder = Math.min(0, ...childOrders) - 1
+        const additions: ObjectGroup[] = []
+        if (addEmpty) {
+          additions.push({ id: crypto.randomUUID(), kind: target.kind, name: 'Unbenannt', itemIds: [], createdAt: Date.now(), sortOrder: nextRootOrder--, sortMode: 'general', sortDirection: 'down', parentGroupId: target.id, afterItems: false })
+        }
+        if (pasteClipboard) {
+          const sourceRoot = pasteClipboard.groups.find((group) => group.id === pasteClipboard.rootId)
+          if (sourceRoot) {
+            const idMap = new Map(pasteClipboard.groups.map((group) => [group.id, crypto.randomUUID()]))
+            additions.push(...pasteClipboard.groups.map((source) => ({
+              ...source,
+              id: idMap.get(source.id)!,
+              name: source.id === pasteClipboard.rootId ? `${source.name} Kopie` : source.name,
+              itemIds: [...source.itemIds],
+              createdAt: Date.now(),
+              sortOrder: source.id === pasteClipboard.rootId ? nextRootOrder-- : source.sortOrder,
+              parentGroupId: source.id === pasteClipboard.rootId ? target.id : source.parentGroupId ? idMap.get(source.parentGroupId) : target.id,
+              afterItems: source.id === pasteClipboard.rootId ? false : source.afterItems,
+            })))
+          }
+        }
+        setObjectGroups((current) => [...additions, ...current.map((group) => selectedSet.has(group.id) ? { ...group, parentGroupId: target.id, afterItems: false } : group)])
+        const changedCount = selected.length + (addEmpty ? 1 : 0) + (pasteClipboard ? 1 : 0)
+        setMessage(`${changedCount} ${changedCount === 1 ? 'Gruppe wurde' : 'Gruppen wurden'} hinzugefügt.`)
       }
     } else {
       const selected = [...groupNestingDraftIds].filter((id) => {
@@ -2445,27 +2468,6 @@ function App() {
     setGroupClipboard({ kind: group.kind, rootId: group.id, groups })
     setOverflowMenu(null); setMessage(`Gruppe „${group.name}“ wurde kopiert.`)
   }
-  const pasteCopiedGroupInto = (parent: ObjectGroup) => {
-    if (!groupClipboard || groupClipboard.kind !== parent.kind) return
-    const sourceRoot = groupClipboard.groups.find((group) => group.id === groupClipboard.rootId)
-    if (!sourceRoot) return
-    const idMap = new Map(groupClipboard.groups.map((group) => [group.id, crypto.randomUUID()]))
-    const siblingOrders = directChildGroups(parent.id).map((group) => group.sortOrder)
-    const rootOrder = Math.min(0, ...siblingOrders) - 1
-    const clones = groupClipboard.groups.map((source) => ({
-      ...source,
-      id: idMap.get(source.id)!,
-      name: source.id === groupClipboard.rootId ? `${source.name} Kopie` : source.name,
-      itemIds: [...source.itemIds],
-      createdAt: Date.now(),
-      sortOrder: source.id === groupClipboard.rootId ? rootOrder : source.sortOrder,
-      parentGroupId: source.id === groupClipboard.rootId ? parent.id : source.parentGroupId ? idMap.get(source.parentGroupId) : parent.id,
-      afterItems: source.id === groupClipboard.rootId ? false : source.afterItems,
-    }))
-    recordHistory(); setObjectGroups((current) => [...clones, ...current])
-    setGroupNestingTarget(null); setMessage(`Gruppe „${sourceRoot.name}“ wurde eingefügt.`)
-  }
-  const removeItemFromGroup = (groupId: string, itemId: string) => setObjectGroups((current) => current.map((group) => group.id === groupId ? { ...group, itemIds: group.itemIds.filter((id) => id !== itemId) } : group))
   const removeAllGroupObjects = (groupId: string) => {
     const ids = new Set([groupId, ...groupDescendantIds(groupId)])
     recordHistory()
@@ -2858,7 +2860,7 @@ function App() {
       const allowedForKind: Array<Song | Playlist | Tag> = group.kind === 'song' ? visibleSongs : group.kind === 'playlist' ? sidebarPlaylists : sidebarTags
       const candidates = sortChooserGroups(group.kind, flattenedGroupsFor(group.kind, allowedForKind).filter((item) => item.id !== group.id && !descendants.has(item.id) && item.parentGroupId !== group.id && !groupDescendantIds(item.id).includes(group.id)), allowedForKind)
       const sortedChildren = sortChooserGroups(group.kind, children, allowedForKind)
-      return <div className="playlist-chooser-backdrop group-membership-backdrop"><section className="playlist-chooser group-membership-dialog" onClick={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">GRUPPE</p><h2>{groupNestingTarget.mode === 'add' ? 'Gruppe hinzufügen' : 'Gruppe entfernen'}</h2></div></div><div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Gruppen suchen" /></div>{renderChooserSortControls(group.kind)}{groupNestingTarget.mode === 'add' ? <div className="group-membership-list group-nesting-list">{candidates.filter((candidate) => fuzzyMatch(candidate.name, chooserSearch)).map((candidate) => { const staged = groupNestingDraftIds.has(candidate.id); return <button type="button" key={candidate.id} onClick={() => toggleGroupNestingDraft(candidate.id)}><span>{candidate.name}</span><strong>{staged ? '−' : '+'}</strong></button> })}{!candidates.filter((candidate) => fuzzyMatch(candidate.name, chooserSearch)).length && <p>Keine weiteren Gruppen vorhanden.</p>}</div> : <div className="group-membership-list group-nesting-list">{group.parentGroupId && fuzzyMatch('Diese Gruppe aus der übergeordneten Gruppe entfernen', chooserSearch) && <button type="button" onClick={() => toggleGroupNestingDraft(group.id)}><span>Diese Gruppe aus der übergeordneten Gruppe entfernen</span><strong>{groupNestingDraftIds.has(group.id) ? '+' : '−'}</strong></button>}{sortedChildren.filter((child) => fuzzyMatch(child.name, chooserSearch)).map((child) => { const staged = groupNestingDraftIds.has(child.id); return <button type="button" key={child.id} onClick={() => toggleGroupNestingDraft(child.id)}><span>{child.name}</span><strong>{staged ? '+' : '−'}</strong></button> })}{!group.parentGroupId && !sortedChildren.filter((child) => fuzzyMatch(child.name, chooserSearch)).length && <p>Keine verschachtelte Gruppe vorhanden.</p>}</div>}<div className="dialog-actions"><button type="button" onClick={closeGroupNestingDraft}>Abbrechen</button><button type="button" onClick={applyGroupNestingDraft}>Fertig</button></div></section></div>
+      return <div className="playlist-chooser-backdrop group-membership-backdrop"><section className="playlist-chooser group-membership-dialog" onClick={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">GRUPPE</p><h2>{groupNestingTarget.mode === 'add' ? 'Gruppe hinzufügen' : 'Gruppe entfernen'}</h2></div></div><div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Gruppen suchen" /></div>{renderChooserSortControls(group.kind)}{groupNestingTarget.mode === 'add' ? <div className="group-membership-list group-nesting-list"><button type="button" onClick={() => toggleGroupNestingDraft(GROUP_NESTING_NEW_DRAFT_ID)}><span>Neue leere Gruppe</span><strong>{groupNestingDraftIds.has(GROUP_NESTING_NEW_DRAFT_ID) ? '−' : '+'}</strong></button><button type="button" disabled={!groupClipboard || groupClipboard.kind !== group.kind} onClick={() => toggleGroupNestingDraft(GROUP_NESTING_PASTE_DRAFT_ID)}><span>Einfügen</span><strong>{groupNestingDraftIds.has(GROUP_NESTING_PASTE_DRAFT_ID) ? '−' : '+'}</strong></button>{candidates.filter((candidate) => fuzzyMatch(candidate.name, chooserSearch)).map((candidate) => { const staged = groupNestingDraftIds.has(candidate.id); return <button type="button" key={candidate.id} onClick={() => toggleGroupNestingDraft(candidate.id)}><span>{candidate.name}</span><strong>{staged ? '−' : '+'}</strong></button> })}{!candidates.filter((candidate) => fuzzyMatch(candidate.name, chooserSearch)).length && <p>Keine weiteren Gruppen vorhanden.</p>}</div> : <div className="group-membership-list group-nesting-list">{group.parentGroupId && fuzzyMatch('Diese Gruppe aus der übergeordneten Gruppe entfernen', chooserSearch) && <button type="button" onClick={() => toggleGroupNestingDraft(group.id)}><span>Diese Gruppe aus der übergeordneten Gruppe entfernen</span><strong>{groupNestingDraftIds.has(group.id) ? '+' : '−'}</strong></button>}{sortedChildren.filter((child) => fuzzyMatch(child.name, chooserSearch)).map((child) => { const staged = groupNestingDraftIds.has(child.id); return <button type="button" key={child.id} onClick={() => toggleGroupNestingDraft(child.id)}><span>{child.name}</span><strong>{staged ? '+' : '−'}</strong></button> })}{!group.parentGroupId && !sortedChildren.filter((child) => fuzzyMatch(child.name, chooserSearch)).length && <p>Keine verschachtelte Gruppe vorhanden.</p>}</div>}<div className="dialog-actions"><button type="button" onClick={closeGroupNestingDraft}>Abbrechen</button><button type="button" onClick={applyGroupNestingDraft}>Fertig</button></div></section></div>
     })()}
     {groupMembershipTarget && (() => { const group = objectGroups.find((item) => item.id === groupMembershipTarget.groupId); if (!group) return null; const allItems: Array<Song | Playlist | Tag> = group.kind === 'song' ? visibleSongs : group.kind === 'playlist' ? sidebarPlaylists : sidebarTags; const rawCandidates = groupMembershipTarget.mode === 'add' ? allItems.filter((item) => !group.itemIds.includes(item.id)) : allItems.filter((item) => group.itemIds.includes(item.id)); const candidates = sortChooserObjects(group.kind, rawCandidates).filter((item) => fuzzyMatch(item.name, chooserSearch)); return <div className="playlist-chooser-backdrop group-membership-backdrop"><section className="playlist-chooser group-membership-dialog" onClick={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">GRUPPE</p><h2>{groupMembershipTarget.mode === 'add' ? 'Objekte hinzufügen' : 'Objekte entfernen'}</h2></div></div><div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Suchen" /></div>{renderChooserSortControls(group.kind)}<div className="group-membership-list">{candidates.map((item) => { const staged = groupMembershipDraftIds.has(item.id); return <button type="button" key={item.id} onClick={() => toggleGroupMembershipDraft(item.id)}><span>{item.name}</span><strong>{groupMembershipTarget.mode === 'add' ? staged ? '−' : '+' : staged ? '+' : '−'}</strong></button> })}{!candidates.length && <p>Keine passenden Objekte.</p>}</div><div className="dialog-actions"><button type="button" onClick={closeGroupMembershipDraft}>Abbrechen</button><button type="button" onClick={applyGroupMembershipDraft}>Fertig</button></div></section></div> })()}
     {colorPickerTarget && <ColorSpectrumPicker title="Tag-Farbe wählen" initialColor={colorPickerTarget === 'create' ? tagColor : renameTagColor} onCancel={() => setColorPickerTarget(null)} onDone={(color) => { if (colorPickerTarget === 'create') setTagColor(color); else setRenameTagColor(color); setColorPickerTarget(null) }} />}
