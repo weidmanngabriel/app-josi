@@ -1325,12 +1325,13 @@ function App() {
       const pool = action.targetKind === 'song' ? songs : playlists
       const newNames = new Set(action.ids.map((id) => normalizeName(pool.find((item) => item.id === id)?.name ?? '')).filter(Boolean))
       const insertIds = resolution === 'replace' ? [...action.ids].reverse().filter((id, index, reversed) => reversed.findIndex((other) => normalizeName(pool.find((item) => item.id === other)?.name ?? '') === normalizeName(pool.find((item) => item.id === id)?.name ?? '')) === index).reverse() : action.ids
+      if (tagChooserTarget) setTagChooserDirty(true)
       if (action.targetKind === 'song') {
         const kept = resolution === 'replace' ? tag.songIds.filter((id) => action.ids.includes(id) || !newNames.has(normalizeName(songs.find((song) => song.id === id)?.name ?? ''))) : tag.songIds
-        await updateTag({ ...tag, songIds: [...new Set([...kept.filter((id) => !action.ids.includes(id)), ...insertIds])], lastUsedAt: Date.now() }, true)
+        await updateTag({ ...tag, songIds: [...new Set([...kept.filter((id) => !action.ids.includes(id)), ...insertIds])], lastUsedAt: Date.now() }, !tagChooserTarget)
       } else {
         const kept = resolution === 'replace' ? tag.playlistIds.filter((id) => action.ids.includes(id) || !newNames.has(normalizeName(playlists.find((playlist) => playlist.id === id)?.name ?? ''))) : tag.playlistIds
-        await updateTag({ ...tag, playlistIds: [...new Set([...kept.filter((id) => !action.ids.includes(id)), ...insertIds])], lastUsedAt: Date.now() }, true)
+        await updateTag({ ...tag, playlistIds: [...new Set([...kept.filter((id) => !action.ids.includes(id)), ...insertIds])], lastUsedAt: Date.now() }, !tagChooserTarget)
       }
       return
     }
