@@ -19,6 +19,7 @@ import {
   type Tag,
 } from './musicDb'
 import { ColorSpectrumPicker } from './ColorSpectrumPicker'
+import { CoverEditor, type CoverEditorValue } from './CoverEditor'
 import './enhancements.css'
 import './loopEditor.css'
 
@@ -110,6 +111,7 @@ type SelectionSourceKind = 'group' | 'playlist' | 'tag' | null
 type SelectionObjectEditMode = 'add' | 'remove' | null
 type BulkMoveContext = { parentGroupId?: string } | null
 type RenameTarget = { kind: 'song' | 'playlist' | 'tag'; id: string } | null
+type CoverEditorDraft = { kind: 'playlist' | 'tag'; id: string; file: Blob; scale: number; x: number; y: number; background: string } | null
 type ShareNavigator = Navigator & {
   share?: (data: { title?: string; text?: string; files?: File[] }) => Promise<void>
   canShare?: (data: { title?: string; text?: string; files?: File[] }) => boolean
@@ -239,9 +241,15 @@ function App() {
   const [loopActivationMode, setLoopActivationMode] = useState<LoopActivationMode>(() => { const value = localStorage.getItem('josi-loop-activation-mode'); return value === 'enabled' || value === 'manual' ? value : 'disabled' })
   const [loopManualRequest, setLoopManualRequest] = useState<LoopManualRequest>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [playlistOverviewSearch, setPlaylistOverviewSearch] = useState('')
+  const [tagOverviewSearch, setTagOverviewSearch] = useState('')
+  const playlistOverviewSearchRef = useRef<HTMLInputElement | null>(null)
+  const tagOverviewSearchRef = useRef<HTMLInputElement | null>(null)
   const [playlistCoverTargetId, setPlaylistCoverTargetId] = useState<string | null>(null)
   const [tagCoverTargetId, setTagCoverTargetId] = useState<string | null>(null)
+  const [coverEditorDraft, setCoverEditorDraft] = useState<CoverEditorDraft>(null)
   const [selectedSongsListOpen, setSelectedSongsListOpen] = useState(false)
+  const [selectedSongsFocusId, setSelectedSongsFocusId] = useState<string | null>(null)
   const [selectedSongsMenuOpen, setSelectedSongsMenuOpen] = useState(false)
   const [selectionSourceKind, setSelectionSourceKind] = useState<SelectionSourceKind>(null)
   const [selectionSourceId, setSelectionSourceId] = useState<string | null>(null)
@@ -2798,7 +2806,6 @@ function App() {
   }
 
   return <div className={`app-shell${sidePaneScrollLocked ? ' side-pane-scroll-locked' : ''}`}>
-    <div data-deployment-test="green-dot" aria-hidden="true" style={{ position: 'fixed', left: '50%', top: '50%', width: '140px', height: '140px', borderRadius: '50%', background: '#22c55e', transform: 'translate(-50%, -50%)', zIndex: 5000, pointerEvents: 'none', boxShadow: '0 0 0 8px rgba(34,197,94,.2)' }} />
     <header className="site-header">
       <div className="history-controls" aria-label="Navigation und Verlauf"><button className="home-button" type="button" onClick={goHome} aria-label="Bibliothek">⌂</button><button className="settings-button" type="button" onClick={() => setSettingsOpen(true)} aria-label="Einstellungen">⚙</button><button type="button" onClick={navigateBack} disabled={navigationIndex === 0 && !loopEditorSongId}>‹</button><button type="button" onClick={navigateForward} disabled={navigationIndex >= navigation.length - 1 || Boolean(loopEditorSongId)}>›</button><button type="button" onClick={() => void undo()} disabled={!undoStack.length || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↶</button><button type="button" onClick={() => void redo()} disabled={(!redoStack.length && !cancelledDuplicateAction) || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↷</button>{moveCandidate && <><button className="confirm-move" type="button" onClick={() => void confirmPendingMove()} disabled={moveCandidate.targetIndex === null}>✓</button><button className="cancel-move" type="button" onClick={() => setMoveCandidate(null)}>×</button></>}</div>
       <div className="header-right-actions">{layoutEditMode && <button className="layout-finish-button" type="button" onClick={finishLayoutEditing}>Layout fertig</button>}<button className="import-button" type="button" onClick={openImportPicker}>+ Musik importieren</button></div><input ref={fileInputRef} className="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac" multiple onChange={(event) => void importFiles(event.target.files)} /><input ref={coverInputRef} className="file-input" type="file" accept="image/*" onChange={(event) => void changeObjectCover(event.target.files)} />
