@@ -270,6 +270,7 @@ function App() {
   const [selectedSongsMenuOpen, setSelectedSongsMenuOpen] = useState(false)
   const [selectionSourceKind, setSelectionSourceKind] = useState<SelectionSourceKind>(null)
   const [selectionSourceId, setSelectionSourceId] = useState<string | null>(null)
+  const [selectionSourceReturn, setSelectionSourceReturn] = useState<NavigationEntry | null>(null)
   const [selectionObjectEditMode, setSelectionObjectEditMode] = useState<SelectionObjectEditMode>(null)
   const [selectionObjectDraftIds, setSelectionObjectDraftIds] = useState<Set<string>>(new Set())
   const [bulkMoveMode, setBulkMoveMode] = useState(false)
@@ -393,6 +394,7 @@ function App() {
   const repeatHoldTriggeredRef = useRef(false)
   const repeatRemainingRef = useRef<number | null>(null)
   const groupPlaybackIdsRef = useRef<string[] | null>(null)
+  const groupDirectClickTimerRef = useRef<number | null>(null)
 
   const currentPlaybackAudio = () => playbackAudioRef.current ?? audioRef.current
   const otherPlaybackAudio = (audio: HTMLAudioElement) => audio === audioRef.current ? overlapAudioRef.current : audioRef.current
