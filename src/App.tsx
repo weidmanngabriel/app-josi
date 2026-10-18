@@ -89,6 +89,20 @@ type LoopManualRequest = { ids: string[]; enabled: boolean } | null
 type GroupKind = 'song' | 'playlist' | 'tag'
 type GroupSortMode = 'general' | SortMode
 type ObjectGroup = { id: string; kind: GroupKind; name: string; itemIds: string[]; createdAt: number; sortOrder: number; sortMode: GroupSortMode; sortDirection: SortDirection; color?: string; parentGroupId?: string; afterItems?: boolean }
+
+function itemMatchesGroupQuery(groups: ObjectGroup[], kind: GroupKind, itemId: string, query: string) {
+  const direct = groups.filter((group) => group.kind === kind && group.itemIds.includes(itemId))
+  return direct.some((start) => {
+    let current: ObjectGroup | undefined = start
+    const seen = new Set<string>()
+    while (current && !seen.has(current.id)) {
+      if (fuzzyMatch(current.name, query)) return true
+      seen.add(current.id)
+      current = current.parentGroupId ? groups.find((group) => group.id === current?.parentGroupId) : undefined
+    }
+    return false
+  })
+}
 type SidebarSelectionKind = 'playlist' | 'tag' | null
 type SidebarSelectionConfirmation = 'delete' | 'switchManualMove' | null
 type AppearanceColorTarget = { kind: GroupKind | 'group'; id: string } | null
@@ -241,6 +255,7 @@ function App() {
   const [loopActivationMode, setLoopActivationMode] = useState<LoopActivationMode>(() => { const value = localStorage.getItem('josi-loop-activation-mode'); return value === 'enabled' || value === 'manual' ? value : 'disabled' })
   const [loopManualRequest, setLoopManualRequest] = useState<LoopManualRequest>(null)
   const [searchQuery, setSearchQuery] = useState('')
+  const [searchIncludesGroups, setSearchIncludesGroups] = useState(true)
   const [playlistOverviewSearch, setPlaylistOverviewSearch] = useState('')
   const [tagOverviewSearch, setTagOverviewSearch] = useState('')
   const playlistOverviewSearchRef = useRef<HTMLInputElement | null>(null)
@@ -558,8 +573,8 @@ function App() {
 
   const searchedVisibleSongs = useMemo(() => {
     if (view !== 'library' || !searchQuery.trim()) return baseVisibleSongs
-    return baseVisibleSongs.filter((song) => fuzzyMatch(song.name, searchQuery))
-  }, [baseVisibleSongs, searchQuery, view])
+    return baseVisibleSongs.filter((song) => fuzzyMatch(song.name, searchQuery) || (searchIncludesGroups && itemMatchesGroupQuery(objectGroups, 'song', song.id, searchQuery)))
+  }, [baseVisibleSongs, searchQuery, searchIncludesGroups, objectGroups, view])
 
   const visibleSongs = useMemo(() => {
     const items = [...searchedVisibleSongs]
