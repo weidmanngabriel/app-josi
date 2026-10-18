@@ -2391,6 +2391,49 @@ function App() {
     if (target.kind !== 'group') return target.kind
     return objectGroups.find((group) => group.id === target.id)?.kind ?? null
   }
+  const moveItemIdsIntoGroup = (kind: GroupKind, ids: string[], sourceParentGroupId: string | undefined, targetGroupId: string) => {
+    const target = objectGroups.find((group) => group.id === targetGroupId && group.kind === kind)
+    const validIds = [...new Set(ids)].filter((id) => Boolean(objectFor(kind, id)))
+    if (!target || !validIds.length) return false
+    if (sourceParentGroupId === targetGroupId) {
+      setMessage(`Die Auswahl befindet sich bereits in „${target.name}“.`)
+      return true
+    }
+    const movingTokens = new Set(validIds.map(itemToken))
+    const sourceKey = sourceParentGroupId ? groupContainerKey(kind, sourceParentGroupId) : rootContainerKey(kind)
+    const sourceBase = containerBaseTokensFor(kind, sourceParentGroupId)
+    const sourceOrder = orderedTokensForContainer(sourceKey, sourceBase, true)
+    const sourceNext = sourceOrder.filter((token) => !movingTokens.has(token))
+    const targetKey = groupContainerKey(kind, targetGroupId)
+    const targetBase = containerBaseTokensFor(kind, targetGroupId)
+    const targetOrder = orderedTokensForContainer(targetKey, targetBase, true).filter((token) => !movingTokens.has(token))
+    const targetNext = [...targetOrder, ...validIds.map(itemToken)]
+    recordHistory()
+    setSortModeFor(kind, 'manual')
+    setObjectGroups((current) => current.map((group) => {
+      if (group.kind !== kind) return group
+      if (sourceParentGroupId && group.id === sourceParentGroupId) return { ...group, itemIds: group.itemIds.filter((id) => !validIds.includes(id)), sortMode: 'manual' }
+      if (group.id === targetGroupId) return { ...group, itemIds: [...group.itemIds.filter((id) => !validIds.includes(id)), ...validIds], sortMode: 'manual' }
+      return group
+    }))
+    setMixedOrders((current) => ({ ...current, [sourceKey]: sourceNext, [targetKey]: targetNext }))
+    const active = activeSortSave(kind)
+    if (active) setSortSaves((current) => current.map((save) => save.id === active.id ? { ...save, orders: { ...save.orders, [sourceKey]: sourceNext, [targetKey]: targetNext } } : save))
+    setMessage(`${validIds.length === 1 ? 'Datei wurde' : 'Dateien wurden'} in „${target.name}“ bewegt. Du kannst dort weiter positionieren.`)
+    return true
+  }
+  const moveSingleTargetIntoGroup = (group: ObjectGroup) => {
+    if (!singleMoveTarget || singleMoveTarget.kind === 'group') return
+    const actualKind = moveTargetKind(singleMoveTarget)
+    if (!actualKind || group.kind !== actualKind) return
+    if (!moveItemIdsIntoGroup(actualKind, [singleMoveTarget.id], singleMoveTarget.parentGroupId, group.id)) return
+    setSingleMoveTarget((current) => current ? { ...current, parentGroupId: group.id, targetIndex: null } : current)
+  }
+  const moveSelectedSongsIntoGroup = (group: ObjectGroup) => {
+    if (!bulkMoveMode || group.kind !== 'song' || !bulkMoveContext || !selectedSongIds.size) return
+    if (!moveItemIdsIntoGroup('song', [...selectedSongIds], bulkMoveContext.parentGroupId, group.id)) return
+    setBulkMoveContext({ parentGroupId: group.id })
+  }
   const openSingleMove = (kind: GroupKind | 'group', id: string, parentGroupId?: string) => {
     const actualKind = kind === 'group' ? objectGroups.find((group) => group.id === id)?.kind : kind
     if (!actualKind) return
