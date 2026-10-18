@@ -24,6 +24,7 @@ export type Tag = {
   id: string
   name: string
   color: string
+  cover?: Blob
   songIds: string[]
   playlistIds: string[]
   groupIds?: string[]
