@@ -53,28 +53,17 @@ Umbenennen wird als ein Undo-Schritt vorbereitet; Positionsänderungen erzeugen 
 
 ## Drei-Punkte-Menüs
 
-Langdruck wird nicht für normale Objektaktionen verwendet; diese bleiben in sichtbaren `•••`-Menüs. Bewusste Ausnahmen sind der Wiederholen-Knopf im Player und die benannten Sortier-Saves: Wiederholen öffnet per Langdruck die Wiederholungsbox, ein Save öffnet per Langdruck den Dialog zum Umbenennen.
+Langdruck wird nicht für normale Objektaktionen verwendet; diese bleiben in sichtbaren `•••`-Menüs. Bewusste Ausnahmen sind der Wiederholen-Knopf im Player und die benannten Sortier-Saves: Wiederholen öffnet per Langdruck die Wiederholungsbox, ein Save öffnet per Langdruck den Dialog zum Umbenennen. Drei-Punkte-Menüs, deren Auslöser in der linken Playlist-/Tag-Spalte liegt, werden auf der rechten Bildschirmseite geöffnet, damit sie die linke Navigation nicht verdecken.
 
 ### Song-Menü
 
-In dieser Reihenfolge:
-
-1. Umbenennen
-2. Kopieren
-3. Einfügen
-4. Tags
-5. Teilen
-6. Loop erstellen bzw. Loop bearbeiten
-7. Bei vorhandenem Loop: Loop aktivieren bzw. Loop deaktivieren
-8. Nur bei blau markierten Songs: „Als gelesen markieren“ in Blau
-9. Nur bei blau markierten Songs: „Alle als gelesen markieren“ in Blau
-10. Löschen in Rot
+In dieser Reihenfolge stehen die Bearbeitungsaktionen mit **Auswählen** und **Reihenfolge ändern** direkt vor dem Positions-/Kopierbereich: Umbenennen, Auswählen, Reihenfolge ändern, Bewegen, Kopieren, Einfügen, Tags, Teilen, Loop erstellen bzw. bearbeiten, gegebenenfalls Loop aktivieren/deaktivieren, die blauen Gelesen-Aktionen und Löschen in Rot.
 
 Beim Teilen wird aus dem gespeicherten Blob eine `File` erzeugt und über die Web Share API an die Systemfreigabe übergeben, sofern Browser/iPadOS Dateifreigabe unterstützt. Bei fehlender Unterstützung zeigt Josi eine Meldung.
 
 ### Playlist-Menü
 
-Einzelne Playlists bieten Bild ändern, Umbenennen, Kopieren, Einfügen, Tags, Teilen und Löschen. „Teilen“ übergibt eine Textübersicht mit Playlistname und Liedliste an die Systemfreigabe. Der separate Löschknopf in der geöffneten Playlist wurde entfernt; die Bestätigungsabfrage bleibt erhalten.
+Einzelne Playlists bieten Bild ändern, Umbenennen und Sortieren; direkt danach stehen **Auswählen**, **Reihenfolge ändern**, **Bewegen** und **Kopieren**, gefolgt von Tags, Einfügen, Teilen und Löschen. „Teilen“ übergibt eine Textübersicht mit Playlistname und Liedliste an die Systemfreigabe. Der separate Löschknopf in der geöffneten Playlist wurde entfernt; die Bestätigungsabfrage bleibt erhalten. Einzelne Tags besitzen entsprechend **Auswählen** und **Reihenfolge ändern** vor ihrer Bewegen-Aktion.
 
 Das `•••` neben der Überschrift „Playlists“ bietet „Auswählen“, „Reihenfolge ändern“ und „Übersicht“. Bei Tags heißt die entsprechende Aktion ebenfalls „Reihenfolge ändern“. Im Auswahlmodus erscheint zusätzlich der schwebende Drei-Punkte-Knopf unten rechts.
 
@@ -92,11 +81,17 @@ Die sichere Metadaten-Speicherung prüft bei Undo, ob der Basis-Song noch existi
 
 ## Mehrfachauswahl und Playlist-Zuordnung
 
-Bibliothek, Playlists, Importverlauf und Loops verwenden denselben Song-Auswahlmodus. Im Player-Bereich ersetzt ein großer Bibliotheks-`•••`-Knopf den früheren sichtbaren „Alle Playlists“-Knopf. Ganz oben stehen dort immer **Auswählen** und direkt darunter **Reihenfolge ändern**. Danach folgen die übrigen Bibliotheksaktionen; **Alle Playlists** ist nur aktiv, wenn mindestens ein Lied ausgewählt ist. Im Song-Auswahlmodus enthält dasselbe Menü zusätzlich Gruppieren, Tags, Loop-Aktionen und Alle löschen. Playlists und Tags besitzen weiterhin ihren eigenen Auswahlmodus mit schwebendem `•••`. In den normalen Bibliotheks-/Objektmenüs bleibt **Bewegen** eine gezielte Objekt- bzw. bereits vorhandene Auswahlaktion; der neue Import-Arbeitsbereich darf dagegen eine eingeschränkte Importauswahl als Block positionieren. Kopieren erzeugt neue Objekte desselben Typs, Löschen verschiebt die Auswahl in den Papierkorb. Alle löschen verlangt eine Sicherheitsabfrage und entfernt die ausgewählten lokalen Dateien aus allen Playlists.
+Bibliothek, Playlists, Importverlauf und Loops verwenden denselben Song-Auswahlmodus. Im Player-Bereich ersetzt ein großer Bibliotheks-`•••`-Knopf den früheren sichtbaren „Alle Playlists“-Knopf. Direkt unter **Auswählen** stehen **Alles aus Gruppe auswählen**, **Alles aus Playlist auswählen** und **Alles aus Tag auswählen**; danach folgt **Reihenfolge ändern**. Die drei Quellen öffnen eine Auswahlbox und übernehmen mit **Fertig** alle in der aktuellen Ansicht vorhandenen Lieder der gewählten Gruppe, Playlist oder des Tags. **Alle Playlists** ist nur aktiv, wenn mindestens ein Lied ausgewählt ist. Im Song-Auswahlmodus enthält dasselbe Menü zusätzlich Gruppieren, Tags, Loop-Aktionen und Alle löschen.
+
+Playlists und Tags besitzen weiterhin ihren eigenen Auswahlmodus. Der dazugehörige schwebende `•••`-Knopf liegt über der linken Playlist-/Tag-Spalte statt über der Bibliothek; sein Aktionsmenü öffnet rechts im Bildschirm. Kopieren erzeugt neue Objekte desselben Typs, Löschen verschiebt die Auswahl in den Papierkorb. Alle löschen verlangt eine Sicherheitsabfrage und entfernt die ausgewählten lokalen Dateien aus allen Playlists.
+
+**Bewegen** einer Song-Auswahl schaltet die betroffene Ebene ohne Rückfrage auf Manuell und verschiebt alle ausgewählten Lieder als zusammenhängenden Block; ihre Reihenfolge von oben nach unten bleibt erhalten. Die roten Zielstriche erscheinen nur auf der gemeinsamen Hierarchieebene. Liegen ausgewählte Lieder auf verschiedenen Ebenen oder hat ein Lied mehrere direkte Gruppenzuordnungen, wird der Block nicht gestartet, weil sonst die feste Gruppengrenze verletzt würde.
 
 ## Ausgewählte Lieder im Playlist-Bereich
 
-Oberhalb des unteren Bibliotheks-`•••` steht nicht mehr eine allgemeine Playlist-Beschriftung, sondern die aktuelle Song-Auswahl. Bei genau einem ausgewählten Lied wird dessen Name angezeigt. Bei mehreren ausgewählten Liedern zeigt die Box die Anzahl; ein Tipp öffnet ein eigenes Fenster mit allen ausgewählten Liedern. Diese Liste besitzt Suche und dieselbe chooser-interne Sortierleiste wie andere Auswahlfenster. Die manuelle Option trägt dort den Namen des aktiven Song-Saves.
+Oberhalb des unteren Bibliotheks-`•••` steht die aktuelle Song-Auswahl. Ohne Auswahl erklärt der kurze Hinweis **„Mit ‚Auswählen‘ Dateien wählen“** den nächsten Schritt. Bei genau einem ausgewählten Lied wird dessen Name angezeigt, bei mehreren die Anzahl. Ein Tipp öffnet das Auswahlfenster mit Suche und eigener Sortierleiste.
+
+Das `•••` dieses Auswahlfensters enthält in dieser Reihenfolge **Auswählen**, **Bewegen**, **Reihenfolge verändern (Pfeil)**, **Reihenfolge verändern (Strich)**, **Objekte hinzufügen**, **Objekte entfernen**, **Abbrechen** und **Fertig**. Auswählen kehrt zum normalen Markieren in der Liste zurück. Bewegen und die Strich-Variante verwenden die roten Zielstriche für die aktuelle Mehrfachauswahl; die Pfeil-Variante startet den normalen Reihenfolge-Modus. Objekte hinzufügen/entfernen sind vorläufige Mehrfachauswahlen und übernehmen erst mit **Fertig**. Während des normalen Auswählens stehen ebenfalls **Abbrechen** und **Fertig** dauerhaft zur Verfügung.
 
 ## Suche
 
