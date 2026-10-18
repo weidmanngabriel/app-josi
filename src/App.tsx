@@ -98,7 +98,7 @@ function itemMatchesGroupQuery(groups: ObjectGroup[], kind: GroupKind, itemId: s
     while (current && !seen.has(current.id)) {
       if (fuzzyMatch(current.name, query)) return true
       seen.add(current.id)
-      const parentId = current.parentGroupId
+      const parentId: string | undefined = current.parentGroupId
       current = parentId ? groups.find((group) => group.id === parentId) : undefined
     }
     return false
