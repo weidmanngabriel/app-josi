@@ -1625,36 +1625,81 @@ function App() {
     requestDuplicateAction({ kind: 'tag-add', tagId: tag.id, targetKind: tagChooserTarget.kind, ids })
   }
   const removeSongFromActiveTag = async (songId: string) => { if (!activeTag) return; await updateTag({ ...activeTag, songIds: activeTag.songIds.filter((id) => id !== songId), lastUsedAt: Date.now() }, true) }
-  const startSelection = () => { setSelectionMode(true); setSelectedSongIds(new Set()); setSortMenuOpen(false); setBulkMoveMode(false) }
-  const stopSelection = () => { setSelectionMode(false); setSelectedSongIds(new Set()); setPlaylistChooserMode(null); setSelectedSongsListOpen(false); setSortMenuOpen(false); setBulkMoveMode(false); setSelectionConfirmation(null) }
+  const startSelection = (initialIds: string[] = []) => { setSelectionMode(true); setSelectedSongIds(new Set(initialIds)); setSortMenuOpen(false); setBulkMoveMode(false); setBulkMoveContext(null) }
+  const finishSelection = () => { setSelectionMode(false); setSelectedSongsListOpen(false); setSelectedSongsMenuOpen(false); setSelectionObjectEditMode(null); setSelectionObjectDraftIds(new Set()); setSortMenuOpen(false) }
+  const stopSelection = () => { setSelectionMode(false); setSelectedSongIds(new Set()); setPlaylistChooserMode(null); setSelectedSongsListOpen(false); setSelectedSongsMenuOpen(false); setSelectionObjectEditMode(null); setSelectionObjectDraftIds(new Set()); setSortMenuOpen(false); setBulkMoveMode(false); setBulkMoveContext(null); setSelectionConfirmation(null) }
+  const openSelectionSource = (kind: Exclude<SelectionSourceKind, null>) => { setSelectionSourceKind(kind); setSelectionSourceId(null); setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setSortMenuOpen(false) }
+  const applySelectionSource = () => {
+    if (!selectionSourceKind || !selectionSourceId) return
+    const visibleIds = new Set(visibleSongs.map((song) => song.id))
+    let ids: string[] = []
+    if (selectionSourceKind === 'group') {
+      const group = objectGroups.find((item) => item.id === selectionSourceId && item.kind === 'song')
+      if (group) ids = deepGroupItemIds(group)
+    } else if (selectionSourceKind === 'playlist') ids = playlists.find((item) => item.id === selectionSourceId)?.songIds ?? []
+    else ids = tags.find((item) => item.id === selectionSourceId)?.songIds ?? []
+    const selected = ids.filter((id) => visibleIds.has(id))
+    setSelectionMode(true)
+    setSelectedSongIds(new Set(selected))
+    setSelectionSourceKind(null); setSelectionSourceId(null); setChooserSearch('')
+    setMessage(selected.length ? `${selected.length} ${selected.length === 1 ? 'Lied wurde' : 'Lieder wurden'} ausgewählt.` : 'In der aktuellen Ansicht gibt es daraus keine auswählbaren Lieder.')
+  }
+  const openSelectionObjectEdit = (mode: Exclude<SelectionObjectEditMode, null>) => { setSelectionObjectEditMode(mode); setSelectionObjectDraftIds(new Set()); setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setSelectedSongsMenuOpen(false) }
+  const toggleSelectionObjectDraft = (id: string) => setSelectionObjectDraftIds((current) => { const next = new Set(current); next.has(id) ? next.delete(id) : next.add(id); return next })
+  const applySelectionObjectEdit = () => {
+    if (!selectionObjectEditMode) return
+    setSelectedSongIds((current) => {
+      const next = new Set(current)
+      selectionObjectDraftIds.forEach((id) => selectionObjectEditMode === 'add' ? next.add(id) : next.delete(id))
+      return next
+    })
+    setSelectionObjectEditMode(null); setSelectionObjectDraftIds(new Set()); setChooserSearch('')
+  }
+  const selectedMoveParent = () => {
+    const selected = [...selectedSongIds]
+    if (!selected.length) return { valid: false, parentGroupId: undefined as string | undefined }
+    const memberships = selected.map((id) => objectGroups.filter((group) => group.kind === 'song' && group.itemIds.includes(id)).map((group) => group.id))
+    if (memberships.some((ids) => ids.length > 1)) return { valid: false, parentGroupId: undefined as string | undefined }
+    const first = memberships[0][0]
+    if (memberships.some((ids) => ids[0] !== first)) return { valid: false, parentGroupId: undefined as string | undefined }
+    return { valid: true, parentGroupId: first }
+  }
   const beginSelectedMove = () => {
-    setSortMenuOpen(false)
+    setSortMenuOpen(false); setSelectedSongsMenuOpen(false); setSelectedSongsListOpen(false)
     if (!selectedSongIds.size || view !== 'library') return
     if (searchQuery.trim()) setSearchQuery('')
-    if (sortMode !== 'manual') { setSelectionConfirmation('switchManual'); return }
+    const context = selectedMoveParent()
+    if (!context.valid) { setMessage('Die ausgewählten Lieder liegen auf verschiedenen Gruppenebenen. Wähle für einen gemeinsamen Strich nur Lieder derselben Ebene.'); return }
+    if (context.parentGroupId) updateObjectGroup(context.parentGroupId, (group) => ({ ...group, sortMode: 'manual' }))
+    else setSortMode('manual')
+    setBulkMoveContext({ parentGroupId: context.parentGroupId })
     setBulkMoveMode(true)
   }
+  const finishSelectedMove = () => { setBulkMoveMode(false); setBulkMoveContext(null); snapshotActiveSortSave('song') }
   const moveSelectedToIndex = async (targetIndex: number) => {
-    if (!bulkMoveMode || !selectedSongIds.size || view !== 'library') return
-    const sourceIds = activePlaylist ? [...activePlaylist.songIds] : manualQueue.map((song) => song.id)
-    const moving = sourceIds.filter((id) => selectedSongIds.has(id))
-    if (!moving.length) return
-    const removedBeforeTarget = sourceIds.slice(0, targetIndex).filter((id) => selectedSongIds.has(id)).length
-    const remaining = sourceIds.filter((id) => !selectedSongIds.has(id))
+    if (!bulkMoveMode || !bulkMoveContext || !selectedSongIds.size || view !== 'library') return
+    const parentGroupId = bulkMoveContext.parentGroupId
+    const baseTokens = containerBaseTokensFor('song', parentGroupId)
+    const key = parentGroupId ? groupContainerKey('song', parentGroupId) : rootContainerKey('song')
+    const order = orderedTokensForContainer(key, baseTokens, true)
+    const movingTokens = order.filter((token) => !isGroupToken(token) && selectedSongIds.has(tokenId(token)))
+    if (!movingTokens.length) return
+    const movingSet = new Set(movingTokens)
+    const removedBeforeTarget = order.slice(0, targetIndex).filter((token) => movingSet.has(token)).length
+    const remaining = order.filter((token) => !movingSet.has(token))
     const insertAt = Math.max(0, Math.min(remaining.length, targetIndex - removedBeforeTarget))
-    const nextIds = [...remaining.slice(0, insertAt), ...moving, ...remaining.slice(insertAt)]
-    if (activePlaylist) {
-      await updatePlaylist({ ...activePlaylist, songIds: nextIds, lastUsedAt: Date.now() }, true)
-    } else {
-      recordHistory()
-      const byId = new Map(songs.map((song) => [song.id, song]))
-      const updated = nextIds.map((id, index) => ({ ...byId.get(id)!, libraryOrder: index }))
-      setSongs(updated)
-      await saveSongOrder(updated)
-    }
-    setMessage('Auswahl wurde bewegt. Der Bewegen-Modus bleibt aktiv, bis du Abbrechen wählst.')
+    const nextOrder = [...remaining.slice(0, insertAt), ...movingTokens, ...remaining.slice(insertAt)]
+    recordHistory()
+    setMixedOrders((current) => ({ ...current, [key]: nextOrder }))
+    await persistRelativeOrder('song', nextOrder, parentGroupId)
+    const active = activeSortSave('song')
+    if (active) setSortSaves((current) => current.map((save) => save.id === active.id ? { ...save, orders: { ...save.orders, [key]: nextOrder } } : save))
+    setMessage('Auswahl wurde als Block bewegt. Die Reihenfolge der ausgewählten Lieder blieb erhalten.')
   }
-  const renderBulkMoveDropZone = (index: number) => !bulkMoveMode ? null : <button className="drop-zone bulk-move-zone" type="button" onClick={() => void moveSelectedToIndex(index)} aria-label="Auswahl hierhin bewegen"><span /></button>
+  const renderBulkMoveDropZone = (parentGroupId: string | undefined, index: number) => {
+    if (!bulkMoveMode || !bulkMoveContext || (bulkMoveContext.parentGroupId ?? undefined) !== (parentGroupId ?? undefined)) return null
+    return <button className="drop-zone bulk-move-zone" type="button" onClick={() => void moveSelectedToIndex(index)} aria-label="Auswahl hierhin bewegen"><span /></button>
+  }
   const deleteSelectedSongs = async () => {
     const ids = new Set(selectedSongIds)
     if (!ids.size) return
