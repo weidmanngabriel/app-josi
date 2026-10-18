@@ -68,7 +68,11 @@ Dateien, die bereits vor dieser Änderung beschädigt oder leer geworden sind, k
 
 ## Mehrfachauswahl
 
-„Auswählen“ funktioniert in Bibliothek, Playlist, Importverlauf und Loops. Rechts neben **„Alle Playlists“** erscheint ein runder `•••`-Knopf mit **Gruppieren**, **Bewegen**, **Tags** und **Alle löschen**. Playlists und Tags erhalten einen eigenen Auswahlmodus über ihre Überschrift und ebenfalls einen Drei-Punkte-Knopf unten rechts. Dort können ausgewählte Objekte gruppiert, als Block bewegt, kopiert oder nach Sicherheitsabfrage gelöscht werden. Tags öffnet die Tag-Auswahl für alle markierten Songs. Bewegen ist nur in Bibliothek bzw. geöffneter Playlist verfügbar und verschiebt die Auswahl als zusammenhängenden Block. Bei einer nicht-manuellen Sortierung fragt Josi, ob auf Manuell umgeschaltet werden soll; Nein bricht die Aktion ab. Alle löschen verlangt eine Sicherheitsabfrage.
+„Auswählen“ funktioniert in Bibliothek, Playlist, Importverlauf und Loops. Die Auswahl kann außerdem direkt aus einer **Gruppe**, **Playlist** oder einem **Tag** übernommen werden. Dazu stehen unter **Auswählen** die drei Aktionen **Alles aus Gruppe auswählen**, **Alles aus Playlist auswählen** und **Alles aus Tag auswählen**. Eine Quelle wird erst mit **Fertig** übernommen.
+
+Playlists und Tags erhalten weiterhin ihren eigenen Auswahlmodus. Der schwebende Auswahlknopf liegt über der linken Playlist-/Tag-Spalte; Aktionslisten von dort öffnen auf der rechten Bildschirmseite und verdecken dadurch nicht die linke Navigation.
+
+Eine Song-Auswahl kann als Block bewegt werden. Dabei wird die betroffene Ebene automatisch auf **Manuell** gestellt, die relative Reihenfolge der ausgewählten Lieder bleibt erhalten und rote Zielstriche zeigen die möglichen Positionen. Der Block darf keine Gruppengrenze überschreiten: Liegen die ausgewählten Lieder auf unterschiedlichen Ebenen, wird der gemeinsame Strich nicht gestartet. Alle löschen verlangt weiterhin eine Sicherheitsabfrage.
 
 ## Suche
 
@@ -90,9 +94,9 @@ Bei **Bewegen** ist zunächst keine Datei markiert. Neben **Alles auswählen** s
 
 ## Bibliotheksaktionen unten
 
-Der frühere sichtbare Knopf **Alle Playlists** wird im Player-Bereich durch einen großen `•••`-Knopf ersetzt. Im Menü stehen ganz oben **Auswählen** und direkt darunter **Reihenfolge ändern**. Danach folgen die übrigen Bibliotheksaktionen; **Alle Playlists** ist nur bei vorhandener Song-Auswahl aktiv. Bei aktiver Song-Auswahl kommen die Auswahlaktionen im selben Menü dazu.
+Der frühere sichtbare Knopf **Alle Playlists** wird im Player-Bereich durch einen großen `•••`-Knopf ersetzt. Im Menü stehen **Auswählen**, danach **Alles aus Gruppe auswählen**, **Alles aus Playlist auswählen**, **Alles aus Tag auswählen** und anschließend **Reihenfolge ändern**. Danach folgen die übrigen Bibliotheksaktionen; **Alle Playlists** ist nur bei vorhandener Song-Auswahl aktiv.
 
-Direkt über diesem Knopf zeigt Josi das ausgewählte Lied. Bei mehreren Liedern erscheint eine kompakte Auswahlbox; sie öffnet eine eigene Liste, die durchsucht und sortiert werden kann.
+Direkt über diesem Knopf zeigt Josi die aktuelle Auswahl. Ohne Auswahl steht dort kurz **„Mit ‚Auswählen‘ Dateien wählen“**. Bei einem oder mehreren ausgewählten Liedern öffnet ein Tipp die Auswahlbox. Ihr `•••` enthält **Auswählen**, **Bewegen**, **Reihenfolge verändern (Pfeil)**, **Reihenfolge verändern (Strich)**, **Objekte hinzufügen**, **Objekte entfernen**, **Abbrechen** und **Fertig**. Hinzufügen und Entfernen sind Entwürfe; erst **Fertig** übernimmt die vorgemerkten Änderungen. Die Auswahlbox selbst sowie der normale Auswahlmodus besitzen ebenfalls **Abbrechen** und **Fertig**.
 
 ## Sortierung
 
@@ -185,7 +189,7 @@ Die nähere Songansicht besitzt ein eigenes `•••` mit songbezogenen Aktion
 
 ## Bildschirmfeste Bedienelemente
 
-Menüs und Dialoge dürfen nicht aus dem sichtbaren Bildschirm hinausragen. Der frei eingestellte Bibliotheks-/Player-Schnitt bleibt auch nach **Layout fertig** bestehen; dieser Knopf speichert die aktuellen Werte und beendet nur die Bearbeitung. Die fertige Ansicht verwendet dieselben Nutzer-Spalten mit Vorrang vor responsiven Ersatzspalten, sodass sich das Layout beim Beenden optisch nicht zurückstellt. Ein Rücksprung zur persönlichen Standardbasis erfolgt ausschließlich über **Standard** in den Einstellungen. Linker Seitenbereich und Bibliotheksbereich können unabhängig vertikal gescrollt werden; **Seitliche Bereiche sperren** schaltet dieses vertikale Scrollen ab, nicht den horizontalen Notfall-Pan.
+Menüs und Dialoge dürfen nicht aus dem sichtbaren Bildschirm hinausragen. Drei-Punkte-Menüs aus der linken Playlist-/Tag-Spalte öffnen ihre Funktionsliste rechts im Bildschirm; der schwebende Playlist-/Tag-Auswahlknopf selbst bleibt über der linken Spalte. Der frei eingestellte Bibliotheks-/Player-Schnitt bleibt auch nach **Layout fertig** bestehen; dieser Knopf speichert die aktuellen Werte und beendet nur die Bearbeitung. Die fertige Ansicht verwendet dieselben Nutzer-Spalten mit Vorrang vor responsiven Ersatzspalten, sodass sich das Layout beim Beenden optisch nicht zurückstellt. Ein Rücksprung zur persönlichen Standardbasis erfolgt ausschließlich über **Standard** in den Einstellungen. Linker Seitenbereich und Bibliotheksbereich können unabhängig vertikal gescrollt werden; **Seitliche Bereiche sperren** schaltet dieses vertikale Scrollen ab, nicht den horizontalen Notfall-Pan.
 
 ## Reihenfolge ändern und Sortierbünde
 
