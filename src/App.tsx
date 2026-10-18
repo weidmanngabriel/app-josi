@@ -1699,13 +1699,12 @@ function App() {
   const runFocusedSelectedSongAction = (action: 'move' | 'arrow' | 'line') => {
     const id = selectedSongsFocusId
     if (!id || !selectedSongIds.has(id)) return
-    setSelectedSongIds(new Set([id]))
+    const focused = new Set([id])
+    setSelectedSongIds(focused)
     setSelectedSongsMenuOpen(false)
     setSelectedSongsListOpen(false)
-    requestAnimationFrame(() => {
-      if (action === 'arrow') beginReorder(activePlaylist ? 'playlist' : 'library')
-      else beginSelectedMove()
-    })
+    if (action === 'arrow') beginReorder(activePlaylist ? 'playlist' : 'library')
+    else beginSelectedMove(focused)
   }
   const openSelectionSource = (kind: Exclude<SelectionSourceKind, null>) => { setSelectionSourceKind(kind); setSelectionSourceId(null); setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setSortMenuOpen(false) }
   const applySelectionSource = () => {
@@ -1734,8 +1733,8 @@ function App() {
     })
     setSelectionObjectEditMode(null); setSelectionObjectDraftIds(new Set()); setChooserSearch('')
   }
-  const selectedMoveParent = () => {
-    const selected = [...selectedSongIds]
+  const selectedMoveParent = (ids: Set<string> = selectedSongIds) => {
+    const selected = [...ids]
     if (!selected.length) return { valid: false, parentGroupId: undefined as string | undefined }
     const memberships = selected.map((id) => objectGroups.filter((group) => group.kind === 'song' && group.itemIds.includes(id)).map((group) => group.id))
     if (memberships.some((ids) => ids.length > 1)) return { valid: false, parentGroupId: undefined as string | undefined }
@@ -1743,13 +1742,13 @@ function App() {
     if (memberships.some((ids) => ids[0] !== first)) return { valid: false, parentGroupId: undefined as string | undefined }
     return { valid: true, parentGroupId: first }
   }
-  const beginSelectedMove = () => {
+  const beginSelectedMove = (ids: Set<string> = selectedSongIds) => {
     setSortMenuOpen(false); setSelectedSongsMenuOpen(false); setSelectedSongsListOpen(false)
-    if (!selectedSongIds.size || view !== 'library') return
+    if (!ids.size || view !== 'library') return
     if (searchQuery.trim()) setSearchQuery('')
     const visibleIds = new Set(visibleSongs.map((song) => song.id))
-    if ([...selectedSongIds].some((id) => !visibleIds.has(id))) { setMessage('Zum gemeinsamen Bewegen müssen alle ausgewählten Lieder in der aktuell geöffneten Liste sichtbar sein.'); return }
-    const context = selectedMoveParent()
+    if ([...ids].some((id) => !visibleIds.has(id))) { setMessage('Zum gemeinsamen Bewegen müssen alle ausgewählten Lieder in der aktuell geöffneten Liste sichtbar sein.'); return }
+    const context = selectedMoveParent(ids)
     if (!context.valid) { setMessage('Die ausgewählten Lieder liegen auf verschiedenen Gruppenebenen. Wähle für einen gemeinsamen Strich nur Lieder derselben Ebene.'); return }
     if (context.parentGroupId) updateObjectGroup(context.parentGroupId, (group) => ({ ...group, sortMode: 'manual' }))
     else setSortMode('manual')
