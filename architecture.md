@@ -65,7 +65,7 @@ Beim Teilen wird aus dem gespeicherten Blob eine `File` erzeugt und über die We
 
 Einzelne Playlists bieten Bild ändern, Umbenennen und Sortieren; direkt danach stehen **Auswählen**, **Reihenfolge ändern**, **Bewegen** und **Kopieren**, gefolgt von Tags, Einfügen, Teilen und Löschen. „Teilen“ übergibt eine Textübersicht mit Playlistname und Liedliste an die Systemfreigabe. Der separate Löschknopf in der geöffneten Playlist wurde entfernt; die Bestätigungsabfrage bleibt erhalten. Einzelne Tags besitzen entsprechend **Auswählen** und **Reihenfolge ändern** vor ihrer Bewegen-Aktion.
 
-Das `•••` neben der Überschrift „Playlists“ bietet „Auswählen“, „Reihenfolge ändern“ und „Übersicht“. Bei Tags heißt die entsprechende Aktion ebenfalls „Reihenfolge ändern“. Im Auswahlmodus erscheint zusätzlich der schwebende Drei-Punkte-Knopf unten rechts.
+Das `•••` neben der Überschrift „Playlists“ bietet „Auswählen“, „Reihenfolge ändern“ und „Übersicht“. Bei Tags heißt die entsprechende Aktion ebenfalls „Reihenfolge ändern“. Im Auswahlmodus erscheint zusätzlich der schwebende Drei-Punkte-Knopf über der linken Playlist-/Tag-Spalte; seine Funktionsliste öffnet rechts im Bildschirm.
 
 ## Direkte Tags für Playlists und Gruppen
 
@@ -215,7 +215,7 @@ Die Sortierfelder für Tags und Playlists stehen nicht dauerhaft in der Seitenle
 
 Lieder, Playlists und Tags können jeweils innerhalb ihres eigenen Typs zu persistenten Objektgruppen zusammengefasst werden. Gruppen sind reine lokale Metadaten in `localStorage` und enthalten ID, Typ, Namen, Objekt-IDs, manuelle Gruppenposition sowie eine interne Sortierung. Audiodateien, Playlist-Inhalte und Tag-Zuordnungen werden dadurch nicht dupliziert. Ein Objekt darf in mehreren Gruppen desselben Typs referenziert werden; Lieder, Playlists und Tags werden dabei niemals typübergreifend gemischt. Gruppen stehen in der jeweiligen Liste immer vor ungruppierten Objekten und werden untereinander nach der Sortierung der Gesamtliste angeordnet. Innerhalb der Gruppe kann `Allgemeine Sortierung` verwendet werden oder eine eigene Sortierung inklusive manueller Reihenfolge. Das Gruppenmenü besitzt zusätzlich Kopieren und Einfügen direkt vor `Gruppe bewegen`: Kopieren merkt sich ausschließlich die Objekt-IDs der Gruppe, Einfügen ergänzt sie nur in einer Gruppe desselben Typs und dupliziert keine Audiodateien oder Playlist-/Tag-Daten.
 
-Die Gruppenzeile zeigt Name, Anzahl der aktuell dargestellten Objekte und deren Gesamtdauer. Gruppen für Songs können als temporäre Player-Queue abgespielt werden. Weitere Gruppenaktionen sind Umbenennen, Sortieren, Reihenfolge ändern, Gruppe bewegen, Objekte hinzufügen/entfernen und Auflösen. Playlists und Tags besitzen dafür einen eigenen Mehrfachauswahlmodus mit einem schwebenden `•••` unten rechts.
+Die Gruppenzeile zeigt Name, Anzahl der aktuell dargestellten Objekte und deren Gesamtdauer. Gruppen für Songs können als temporäre Player-Queue abgespielt werden. Weitere Gruppenaktionen sind Umbenennen, Sortieren, Reihenfolge ändern, Gruppe bewegen, Objekte hinzufügen/entfernen und Auflösen. Playlists und Tags besitzen dafür einen eigenen Mehrfachauswahlmodus mit einem schwebenden `•••` über der linken Playlist-/Tag-Spalte.
 
 Die Tag-Farbauswahl verwendet keine feste Palette mehr. Ein zweidimensionales Spektrum wird rein im Frontend dargestellt; ein Tippen setzt einen nicht interaktiven Zielpunkt. Erst `Fertig` übernimmt die Farbe unter diesem Punkt, `Abbrechen` verwirft sie.
 
