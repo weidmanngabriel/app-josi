@@ -1895,9 +1895,17 @@ input, textarea {
 }
 .overview-create-form {
   box-sizing: border-box;
-  width: calc((100% - 3 * clamp(12px, 2.4vw, 30px)) / 4);
+  width: min(420px, 100%);
   min-width: 0;
   margin-top: 30px;
+}
+.new-object-create-label {
+  grid-column: 1 / -1;
+  color: #8d96a6;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: .08em;
+  text-transform: uppercase;
 }
 .new-tag input {
   box-sizing: border-box;
@@ -1912,6 +1920,6 @@ input, textarea {
   .playlist-card > strong { font-size: 12px; }
   .playlist-card > small { font-size: 10px; }
   .overview-create-form {
-    width: calc((100% - 30px) / 4);
+    width: 100%;
   }
 }
