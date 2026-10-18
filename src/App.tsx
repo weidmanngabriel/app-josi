@@ -1596,18 +1596,29 @@ function App() {
   const savePlaylistName = async (event: React.FormEvent) => { event.preventDefault(); if (!activePlaylist || !editingName.trim()) return; await updatePlaylist({ ...activePlaylist, name: editingName.trim(), lastUsedAt: Date.now() }, true); setIsEditingPlaylist(false) }
   const openPlaylistCoverPicker = (id: string) => { setPlaylistCoverTargetId(id); setTagCoverTargetId(null); setOverflowMenu(null); requestAnimationFrame(() => { if (!coverInputRef.current) return; coverInputRef.current.value = ''; coverInputRef.current.click() }) }
   const openTagCoverPicker = (id: string) => { setTagCoverTargetId(id); setPlaylistCoverTargetId(null); setOverflowMenu(null); requestAnimationFrame(() => { if (!coverInputRef.current) return; coverInputRef.current.value = ''; coverInputRef.current.click() }) }
-  const changeObjectCover = async (files: FileList | null) => {
+  const changeObjectCover = (files: FileList | null) => {
     const file = files?.[0]
     if (!file || !file.type.startsWith('image/')) return
     if (playlistCoverTargetId) {
       const playlist = playlists.find((item) => item.id === playlistCoverTargetId)
-      if (playlist) await updatePlaylist({ ...playlist, cover: file, lastUsedAt: Date.now() }, true)
+      if (playlist) setCoverEditorDraft({ kind: 'playlist', id: playlist.id, file, scale: playlist.coverScale ?? 1, x: playlist.coverX ?? 0, y: playlist.coverY ?? 0, background: playlist.coverBackground ?? '#111827' })
     } else if (tagCoverTargetId) {
       const tag = tags.find((item) => item.id === tagCoverTargetId)
-      if (tag) await updateTag({ ...tag, cover: file, lastUsedAt: Date.now() }, true)
+      if (tag) setCoverEditorDraft({ kind: 'tag', id: tag.id, file, scale: tag.coverScale ?? 1, x: tag.coverX ?? 0, y: tag.coverY ?? 0, background: tag.coverBackground ?? '#111827' })
     }
     setPlaylistCoverTargetId(null); setTagCoverTargetId(null)
     if (coverInputRef.current) coverInputRef.current.value = ''
+  }
+  const applyCoverEditor = async (value: CoverEditorValue) => {
+    if (!coverEditorDraft) return
+    if (coverEditorDraft.kind === 'playlist') {
+      const playlist = playlists.find((item) => item.id === coverEditorDraft.id)
+      if (playlist) await updatePlaylist({ ...playlist, cover: value.file, coverScale: value.scale, coverX: value.x, coverY: value.y, coverBackground: value.background, lastUsedAt: Date.now() }, true)
+    } else {
+      const tag = tags.find((item) => item.id === coverEditorDraft.id)
+      if (tag) await updateTag({ ...tag, cover: value.file, coverScale: value.scale, coverX: value.x, coverY: value.y, coverBackground: value.background, lastUsedAt: Date.now() }, true)
+    }
+    setCoverEditorDraft(null)
   }
   const confirmDeletePlaylist = async () => { if (!playlistToDelete) return; const trashed = { ...playlistToDelete, trashedAt: Date.now() }; await savePlaylist(trashed); setPlaylists((items) => items.filter((playlist) => playlist.id !== playlistToDelete.id)); setTrashedPlaylists((items) => [trashed, ...items.filter((playlist) => playlist.id !== trashed.id)]); if (activePlaylistId === playlistToDelete.id) navigateTo({ view: 'library', playlistId: null, detailOpen: false }); setPlaylistToDelete(null) }
 
