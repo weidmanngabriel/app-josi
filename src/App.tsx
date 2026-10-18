@@ -2982,21 +2982,23 @@ function App() {
 
     {selectedSongsListOpen && (() => {
       const selectedSongs = sortChooserObjects('song', songs.filter((song) => selectedSongIds.has(song.id))).filter((song) => fuzzyMatch(song.name, chooserSearch))
+      const focusId = selectedSongsFocusId && selectedSongIds.has(selectedSongsFocusId) ? selectedSongsFocusId : selectedSongs[0]?.id ?? null
       return <div className="playlist-chooser-backdrop selected-songs-list-backdrop"><section className="playlist-chooser selected-songs-list-dialog" onClick={(event) => event.stopPropagation()}>
-        <div className="playlist-chooser-heading selected-songs-heading"><div><p className="eyebrow">AUSWAHL</p><h2>{selectedSongIds.size === 1 ? 'Ausgewähltes Lied' : 'Ausgewählte Lieder'}</h2></div><div className="selected-songs-heading-actions"><div className="selection-more-wrap"><button className="selection-more-button selected-songs-more-button" type="button" onClick={() => setSelectedSongsMenuOpen((value) => !value)}>•••</button>{selectedSongsMenuOpen && <><button className="selection-menu-shield" type="button" onClick={() => setSelectedSongsMenuOpen(false)} /><div className="selection-action-menu selected-songs-action-menu">
+        <div className="dialog-actions dialog-actions-top selected-songs-dialog-actions"><button type="button" onClick={() => { setSelectedSongsMenuOpen(false); setSelectedSongsListOpen(false); setChooserSearch('') }}>Abbrechen</button><button type="button" onClick={finishSelection}>Fertig</button></div>
+        <div className="playlist-chooser-heading selected-songs-heading"><div><p className="eyebrow">AUSWAHL</p><h2>{selectedSongIds.size === 1 ? 'Ausgewähltes Lied' : 'Ausgewählte Lieder'}</h2><small>{focusId ? 'Ein Lied ist aktiv. Tippe ein anderes an, um es für die Aktionen zu wählen.' : 'Tippe ein Lied an.'}</small></div><div className="selected-songs-heading-actions"><button className="selection-more-button selected-songs-more-button" type="button" disabled={!focusId} onClick={() => setSelectedSongsMenuOpen((value) => !value)}>•••</button></div></div>
+        {selectedSongsMenuOpen && <div className="overflow-menu selected-songs-action-menu-fixed">
           <button type="button" onClick={() => { setSelectionMode(true); setSelectedSongsMenuOpen(false); setSelectedSongsListOpen(false) }}>Auswählen</button>
-          <button type="button" disabled={!selectedSongIds.size || view !== 'library'} onClick={beginSelectedMove}>Bewegen</button>
-          <button type="button" disabled={view !== 'library'} onClick={() => { setSelectedSongsMenuOpen(false); setSelectedSongsListOpen(false); beginReorder(activePlaylist ? 'playlist' : 'library') }}>Reihenfolge verändern (Pfeil)</button>
-          <button type="button" disabled={!selectedSongIds.size || view !== 'library'} onClick={beginSelectedMove}>Reihenfolge verändern (Strich)</button>
+          <button type="button" disabled={!focusId || view !== 'library'} onClick={() => runFocusedSelectedSongAction('move')}>Bewegen</button>
+          <button type="button" disabled={!focusId || view !== 'library'} onClick={() => runFocusedSelectedSongAction('arrow')}>Reihenfolge verändern (Pfeil)</button>
+          <button type="button" disabled={!focusId || view !== 'library'} onClick={() => runFocusedSelectedSongAction('line')}>Reihenfolge verändern (Strich)</button>
           <button type="button" onClick={() => openSelectionObjectEdit('add')}>Objekte hinzufügen</button>
           <button type="button" disabled={!selectedSongIds.size} onClick={() => openSelectionObjectEdit('remove')}>Objekte entfernen</button>
           <button type="button" onClick={() => { setSelectedSongsMenuOpen(false); setSelectedSongsListOpen(false); setChooserSearch('') }}>Abbrechen</button>
           <button type="button" onClick={finishSelection}>Fertig</button>
-        </div></>}</div></div></div>
+        </div>}
         <div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Auswahl durchsuchen" /></div>
         {renderChooserSortControls('song')}
-        <div className="selected-songs-list">{selectedSongs.map((song, index) => <div key={song.id}><span>{index + 1}.</span><strong>{song.name}</strong><small>{formatTime(song.duration)}</small></div>)}{!selectedSongs.length && <p>Keine passenden Lieder.</p>}</div>
-        <div className="dialog-actions selected-songs-dialog-actions"><button type="button" onClick={() => { setSelectedSongsMenuOpen(false); setSelectedSongsListOpen(false); setChooserSearch('') }}>Abbrechen</button><button type="button" onClick={finishSelection}>Fertig</button></div>
+        <div className="selected-songs-list">{selectedSongs.map((song, index) => <button className={`selected-song-list-item${focusId === song.id ? ' active' : ''}`} type="button" aria-pressed={focusId === song.id} key={song.id} onClick={() => { setSelectedSongsFocusId(song.id); setSelectedSongsMenuOpen(false) }}><span>{index + 1}.</span><strong>{song.name}</strong><small>{formatTime(song.duration)}</small></button>)}{!selectedSongs.length && <p>Keine passenden Lieder.</p>}</div>
       </section></div>
     })()}
     {selectionSourceKind && (() => {
