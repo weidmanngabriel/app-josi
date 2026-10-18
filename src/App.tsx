@@ -2851,7 +2851,31 @@ function App() {
     const key = containerKey ?? rootContainerKey(group.kind)
     const bundleClass = bundleDisplayClass(key, baseTokens, token)
     const toggleCollapsed = () => setCollapsedGroupIds((current) => { const next = new Set(current); next.has(group.id) ? next.delete(group.id) : next.add(group.id); return next })
-    return <div className={`object-group-header${collapsed ? ' collapsed' : ''}${group.color ? ' custom-surface' : ''}${bundleClass}`} style={surfaceStyle(group.color)} role="button" tabIndex={0} aria-expanded={!collapsed} onClick={toggleCollapsed} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleCollapsed() } }}><div className="object-group-heading"><strong><b className="group-chevron">{collapsed ? '▸' : '▾'}</b><span className="group-tag-dots">{groupTags(group.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} title={tag.name} />)}</span><span className="group-name-text">{group.name}</span></strong><span>{groupObjectCount(group, allowed)} Objekte · {formatTime(groupDuration(group, allowed))}</span></div>{renderOrderControls(group.kind, key, baseTokens, token, group.parentGroupId)}{groupMoveId === group.id && !reorderActiveForKind(group.kind) && <div className="group-inline-tools"><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, -1) }}>↑</button><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, 1) }}>↓</button><button type="button" onClick={(event) => { event.stopPropagation(); setGroupMoveId(null) }}>Fertig</button></div>}{groupReorderId === group.id && !reorderActiveForKind(group.kind) && <button className="group-finish" type="button" onClick={(event) => { event.stopPropagation(); cleanupBundleSingletons(); setGroupReorderId(null) }}>Fertig</button>}{renderBundleBadge(group.kind, key, baseTokens, token, group.parentGroupId)}<button className="overflow-button group-overflow" type="button" onClick={(event) => { event.stopPropagation(); setOverflowMenu({ kind: 'group', id: group.id }) }}>•••</button></div>
+    const singleMoveGroupTarget = Boolean(singleMoveTarget && singleMoveTarget.kind !== 'group' && moveTargetKind(singleMoveTarget) === group.kind)
+    const bulkMoveGroupTarget = Boolean(bulkMoveMode && group.kind === 'song')
+    const sourceGroupTarget = selectionSourceKind === 'group' && group.kind === 'song'
+    const directGroupMode = singleMoveGroupTarget || bulkMoveGroupTarget || Boolean(selectionSourceKind)
+    const actionableGroup = singleMoveGroupTarget || bulkMoveGroupTarget || sourceGroupTarget
+    const runDirectGroupAction = () => {
+      if (singleMoveGroupTarget) { moveSingleTargetIntoGroup(group); return }
+      if (bulkMoveGroupTarget) { moveSelectedSongsIntoGroup(group); return }
+      if (sourceGroupTarget) applySelectionSourceById('group', group.id)
+    }
+    const handleGroupClick = () => {
+      if (!directGroupMode) { toggleCollapsed(); return }
+      if (groupDirectClickTimerRef.current !== null) window.clearTimeout(groupDirectClickTimerRef.current)
+      groupDirectClickTimerRef.current = window.setTimeout(() => {
+        groupDirectClickTimerRef.current = null
+        if (actionableGroup) runDirectGroupAction()
+      }, 220)
+    }
+    const handleGroupDoubleClick = () => {
+      if (!directGroupMode) return
+      if (groupDirectClickTimerRef.current !== null) window.clearTimeout(groupDirectClickTimerRef.current)
+      groupDirectClickTimerRef.current = null
+      toggleCollapsed()
+    }
+    return <div className={`object-group-header${collapsed ? ' collapsed' : ''}${group.color ? ' custom-surface' : ''}${bundleClass}${actionableGroup ? ' direct-group-target' : ''}${directGroupMode && !actionableGroup ? ' direct-group-navigation' : ''}`} style={surfaceStyle(group.color)} role="button" tabIndex={0} aria-expanded={!collapsed} onClick={handleGroupClick} onDoubleClick={handleGroupDoubleClick} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); actionableGroup ? runDirectGroupAction() : toggleCollapsed() } }}><div className="object-group-heading"><strong><b className="group-chevron">{collapsed ? '▸' : '▾'}</b><span className="group-tag-dots">{groupTags(group.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} title={tag.name} />)}</span><span className="group-name-text">{group.name}</span></strong><span>{groupObjectCount(group, allowed)} Objekte · {formatTime(groupDuration(group, allowed))}</span></div>{renderOrderControls(group.kind, key, baseTokens, token, group.parentGroupId)}{groupMoveId === group.id && !reorderActiveForKind(group.kind) && <div className="group-inline-tools"><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, -1) }}>↑</button><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, 1) }}>↓</button><button type="button" onClick={(event) => { event.stopPropagation(); setGroupMoveId(null) }}>Fertig</button></div>}{groupReorderId === group.id && !reorderActiveForKind(group.kind) && <button className="group-finish" type="button" onClick={(event) => { event.stopPropagation(); cleanupBundleSingletons(); setGroupReorderId(null) }}>Fertig</button>}{renderBundleBadge(group.kind, key, baseTokens, token, group.parentGroupId)}<button className="overflow-button group-overflow" type="button" onClick={(event) => { event.stopPropagation(); setOverflowMenu({ kind: 'group', id: group.id }) }}>•••</button></div>
   }
   const renderSongRow = (song: Song, index: number, groupId?: string, containerKey?: string, baseTokens: string[] = []) => {
     const groupReordering = groupId === groupReorderId
