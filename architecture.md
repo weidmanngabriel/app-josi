@@ -6,7 +6,7 @@ Die Anwendung ist eine rein clientseitige React-App mit TypeScript und Vite. `sr
 
 Josi bleibt eine lokale Musik-PWA ohne Backend. Audiodateien und Playlists liegen ausschließlich im Browser-Speicher des jeweiligen Geräts.
 
-Die PWA registriert ihren Service Worker weiterhin im Auto-Update-Modus. Beim Start wird aktiv nach einer neuen Version gesucht; steht ein neuer Service Worker bereit, wird er übernommen und die App neu geladen. Bei länger geöffneten Installationen wird zusätzlich regelmäßig nach Updates gesucht, damit ein neues GitHub-Pages-Deployment nicht dauerhaft hinter einer alten installierten Version hängen bleibt.
+Die PWA registriert ihren Service Worker weiterhin im Auto-Update-Modus. Beim Start wird aktiv nach einer neuen Version gesucht; steht ein neuer Service Worker bereit, wird er übernommen und die App neu geladen. Es gibt bewusst keinen periodischen Zwangs-Reload während einer laufenden Sitzung, weil ein noch nicht abgeschlossener Import nur im Arbeitsspeicher liegt und sonst verloren gehen könnte.
 
 ## Lokale Musikdaten
 
