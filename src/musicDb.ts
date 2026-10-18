@@ -25,6 +25,10 @@ export type Tag = {
   name: string
   color: string
   cover?: Blob
+  coverScale?: number
+  coverX?: number
+  coverY?: number
+  coverBackground?: string
   songIds: string[]
   playlistIds: string[]
   groupIds?: string[]
@@ -41,6 +45,10 @@ export type Playlist = {
   createdAt: number
   lastUsedAt: number
   cover?: Blob
+  coverScale?: number
+  coverX?: number
+  coverY?: number
+  coverBackground?: string
   sortOrder?: number
   trashedAt?: number
 }
