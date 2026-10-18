@@ -189,7 +189,7 @@ Menüs und Dialoge dürfen nicht aus dem sichtbaren Bildschirm hinausragen. Der 
 
 ## Reihenfolge ändern und Sortierbünde
 
-Bei Playlists und Tags heißt die bisherige Aktion **Bearbeiten** jetzt **Reihenfolge ändern**. In diesem Modus können benannte Gruppen und einzelne Lieder, Playlists oder Tags auf derselben Ebene gemeinsam nach oben oder unten verschoben werden, auch innerhalb einer Obergruppe.
+Bei Playlists und Tags heißt die bisherige Aktion **Bearbeiten** jetzt **Reihenfolge ändern**. In diesem Modus können benannte Gruppen und einzelne Lieder, Playlists oder Tags auf derselben Ebene gemeinsam nach oben oder unten verschoben werden, auch innerhalb einer Obergruppe. Dasselbe gilt für **Reihenfolge ändern** direkt in einer Gruppe: Direkte Objekte und direkte Untergruppen können unabhängig gegeneinander verschoben werden. Dabei wird niemals die Ebene gewechselt; ein Objekt kann so weder aus seiner Gruppe heraus noch von außen in eine Gruppe hinein verschoben werden.
 
 Neben den Pfeilen hat jeder Eintrag ein Schloss. Standardmäßig ist es offen. Wird es geschlossen, erscheint es rot. Zwei oder mehr direkt benachbarte geschlossene Einträge bilden einen namenlosen Sortierbund. Der Bund wird beim Verschieben zusammen bewegt, ohne seine interne Reihenfolge zu verändern. Bei einem gültigen Bund erscheint zusätzlich ein weißer Kreis je Eintrag; der ausgewählte Kreis wird rot und legt fest, nach welchem Eintrag der Bund bei automatischer Sortierung eingeordnet wird.
 
@@ -213,8 +213,8 @@ Untergruppen stehen standardmäßig oberhalb der direkten Lieder, Playlists oder
 
 Im Drei-Punkte-Menü einer Gruppe stehen nach **Gruppe bewegen**:
 1. **Gruppe gruppieren** – erstellt eine neue übergeordnete Gruppe und legt die aktuelle Gruppe hinein.
-2. **Gruppe hinzufügen** – zeigt passende vorhandene Gruppen. Ganz oben steht **Neue leere Gruppe**, direkt darunter **Einfügen**. Einfügen ist grau und nicht bedienbar, solange keine passende Gruppe kopiert wurde. Nach **Kopieren** wird die Gruppe samt ihrer Untergruppen als neue Kopie eingefügt.
-3. **Gruppe entfernen** – entfernt Untergruppen wieder aus der aktuellen Gruppe beziehungsweise die aktuelle Gruppe aus ihrer übergeordneten Gruppe.
+2. **Gruppe hinzufügen** – zeigt passende vorhandene Gruppen. Ganz oben stehen weiterhin **Neue leere Gruppe** und **Einfügen**. Alle `+`-Auswahlen sind zunächst nur vorgemerkt; auch eine neue leere Gruppe oder eine kopierte Gruppe wird erst mit **Fertig** tatsächlich hinzugefügt. Eine neue leere Gruppe erhält dabei zunächst den Namen **Unbenannt**.
+3. **Gruppe entfernen** – zeigt die aktuelle Untergruppenstruktur mit `−`. Mehrere Untergruppen beziehungsweise die aktuelle Gruppe selbst können vorgemerkt werden; entfernt wird erst mit **Fertig**.
 
 Leere Gruppen können direkt erstellt werden und bleiben auch leer bestehen. **Alle Lieder entfernen** beziehungsweise **Alle Objekte entfernen** leert die ausgewählte Gruppe inklusive ihrer Untergruppen, löscht aber keine Gruppenhülle. Eine Gruppe verschwindet nur über **Gruppe auflösen** oder **Gruppe löschen**.
 
@@ -237,7 +237,7 @@ Die frühere Palette entfällt. Der Farbkreis öffnet ein großes Spektrum mit p
 Die eingegebene Wiederholungszahl zählt auch bei unbearbeiteten Liedern zuverlässig pro vollständigem Durchlauf herunter. Solange der Restwert größer als 0 ist, startet dasselbe Lied erneut. Erst bei 0 wird zum nächsten Lied gewechselt. Für gespeicherte Loops bleibt dasselbe Prinzip pro Loop-Durchlauf bestehen.
 
 
-Bei **Objekte hinzufügen** ist die Auswahl vorläufig: Ein `+` wird nach dem Antippen zu `−`, sodass die Wahl vor dem Speichern zurückgenommen werden kann. Erst **Fertig** fügt die vorgemerkten Objekte hinzu; **Abbrechen** lässt die Gruppe unverändert.
+Bei **Objekte hinzufügen**, **Objekte entfernen**, **Gruppe hinzufügen** und **Gruppe entfernen** ist die gesamte Auswahl vorläufig. Mehrere Einträge können nacheinander mit `+` oder `−` markiert und vor dem Abschluss wieder zurückgenommen werden. **Abbrechen** verwirft den gesamten Entwurf, **Fertig** übernimmt ihn gesammelt und schließt danach das Fenster. Diese beiden Schaltflächen sind die einzigen Abschlussmöglichkeiten; weder ein zusätzlicher Schließen-Knopf noch ein Tipp außerhalb des Fensters beendet den Vorgang.
 
 
 ## Globale Loop-Regel
