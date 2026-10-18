@@ -2137,3 +2137,79 @@ input, textarea {
     width: min(320px, calc(100vw - 24px));
   }
 }
+
+
+/* Non-modal editing modes explain themselves at the side instead of covering the working area. */
+.inline-mode-guide {
+  position: fixed;
+  top: 50%;
+  right: 12px;
+  transform: translateY(-50%);
+  z-index: 155;
+  width: min(250px, calc(100vw - 28px));
+  max-height: 46dvh;
+  overflow: auto;
+  padding: 12px;
+  border: 1px solid rgba(148,163,184,.32);
+  border-radius: 12px;
+  background: rgba(15,20,29,.9);
+  box-shadow: 0 12px 30px rgba(0,0,0,.22);
+  backdrop-filter: blur(9px);
+  color: #e5e7eb;
+}
+.inline-mode-guide strong {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 12px;
+  letter-spacing: .04em;
+}
+.inline-mode-guide p {
+  margin: 0 0 8px;
+  color: #aab3c2;
+  font-size: 11px;
+  line-height: 1.35;
+}
+.inline-mode-guide > div {
+  display: flex;
+  gap: 8px;
+}
+.inline-mode-guide button {
+  min-height: 34px;
+  padding: 0 10px;
+  border: 1px solid #3c4658;
+  border-radius: 8px;
+  background: #1a202b;
+  color: #f3f4f6;
+  cursor: pointer;
+}
+.object-group-header.direct-group-target {
+  outline: 1px solid rgba(239,68,68,.72);
+  outline-offset: -1px;
+  cursor: crosshair;
+}
+.object-group-header.direct-group-target:hover {
+  box-shadow: inset 4px 0 0 #ef4444;
+}
+.object-group-header.direct-group-navigation {
+  cursor: zoom-in;
+}
+.nav-item.direct-source-target {
+  outline: 1px solid rgba(96,165,250,.65);
+  outline-offset: -1px;
+  cursor: crosshair;
+}
+.nav-item.direct-source-target:hover {
+  box-shadow: inset 4px 0 0 #60a5fa;
+}
+
+@media (max-width: 720px) {
+  .inline-mode-guide {
+    top: auto;
+    right: 8px;
+    bottom: 86px;
+    transform: none;
+    width: min(230px, 48vw);
+    max-height: 38dvh;
+    padding: 10px;
+  }
+}
