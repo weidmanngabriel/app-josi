@@ -129,6 +129,8 @@ const LOOP_PREVIEW_OPTIONS = [0.05, 0.1, 0.25, 0.5, 1, 2, 3, 5, 10] as const
 const SEEK_SECOND_OPTIONS = [5, 10, 15, 30, 60] as const
 const LOOP_OVERLAP_SECONDS = .18
 const AUTO_LOOP_SEARCH_RADIUS_SECONDS = .6
+const GROUP_NESTING_NEW_DRAFT_ID = '__new-empty-group__'
+const GROUP_NESTING_PASTE_DRAFT_ID = '__paste-copied-group__'
 
 function App() {
   const [songs, setSongs] = useState<Song[]>([])
@@ -170,6 +172,7 @@ function App() {
   const [groupMembershipTarget, setGroupMembershipTarget] = useState<GroupMembershipTarget>(null)
   const [groupMembershipDraftIds, setGroupMembershipDraftIds] = useState<Set<string>>(new Set())
   const [groupNestingTarget, setGroupNestingTarget] = useState<GroupNestingTarget>(null)
+  const [groupNestingDraftIds, setGroupNestingDraftIds] = useState<Set<string>>(new Set())
   const [groupClipboard, setGroupClipboard] = useState<GroupClipboard>(null)
   const [groupReorderId, setGroupReorderId] = useState<string | null>(null)
   const [groupMoveId, setGroupMoveId] = useState<string | null>(null)
@@ -2047,8 +2050,9 @@ function App() {
   const reorderActiveForKind = (kind: GroupKind) => kind === 'song'
     ? view === 'library' && reorderScope === (activePlaylist ? 'playlist' : 'library')
     : kind === 'playlist' ? reorderScope === 'sidebar' : reorderScope === 'tags'
+  const reorderActiveForContainer = (kind: GroupKind, parentGroupId?: string) => reorderActiveForKind(kind) || Boolean(parentGroupId && groupReorderId === parentGroupId)
   const containerManualMode = (kind: GroupKind, parentGroupId?: string) => {
-    if (reorderActiveForKind(kind)) return true
+    if (reorderActiveForContainer(kind, parentGroupId)) return true
     if (parentGroupId) {
       const parent = objectGroups.find((group) => group.id === parentGroupId)
       const mode = parent?.sortMode === 'general' ? globalSortForKind(kind).mode : parent?.sortMode
@@ -2235,12 +2239,12 @@ function App() {
     setBundleLocks(nextLocks); setBundleAnchors(nextAnchors)
   }
   const renderOrderControls = (kind: GroupKind, containerKey: string, baseTokens: string[], token: string, parentGroupId?: string) => {
-    if (!reorderActiveForKind(kind)) return null
+    if (!reorderActiveForContainer(kind, parentGroupId)) return null
     const info = bundleInfo(containerKey, baseTokens, token)
     return <span className="order-edit-controls"><button type="button" onClick={(event) => { event.stopPropagation(); void moveContainerToken(kind, containerKey, baseTokens, token, -1, parentGroupId) }}>↑</button><button type="button" onClick={(event) => { event.stopPropagation(); void moveContainerToken(kind, containerKey, baseTokens, token, 1, parentGroupId) }}>↓</button><button className={`bundle-lock${info.locked ? ' locked' : ''}`} type="button" onClick={(event) => { event.stopPropagation(); toggleBundleLock(containerKey, baseTokens, token) }} aria-label={info.locked ? 'Bund entsperren' : 'Für Bund sperren'}><span aria-hidden="true" /></button>{info.bundled && <button className={`bundle-anchor${info.anchor ? ' active' : ''}`} type="button" onClick={(event) => { event.stopPropagation(); selectBundleAnchor(containerKey, baseTokens, token) }} aria-label="Sortieranker für Bund" />}</span>
   }
   const bundleDisplayClass = (containerKey: string, baseTokens: string[], token: string) => bundleInfo(containerKey, baseTokens, token).bundled ? ' bundle-member' : ''
-  const renderBundleBadge = (kind: GroupKind, containerKey: string, baseTokens: string[], token: string) => !reorderActiveForKind(kind) && bundleInfo(containerKey, baseTokens, token).bundled ? <span className="bundle-static-lock" title="Sortierbund" aria-label="Sortierbund"><span aria-hidden="true" /></span> : null
+  const renderBundleBadge = (kind: GroupKind, containerKey: string, baseTokens: string[], token: string, parentGroupId?: string) => !reorderActiveForContainer(kind, parentGroupId) && bundleInfo(containerKey, baseTokens, token).bundled ? <span className="bundle-static-lock" title="Sortierbund" aria-label="Sortierbund"><span aria-hidden="true" /></span> : null
 
   const createEmptyObjectGroup = (kind: GroupKind, parentGroupId?: string) => {
     setPendingGroupCreate({ kind, sourceIds: [], parentGroupId, name: 'Unbenannt', moveAfterCreate: false })
@@ -2368,19 +2372,25 @@ function App() {
       return current
     })
   }
-  const moveGroupItem = (groupId: string, itemId: string, delta: -1 | 1) => updateObjectGroup(groupId, (group) => { const ids = [...group.itemIds]; const index = ids.indexOf(itemId); const other = index + delta; if (index < 0 || other < 0 || other >= ids.length) return group; [ids[index], ids[other]] = [ids[other], ids[index]]; return { ...group, itemIds: ids, sortMode: 'manual' } })
-  const addItemToGroup = (groupId: string, itemId: string) => {
-    const target = objectGroups.find((group) => group.id === groupId); if (!target || !objectFor(target.kind, itemId)) return
-    updateObjectGroup(groupId, (group) => group.itemIds.includes(itemId) ? group : { ...group, itemIds: [...group.itemIds, itemId] })
-  }
+  const closeGroupMembershipDraft = () => { setGroupMembershipDraftIds(new Set()); setGroupMembershipTarget(null); setChooserSearch('') }
   const openGroupMembership = (groupId: string, mode: 'add' | 'remove') => { setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setGroupMembershipDraftIds(new Set()); setGroupMembershipTarget({ groupId, mode }); setOverflowMenu(null) }
   const toggleGroupMembershipDraft = (itemId: string) => setGroupMembershipDraftIds((current) => { const next = new Set(current); next.has(itemId) ? next.delete(itemId) : next.add(itemId); return next })
   const applyGroupMembershipDraft = () => {
-    if (!groupMembershipTarget || groupMembershipTarget.mode !== 'add') return
-    const group = objectGroups.find((item) => item.id === groupMembershipTarget.groupId); if (!group) return
-    const valid = [...groupMembershipDraftIds].filter((id) => Boolean(objectFor(group.kind, id)) && !group.itemIds.includes(id))
-    if (valid.length) updateObjectGroup(group.id, (item) => ({ ...item, itemIds: [...item.itemIds, ...valid] }))
-    setGroupMembershipDraftIds(new Set()); setGroupMembershipTarget(null)
+    if (!groupMembershipTarget) return
+    const group = objectGroups.find((item) => item.id === groupMembershipTarget.groupId)
+    if (!group) { closeGroupMembershipDraft(); return }
+    const selected = [...groupMembershipDraftIds].filter((id) => Boolean(objectFor(group.kind, id)))
+    const valid = groupMembershipTarget.mode === 'add'
+      ? selected.filter((id) => !group.itemIds.includes(id))
+      : selected.filter((id) => group.itemIds.includes(id))
+    if (valid.length) {
+      recordHistory()
+      const selectedSet = new Set(valid)
+      updateObjectGroup(group.id, (item) => groupMembershipTarget.mode === 'add'
+        ? { ...item, itemIds: [...item.itemIds, ...valid] }
+        : { ...item, itemIds: item.itemIds.filter((id) => !selectedSet.has(id)) })
+    }
+    closeGroupMembershipDraft()
   }
   const groupGroup = (group: ObjectGroup) => {
     const wrapperId = crypto.randomUUID()
@@ -2393,20 +2403,64 @@ function App() {
     })
     setOverflowMenu(null); setMessage('Gruppe wurde in eine neue Gruppe gelegt.')
   }
-  const openGroupNesting = (groupId: string, mode: 'add' | 'remove') => { setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setGroupNestingTarget({ groupId, mode }); setOverflowMenu(null) }
-  const addGroupToGroup = (parentId: string, childId: string) => {
-    const parent = objectGroups.find((group) => group.id === parentId)
-    const child = objectGroups.find((group) => group.id === childId)
-    if (!parent || !child || parent.kind !== child.kind || parent.id === child.id || groupDescendantIds(child.id).includes(parent.id)) return
-    recordHistory()
-    updateObjectGroup(child.id, (group) => ({ ...group, parentGroupId: parent.id, afterItems: false }))
-    setGroupNestingTarget(null); setMessage(`„${child.name}“ wurde der Gruppe hinzugefügt.`)
-  }
-  const detachGroup = (groupId: string) => {
-    const target = objectGroups.find((group) => group.id === groupId)
-    if (!target?.parentGroupId) return
-    recordHistory(); updateObjectGroup(groupId, (group) => ({ ...group, parentGroupId: undefined, afterItems: undefined }))
-    setGroupNestingTarget(null); setMessage(`„${target.name}“ wurde aus der übergeordneten Gruppe entfernt.`)
+  const closeGroupNestingDraft = () => { setGroupNestingDraftIds(new Set()); setGroupNestingTarget(null); setChooserSearch('') }
+  const openGroupNesting = (groupId: string, mode: 'add' | 'remove') => { setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setGroupNestingDraftIds(new Set()); setGroupNestingTarget({ groupId, mode }); setOverflowMenu(null) }
+  const toggleGroupNestingDraft = (groupId: string) => setGroupNestingDraftIds((current) => { const next = new Set(current); next.has(groupId) ? next.delete(groupId) : next.add(groupId); return next })
+  const applyGroupNestingDraft = () => {
+    if (!groupNestingTarget) return
+    const target = objectGroups.find((group) => group.id === groupNestingTarget.groupId)
+    if (!target) { closeGroupNestingDraft(); return }
+    if (groupNestingTarget.mode === 'add') {
+      const descendants = new Set(groupDescendantIds(target.id))
+      const selected = [...groupNestingDraftIds].filter((id) => {
+        if (id === GROUP_NESTING_NEW_DRAFT_ID || id === GROUP_NESTING_PASTE_DRAFT_ID) return false
+        const child = objectGroups.find((group) => group.id === id)
+        return Boolean(child && child.kind === target.kind && child.id !== target.id && !descendants.has(child.id) && child.parentGroupId !== target.id && !groupDescendantIds(child!.id).includes(target.id))
+      })
+      const addEmpty = groupNestingDraftIds.has(GROUP_NESTING_NEW_DRAFT_ID)
+      const pasteClipboard = groupNestingDraftIds.has(GROUP_NESTING_PASTE_DRAFT_ID) && groupClipboard?.kind === target.kind ? groupClipboard : null
+      if (selected.length || addEmpty || pasteClipboard) {
+        recordHistory()
+        const selectedSet = new Set(selected)
+        const childOrders = directChildGroups(target.id).map((group) => group.sortOrder)
+        let nextRootOrder = Math.min(0, ...childOrders) - 1
+        const additions: ObjectGroup[] = []
+        if (addEmpty) {
+          additions.push({ id: crypto.randomUUID(), kind: target.kind, name: 'Unbenannt', itemIds: [], createdAt: Date.now(), sortOrder: nextRootOrder--, sortMode: 'general', sortDirection: 'down', parentGroupId: target.id, afterItems: false })
+        }
+        if (pasteClipboard) {
+          const sourceRoot = pasteClipboard.groups.find((group) => group.id === pasteClipboard.rootId)
+          if (sourceRoot) {
+            const idMap = new Map(pasteClipboard.groups.map((group) => [group.id, crypto.randomUUID()]))
+            additions.push(...pasteClipboard.groups.map((source) => ({
+              ...source,
+              id: idMap.get(source.id)!,
+              name: source.id === pasteClipboard.rootId ? `${source.name} Kopie` : source.name,
+              itemIds: [...source.itemIds],
+              createdAt: Date.now(),
+              sortOrder: source.id === pasteClipboard.rootId ? nextRootOrder-- : source.sortOrder,
+              parentGroupId: source.id === pasteClipboard.rootId ? target.id : source.parentGroupId ? idMap.get(source.parentGroupId) : target.id,
+              afterItems: source.id === pasteClipboard.rootId ? false : source.afterItems,
+            })))
+          }
+        }
+        setObjectGroups((current) => [...additions, ...current.map((group) => selectedSet.has(group.id) ? { ...group, parentGroupId: target.id, afterItems: false } : group)])
+        const changedCount = selected.length + (addEmpty ? 1 : 0) + (pasteClipboard ? 1 : 0)
+        setMessage(`${changedCount} ${changedCount === 1 ? 'Gruppe wurde' : 'Gruppen wurden'} hinzugefügt.`)
+      }
+    } else {
+      const selected = [...groupNestingDraftIds].filter((id) => {
+        const candidate = objectGroups.find((group) => group.id === id)
+        return Boolean(candidate && ((id === target.id && target.parentGroupId) || candidate.parentGroupId === target.id))
+      })
+      if (selected.length) {
+        recordHistory()
+        const selectedSet = new Set(selected)
+        setObjectGroups((current) => current.map((group) => selectedSet.has(group.id) ? { ...group, parentGroupId: undefined, afterItems: undefined } : group))
+        setMessage(`${selected.length} ${selected.length === 1 ? 'Gruppe wurde' : 'Gruppen wurden'} entfernt.`)
+      }
+    }
+    closeGroupNestingDraft()
   }
   const copyGroup = (group: ObjectGroup) => {
     const ids = new Set([group.id, ...groupDescendantIds(group.id)])
@@ -2414,27 +2468,6 @@ function App() {
     setGroupClipboard({ kind: group.kind, rootId: group.id, groups })
     setOverflowMenu(null); setMessage(`Gruppe „${group.name}“ wurde kopiert.`)
   }
-  const pasteCopiedGroupInto = (parent: ObjectGroup) => {
-    if (!groupClipboard || groupClipboard.kind !== parent.kind) return
-    const sourceRoot = groupClipboard.groups.find((group) => group.id === groupClipboard.rootId)
-    if (!sourceRoot) return
-    const idMap = new Map(groupClipboard.groups.map((group) => [group.id, crypto.randomUUID()]))
-    const siblingOrders = directChildGroups(parent.id).map((group) => group.sortOrder)
-    const rootOrder = Math.min(0, ...siblingOrders) - 1
-    const clones = groupClipboard.groups.map((source) => ({
-      ...source,
-      id: idMap.get(source.id)!,
-      name: source.id === groupClipboard.rootId ? `${source.name} Kopie` : source.name,
-      itemIds: [...source.itemIds],
-      createdAt: Date.now(),
-      sortOrder: source.id === groupClipboard.rootId ? rootOrder : source.sortOrder,
-      parentGroupId: source.id === groupClipboard.rootId ? parent.id : source.parentGroupId ? idMap.get(source.parentGroupId) : parent.id,
-      afterItems: source.id === groupClipboard.rootId ? false : source.afterItems,
-    }))
-    recordHistory(); setObjectGroups((current) => [...clones, ...current])
-    setGroupNestingTarget(null); setMessage(`Gruppe „${sourceRoot.name}“ wurde eingefügt.`)
-  }
-  const removeItemFromGroup = (groupId: string, itemId: string) => setObjectGroups((current) => current.map((group) => group.id === groupId ? { ...group, itemIds: group.itemIds.filter((id) => id !== itemId) } : group))
   const removeAllGroupObjects = (groupId: string) => {
     const ids = new Set([groupId, ...groupDescendantIds(groupId)])
     recordHistory()
@@ -2562,7 +2595,7 @@ function App() {
     const key = containerKey ?? rootContainerKey(group.kind)
     const bundleClass = bundleDisplayClass(key, baseTokens, token)
     const toggleCollapsed = () => setCollapsedGroupIds((current) => { const next = new Set(current); next.has(group.id) ? next.delete(group.id) : next.add(group.id); return next })
-    return <div className={`object-group-header${collapsed ? ' collapsed' : ''}${group.color ? ' custom-surface' : ''}${bundleClass}`} style={surfaceStyle(group.color)} role="button" tabIndex={0} aria-expanded={!collapsed} onClick={toggleCollapsed} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleCollapsed() } }}><div className="object-group-heading"><strong><b className="group-chevron">{collapsed ? '▸' : '▾'}</b><span className="group-tag-dots">{groupTags(group.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} title={tag.name} />)}</span><span className="group-name-text">{group.name}</span></strong><span>{groupObjectCount(group, allowed)} Objekte · {formatTime(groupDuration(group, allowed))}</span></div>{renderOrderControls(group.kind, key, baseTokens, token, group.parentGroupId)}{groupMoveId === group.id && !reorderActiveForKind(group.kind) && <div className="group-inline-tools"><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, -1) }}>↑</button><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, 1) }}>↓</button><button type="button" onClick={(event) => { event.stopPropagation(); setGroupMoveId(null) }}>Fertig</button></div>}{groupReorderId === group.id && !reorderActiveForKind(group.kind) && <button className="group-finish" type="button" onClick={(event) => { event.stopPropagation(); setGroupReorderId(null) }}>Fertig</button>}{renderBundleBadge(group.kind, key, baseTokens, token)}<button className="overflow-button group-overflow" type="button" onClick={(event) => { event.stopPropagation(); setOverflowMenu({ kind: 'group', id: group.id }) }}>•••</button></div>
+    return <div className={`object-group-header${collapsed ? ' collapsed' : ''}${group.color ? ' custom-surface' : ''}${bundleClass}`} style={surfaceStyle(group.color)} role="button" tabIndex={0} aria-expanded={!collapsed} onClick={toggleCollapsed} onKeyDown={(event) => { if (event.target !== event.currentTarget) return; if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); toggleCollapsed() } }}><div className="object-group-heading"><strong><b className="group-chevron">{collapsed ? '▸' : '▾'}</b><span className="group-tag-dots">{groupTags(group.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} title={tag.name} />)}</span><span className="group-name-text">{group.name}</span></strong><span>{groupObjectCount(group, allowed)} Objekte · {formatTime(groupDuration(group, allowed))}</span></div>{renderOrderControls(group.kind, key, baseTokens, token, group.parentGroupId)}{groupMoveId === group.id && !reorderActiveForKind(group.kind) && <div className="group-inline-tools"><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, -1) }}>↑</button><button type="button" onClick={(event) => { event.stopPropagation(); moveGroup(group.id, 1) }}>↓</button><button type="button" onClick={(event) => { event.stopPropagation(); setGroupMoveId(null) }}>Fertig</button></div>}{groupReorderId === group.id && !reorderActiveForKind(group.kind) && <button className="group-finish" type="button" onClick={(event) => { event.stopPropagation(); cleanupBundleSingletons(); setGroupReorderId(null) }}>Fertig</button>}{renderBundleBadge(group.kind, key, baseTokens, token, group.parentGroupId)}<button className="overflow-button group-overflow" type="button" onClick={(event) => { event.stopPropagation(); setOverflowMenu({ kind: 'group', id: group.id }) }}>•••</button></div>
   }
   const renderSongRow = (song: Song, index: number, groupId?: string, containerKey?: string, baseTokens: string[] = []) => {
     const groupReordering = groupId === groupReorderId
@@ -2570,7 +2603,7 @@ function App() {
     const token = itemToken(song.id)
     const key = containerKey ?? (groupId ? groupContainerKey('song', groupId) : rootContainerKey('song'))
     const bundleClass = bundleDisplayClass(key, baseTokens, token)
-    return <div key={song.id} className={`song-row${song.isNew ? ' new-import' : ''}${selectedSongIds.has(song.id) ? ' selected-song' : ''}${groupId ? ' grouped-object-row' : ''}${surfaceColor ? ' custom-surface' : ''}${bundleClass}`} style={surfaceStyle(surfaceColor)}>{renderOrderControls('song', key, baseTokens, token, groupId)}{groupReordering && !reorderActiveForKind('song') && <div className="group-item-reorder"><button type="button" onClick={() => moveGroupItem(groupId!, song.id, -1)}>↑</button><button type="button" onClick={() => moveGroupItem(groupId!, song.id, 1)}>↓</button></div>}{selectionMode && <button className="selection-check" type="button" onClick={() => toggleSelected(song.id)}>{selectedSongIds.has(song.id) ? '✓' : ''}</button>}<button className="song-main" type="button" onClick={() => playSong(song.id)} disabled={songEditMode || groupReordering}><span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span><span className="song-copy"><strong>{song.name}</strong><small className="song-subline"><span className="song-tag-dots">{songTags(song.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} title={tag.name} />)}</span><span>{view === 'history' ? formatDate(song.addedAt) : membershipText(song.id)}</span></small></span><span className="song-meta"><small>{!song.file || song.file.size === 0 ? 'FEHLT' : formatTime(song.duration)}</small>{song.loopStart !== undefined && song.loopEnd !== undefined && <span className="loop-badge">↻</span>}</span></button>{renderBundleBadge('song', key, baseTokens, token)}<button className="overflow-button song-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'song', id: song.id, parentGroupId: groupId })}>•••</button>{activePlaylist && view === 'library' && !selectionMode && !songEditMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActivePlaylist(song.id)}>Entfernen</button>}{activeTag && view === 'tag' && !selectionMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActiveTag(song.id)}>Entfernen</button>}</div>
+    return <div key={song.id} className={`song-row${song.isNew ? ' new-import' : ''}${selectedSongIds.has(song.id) ? ' selected-song' : ''}${groupId ? ' grouped-object-row' : ''}${surfaceColor ? ' custom-surface' : ''}${bundleClass}`} style={surfaceStyle(surfaceColor)}>{renderOrderControls('song', key, baseTokens, token, groupId)}{selectionMode && <button className="selection-check" type="button" onClick={() => toggleSelected(song.id)}>{selectedSongIds.has(song.id) ? '✓' : ''}</button>}<button className="song-main" type="button" onClick={() => playSong(song.id)} disabled={songEditMode || groupReordering}><span className="song-number">{song.id === currentSongId && isPlaying ? '▶' : index + 1}</span><span className="song-copy"><strong>{song.name}</strong><small className="song-subline"><span className="song-tag-dots">{songTags(song.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} title={tag.name} />)}</span><span>{view === 'history' ? formatDate(song.addedAt) : membershipText(song.id)}</span></small></span><span className="song-meta"><small>{!song.file || song.file.size === 0 ? 'FEHLT' : formatTime(song.duration)}</small>{song.loopStart !== undefined && song.loopEnd !== undefined && <span className="loop-badge">↻</span>}</span></button>{renderBundleBadge('song', key, baseTokens, token, groupId)}<button className="overflow-button song-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'song', id: song.id, parentGroupId: groupId })}>•••</button>{activePlaylist && view === 'library' && !selectionMode && !songEditMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActivePlaylist(song.id)}>Entfernen</button>}{activeTag && view === 'tag' && !selectionMode && <button className="remove-song" type="button" onClick={() => void removeSongFromActiveTag(song.id)}>Entfernen</button>}</div>
   }
   const renderPlaylistRow = (playlist: Playlist, index: number, groupId?: string, containerKey?: string, baseTokens: string[] = []) => {
     const groupReordering = groupId === groupReorderId
@@ -2579,7 +2612,7 @@ function App() {
     const token = itemToken(playlist.id)
     const key = containerKey ?? (groupId ? groupContainerKey('playlist', groupId) : rootContainerKey('playlist'))
     const bundleClass = bundleDisplayClass(key, baseTokens, token)
-    return <div className={`playlist-nav-row${groupId ? ' grouped-object-row' : ''}${bundleClass}`} key={playlist.id}>{renderOrderControls('playlist', key, baseTokens, token, groupId)}{groupReordering && !reorderActiveForKind('playlist') && <div className="group-item-reorder"><button type="button" onClick={() => moveGroupItem(groupId!, playlist.id, -1)}>↑</button><button type="button" onClick={() => moveGroupItem(groupId!, playlist.id, 1)}>↓</button></div>}{sidebarSelectionKind === 'playlist' && <button className="selection-check sidebar-selection-check" type="button" onClick={() => toggleSidebarSelected('playlist', playlist.id)}>{selected ? '✓' : ''}</button>}<button className={`nav-item${activePlaylistId === playlist.id && view === 'library' ? ' active' : ''}${selected ? ' selected-sidebar-object' : ''}${surfaceColor ? ' custom-surface' : ''}`} style={surfaceStyle(surfaceColor)} type="button" onClick={() => sidebarSelectionKind === 'playlist' ? toggleSidebarSelected('playlist', playlist.id) : void openPlaylist(playlist.id)} disabled={reorderScope === 'sidebar' || groupReordering}><span className="playlist-nav-name">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span className="playlist-mini-cover">♫</span>}<span className="nav-tag-dots">{playlistTags(playlist.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} />)}</span><span>{playlist.name}</span></span><strong>{playlist.songIds.length}</strong></button>{renderBundleBadge('playlist', key, baseTokens, token)}{sidebarSelectionKind !== 'playlist' && <button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id, parentGroupId: groupId })}>•••</button>}</div>
+    return <div className={`playlist-nav-row${groupId ? ' grouped-object-row' : ''}${bundleClass}`} key={playlist.id}>{renderOrderControls('playlist', key, baseTokens, token, groupId)}{sidebarSelectionKind === 'playlist' && <button className="selection-check sidebar-selection-check" type="button" onClick={() => toggleSidebarSelected('playlist', playlist.id)}>{selected ? '✓' : ''}</button>}<button className={`nav-item${activePlaylistId === playlist.id && view === 'library' ? ' active' : ''}${selected ? ' selected-sidebar-object' : ''}${surfaceColor ? ' custom-surface' : ''}`} style={surfaceStyle(surfaceColor)} type="button" onClick={() => sidebarSelectionKind === 'playlist' ? toggleSidebarSelected('playlist', playlist.id) : void openPlaylist(playlist.id)} disabled={reorderScope === 'sidebar' || groupReordering}><span className="playlist-nav-name">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : <span className="playlist-mini-cover">♫</span>}<span className="nav-tag-dots">{playlistTags(playlist.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} />)}</span><span>{playlist.name}</span></span><strong>{playlist.songIds.length}</strong></button>{renderBundleBadge('playlist', key, baseTokens, token, groupId)}{sidebarSelectionKind !== 'playlist' && <button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id, parentGroupId: groupId })}>•••</button>}</div>
   }
   const renderTagRow = (tag: Tag, index: number, groupId?: string, containerKey?: string, baseTokens: string[] = []) => {
     const groupReordering = groupId === groupReorderId
@@ -2588,7 +2621,7 @@ function App() {
     const token = itemToken(tag.id)
     const key = containerKey ?? (groupId ? groupContainerKey('tag', groupId) : rootContainerKey('tag'))
     const bundleClass = bundleDisplayClass(key, baseTokens, token)
-    return <div className={`playlist-nav-row tag-nav-row${groupId ? ' grouped-object-row' : ''}${bundleClass}`} key={tag.id}>{renderOrderControls('tag', key, baseTokens, token, groupId)}{groupReordering && !reorderActiveForKind('tag') && <div className="group-item-reorder"><button type="button" onClick={() => moveGroupItem(groupId!, tag.id, -1)}>↑</button><button type="button" onClick={() => moveGroupItem(groupId!, tag.id, 1)}>↓</button></div>}{sidebarSelectionKind === 'tag' && <button className="selection-check sidebar-selection-check" type="button" onClick={() => toggleSidebarSelected('tag', tag.id)}>{selected ? '✓' : ''}</button>}<button className={`nav-item${activeTagId === tag.id && view === 'tag' ? ' active' : ''}${selected ? ' selected-sidebar-object' : ''}${surfaceColor ? ' custom-surface' : ''}`} style={surfaceStyle(surfaceColor)} type="button" onClick={() => sidebarSelectionKind === 'tag' ? toggleSidebarSelected('tag', tag.id) : void openTag(tag.id)} disabled={tagEditMode || groupReordering}><span className="tag-nav-name"><i className="tag-dot" style={{ background: tag.color }} /><span>{tag.name}</span></span><strong>{tag.songIds.filter((id) => songs.some((song) => song.id === id)).length}</strong></button>{renderBundleBadge('tag', key, baseTokens, token)}{sidebarSelectionKind !== 'tag' && <button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'tag', id: tag.id, parentGroupId: groupId })}>•••</button>}</div>
+    return <div className={`playlist-nav-row tag-nav-row${groupId ? ' grouped-object-row' : ''}${bundleClass}`} key={tag.id}>{renderOrderControls('tag', key, baseTokens, token, groupId)}{sidebarSelectionKind === 'tag' && <button className="selection-check sidebar-selection-check" type="button" onClick={() => toggleSidebarSelected('tag', tag.id)}>{selected ? '✓' : ''}</button>}<button className={`nav-item${activeTagId === tag.id && view === 'tag' ? ' active' : ''}${selected ? ' selected-sidebar-object' : ''}${surfaceColor ? ' custom-surface' : ''}`} style={surfaceStyle(surfaceColor)} type="button" onClick={() => sidebarSelectionKind === 'tag' ? toggleSidebarSelected('tag', tag.id) : void openTag(tag.id)} disabled={tagEditMode || groupReordering}><span className="tag-nav-name"><i className="tag-dot" style={{ background: tag.color }} /><span>{tag.name}</span></span><strong>{tag.songIds.filter((id) => songs.some((song) => song.id === id)).length}</strong></button>{renderBundleBadge('tag', key, baseTokens, token, groupId)}{sidebarSelectionKind !== 'tag' && <button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'tag', id: tag.id, parentGroupId: groupId })}>•••</button>}</div>
   }
   const renderPlaylistCard = (playlist: Playlist) => { const surfaceColor = objectSurfaceColor('playlist', playlist.id); return <div className="playlist-card-wrap" key={playlist.id}><button className={`playlist-card${surfaceColor ? ' custom-surface' : ''}`} style={surfaceStyle(surfaceColor)} type="button" onClick={() => void openPlaylist(playlist.id)}><span className="playlist-card-cover">{coverUrls[playlist.id] ? <img src={coverUrls[playlist.id]} alt="" /> : '♫'}</span><strong><span className="card-tag-dots">{playlistTags(playlist.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} />)}</span>{playlist.name}</strong><small>{playlist.songIds.length} {playlist.songIds.length === 1 ? 'Lied' : 'Lieder'}</small></button><button className="overflow-button card-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id })}>•••</button></div> }
   const renderSongGroup = (group: ObjectGroup, depth = 0, parentContainerKey?: string, parentBaseTokens: string[] = []): React.ReactNode => {
@@ -2827,9 +2860,9 @@ function App() {
       const allowedForKind: Array<Song | Playlist | Tag> = group.kind === 'song' ? visibleSongs : group.kind === 'playlist' ? sidebarPlaylists : sidebarTags
       const candidates = sortChooserGroups(group.kind, flattenedGroupsFor(group.kind, allowedForKind).filter((item) => item.id !== group.id && !descendants.has(item.id) && item.parentGroupId !== group.id && !groupDescendantIds(item.id).includes(group.id)), allowedForKind)
       const sortedChildren = sortChooserGroups(group.kind, children, allowedForKind)
-      return <div className="playlist-chooser-backdrop group-membership-backdrop" onClick={() => { setGroupNestingTarget(null); setChooserSearch('') }}><section className="playlist-chooser group-membership-dialog" onClick={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">GRUPPE</p><h2>{groupNestingTarget.mode === 'add' ? 'Gruppe hinzufügen' : 'Gruppe entfernen'}</h2></div><button type="button" onClick={() => { setGroupNestingTarget(null); setChooserSearch('') }}>×</button></div><div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Gruppen suchen" /></div>{renderChooserSortControls(group.kind)}{groupNestingTarget.mode === 'add' ? <><div className="group-membership-list group-nesting-list"><button type="button" onClick={() => createEmptyObjectGroup(group.kind, group.id)}><span>Neue leere Gruppe</span><strong>+</strong></button><button type="button" disabled={!groupClipboard || groupClipboard.kind !== group.kind} onClick={() => pasteCopiedGroupInto(group)}><span>Einfügen</span><strong>⌘</strong></button>{candidates.filter((candidate) => fuzzyMatch(candidate.name, chooserSearch)).map((candidate) => <button type="button" key={candidate.id} onClick={() => addGroupToGroup(group.id, candidate.id)}><span>{candidate.name}</span><strong>+</strong></button>)}{!candidates.filter((candidate) => fuzzyMatch(candidate.name, chooserSearch)).length && <p>Keine weiteren Gruppen vorhanden.</p>}</div></> : <div className="group-membership-list group-nesting-list">{group.parentGroupId && fuzzyMatch('Diese Gruppe aus der übergeordneten Gruppe entfernen', chooserSearch) && <button type="button" onClick={() => detachGroup(group.id)}><span>Diese Gruppe aus der übergeordneten Gruppe entfernen</span><strong>−</strong></button>}{sortedChildren.filter((child) => fuzzyMatch(child.name, chooserSearch)).map((child) => <button type="button" key={child.id} onClick={() => detachGroup(child.id)}><span>{child.name}</span><strong>−</strong></button>)}{!group.parentGroupId && !sortedChildren.filter((child) => fuzzyMatch(child.name, chooserSearch)).length && <p>Keine verschachtelte Gruppe vorhanden.</p>}</div>}</section></div>
+      return <div className="playlist-chooser-backdrop group-membership-backdrop"><section className="playlist-chooser group-membership-dialog" onClick={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">GRUPPE</p><h2>{groupNestingTarget.mode === 'add' ? 'Gruppe hinzufügen' : 'Gruppe entfernen'}</h2></div></div><div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Gruppen suchen" /></div>{renderChooserSortControls(group.kind)}{groupNestingTarget.mode === 'add' ? <div className="group-membership-list group-nesting-list"><button type="button" onClick={() => toggleGroupNestingDraft(GROUP_NESTING_NEW_DRAFT_ID)}><span>Neue leere Gruppe</span><strong>{groupNestingDraftIds.has(GROUP_NESTING_NEW_DRAFT_ID) ? '−' : '+'}</strong></button><button type="button" disabled={!groupClipboard || groupClipboard.kind !== group.kind} onClick={() => toggleGroupNestingDraft(GROUP_NESTING_PASTE_DRAFT_ID)}><span>Einfügen</span><strong>{groupNestingDraftIds.has(GROUP_NESTING_PASTE_DRAFT_ID) ? '−' : '+'}</strong></button>{candidates.filter((candidate) => fuzzyMatch(candidate.name, chooserSearch)).map((candidate) => { const staged = groupNestingDraftIds.has(candidate.id); return <button type="button" key={candidate.id} onClick={() => toggleGroupNestingDraft(candidate.id)}><span>{candidate.name}</span><strong>{staged ? '−' : '+'}</strong></button> })}{!candidates.filter((candidate) => fuzzyMatch(candidate.name, chooserSearch)).length && <p>Keine weiteren Gruppen vorhanden.</p>}</div> : <div className="group-membership-list group-nesting-list">{group.parentGroupId && fuzzyMatch('Diese Gruppe aus der übergeordneten Gruppe entfernen', chooserSearch) && <button type="button" onClick={() => toggleGroupNestingDraft(group.id)}><span>Diese Gruppe aus der übergeordneten Gruppe entfernen</span><strong>{groupNestingDraftIds.has(group.id) ? '+' : '−'}</strong></button>}{sortedChildren.filter((child) => fuzzyMatch(child.name, chooserSearch)).map((child) => { const staged = groupNestingDraftIds.has(child.id); return <button type="button" key={child.id} onClick={() => toggleGroupNestingDraft(child.id)}><span>{child.name}</span><strong>{staged ? '+' : '−'}</strong></button> })}{!group.parentGroupId && !sortedChildren.filter((child) => fuzzyMatch(child.name, chooserSearch)).length && <p>Keine verschachtelte Gruppe vorhanden.</p>}</div>}<div className="dialog-actions"><button type="button" onClick={closeGroupNestingDraft}>Abbrechen</button><button type="button" onClick={applyGroupNestingDraft}>Fertig</button></div></section></div>
     })()}
-    {groupMembershipTarget && (() => { const group = objectGroups.find((item) => item.id === groupMembershipTarget.groupId); if (!group) return null; const allItems: Array<Song | Playlist | Tag> = group.kind === 'song' ? visibleSongs : group.kind === 'playlist' ? sidebarPlaylists : sidebarTags; const rawCandidates = groupMembershipTarget.mode === 'add' ? allItems.filter((item) => !group.itemIds.includes(item.id)) : allItems.filter((item) => group.itemIds.includes(item.id)); const candidates = sortChooserObjects(group.kind, rawCandidates).filter((item) => fuzzyMatch(item.name, chooserSearch)); return <div className="playlist-chooser-backdrop group-membership-backdrop" onClick={() => { setGroupMembershipDraftIds(new Set()); setGroupMembershipTarget(null); setChooserSearch('') }}><section className="playlist-chooser group-membership-dialog" onClick={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">GRUPPE</p><h2>{groupMembershipTarget.mode === 'add' ? 'Objekte hinzufügen' : 'Objekte entfernen'}</h2></div><button type="button" onClick={() => { setGroupMembershipDraftIds(new Set()); setGroupMembershipTarget(null) }}>×</button></div><div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Suchen" /></div>{renderChooserSortControls(group.kind)}<div className="group-membership-list">{candidates.map((item) => { const staged = groupMembershipDraftIds.has(item.id); return <button type="button" key={item.id} onClick={() => groupMembershipTarget.mode === 'add' ? toggleGroupMembershipDraft(item.id) : removeItemFromGroup(group.id, item.id)}><span>{item.name}</span><strong>{groupMembershipTarget.mode === 'add' ? staged ? '−' : '+' : '−'}</strong></button> })}{!candidates.length && <p>Keine passenden Objekte.</p>}</div>{groupMembershipTarget.mode === 'add' && <div className="dialog-actions"><button type="button" onClick={() => { setGroupMembershipDraftIds(new Set()); setGroupMembershipTarget(null) }}>Abbrechen</button><button type="button" onClick={applyGroupMembershipDraft} disabled={!groupMembershipDraftIds.size}>Fertig</button></div>}</section></div> })()}
+    {groupMembershipTarget && (() => { const group = objectGroups.find((item) => item.id === groupMembershipTarget.groupId); if (!group) return null; const allItems: Array<Song | Playlist | Tag> = group.kind === 'song' ? visibleSongs : group.kind === 'playlist' ? sidebarPlaylists : sidebarTags; const rawCandidates = groupMembershipTarget.mode === 'add' ? allItems.filter((item) => !group.itemIds.includes(item.id)) : allItems.filter((item) => group.itemIds.includes(item.id)); const candidates = sortChooserObjects(group.kind, rawCandidates).filter((item) => fuzzyMatch(item.name, chooserSearch)); return <div className="playlist-chooser-backdrop group-membership-backdrop"><section className="playlist-chooser group-membership-dialog" onClick={(event) => event.stopPropagation()}><div className="playlist-chooser-heading"><div><p className="eyebrow">GRUPPE</p><h2>{groupMembershipTarget.mode === 'add' ? 'Objekte hinzufügen' : 'Objekte entfernen'}</h2></div></div><div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Suchen" /></div>{renderChooserSortControls(group.kind)}<div className="group-membership-list">{candidates.map((item) => { const staged = groupMembershipDraftIds.has(item.id); return <button type="button" key={item.id} onClick={() => toggleGroupMembershipDraft(item.id)}><span>{item.name}</span><strong>{groupMembershipTarget.mode === 'add' ? staged ? '−' : '+' : staged ? '+' : '−'}</strong></button> })}{!candidates.length && <p>Keine passenden Objekte.</p>}</div><div className="dialog-actions"><button type="button" onClick={closeGroupMembershipDraft}>Abbrechen</button><button type="button" onClick={applyGroupMembershipDraft}>Fertig</button></div></section></div> })()}
     {colorPickerTarget && <ColorSpectrumPicker title="Tag-Farbe wählen" initialColor={colorPickerTarget === 'create' ? tagColor : renameTagColor} onCancel={() => setColorPickerTarget(null)} onDone={(color) => { if (colorPickerTarget === 'create') setTagColor(color); else setRenameTagColor(color); setColorPickerTarget(null) }} />}
     {appearanceColorTarget && <ColorSpectrumPicker title="Farbe ändern" initialColor={appearanceInitialColor()} onCancel={() => setAppearanceColorTarget(null)} onDone={applyAppearanceColor} />}
     {repeatMenuOpen && <div className="modal-backdrop repeat-choice-backdrop" onClick={() => setRepeatMenuOpen(false)}><div className="confirm-dialog repeat-choice-dialog" onClick={(event) => event.stopPropagation()}><h2>Wiederholung</h2><p>Unendlich wiederholen oder eine feste Anzahl wählen. Bei einem aktiven Loop zählt die Zahl pro Loop-Durchlauf herunter.</p><div className="repeat-choice-options"><button className="repeat-infinity-option" type="button" onClick={chooseInfiniteRepeat}><span>∞</span><strong>Unendlich</strong></button><div className="repeat-count-option"><input type="number" min="1" max="9999" inputMode="numeric" value={repeatCountInput} onChange={(event) => setRepeatCountInput(event.target.value)} aria-label="Anzahl Wiederholungen" /><button type="button" onClick={chooseCountRepeat}>Anwenden</button></div></div><div className="dialog-actions"><button type="button" onClick={() => setRepeatMenuOpen(false)}>Abbrechen</button></div></div></div>}

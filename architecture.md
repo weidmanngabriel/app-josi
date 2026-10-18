@@ -6,6 +6,8 @@ Die Anwendung ist eine rein clientseitige React-App mit TypeScript und Vite. `sr
 
 Josi bleibt eine lokale Musik-PWA ohne Backend. Audiodateien und Playlists liegen ausschließlich im Browser-Speicher des jeweiligen Geräts.
 
+Die PWA registriert ihren Service Worker weiterhin im Auto-Update-Modus. Beim Start wird aktiv nach einer neuen Version gesucht; steht ein neuer Service Worker bereit, wird er übernommen und die App neu geladen. Es gibt bewusst keinen periodischen Zwangs-Reload während einer laufenden Sitzung, weil ein noch nicht abgeschlossener Import nur im Arbeitsspeicher liegt und sonst verloren gehen könnte.
+
 ## Lokale Musikdaten
 
 ### Songs
@@ -102,6 +104,8 @@ Bibliothek und geöffnete Playlists besitzen eine lokale Textsuche. Die Suche is
 
 Auswahlfenster für Songs, Playlists, Tags und Gruppen besitzen ebenfalls eine Suchleiste und eine eigene Sortierleiste. Dazu gehören insbesondere Playlist-/Tag-Zuordnung, „Weitere Gruppen abspielen“, „Gruppe hinzufügen/entfernen“ und „Objekte hinzufügen/entfernen“. Die oberste Sortieroption entspricht der manuellen Reihenfolge, trägt aber den Namen des aktuell aktiven Saves des jeweiligen Listentyps. Darunter stehen die automatischen Sortierungen mit Richtungspfeil. Die Auswahlfenster verändern die eigentliche Hauptsortierung nicht.
 
+**Gruppe hinzufügen**, **Gruppe entfernen**, **Objekte hinzufügen** und **Objekte entfernen** arbeiten vollständig als Entwurf. Mehrere Einträge können über `+` beziehungsweise `−` vorgemerkt und durch erneutes Antippen wieder zurückgenommen werden. Während dieses Fensters wird die eigentliche Gruppenstruktur nicht verändert. Nur **Fertig** übernimmt alle vorgemerkten Änderungen gemeinsam; **Abbrechen** verwirft den gesamten Entwurf. Das Fenster besitzt dafür keinen zusätzlichen Schließen-Knopf und ein Tipp außerhalb beendet es nicht. Bei **Gruppe hinzufügen** werden auch **Neue leere Gruppe** und **Einfügen** nur vorgemerkt; eine neue leere Gruppe wird bei **Fertig** als **Unbenannt** erstellt und eine kopierte Gruppe erst dann eingefügt.
+
 ## Importverlauf
 
 Der frühere Tab „Verlauf“ heißt „Importverlauf“. Er zeigt alle aktiven Songs. Die Navigation zeigt `x/y`: x sind aktuell blau markierte neue Importe, y ist die Gesamtzahl aller aktiven Songs. Die Zahl x ist blau. In allen Songlisten werden blau markierte Songs als temporäre obere Gruppe von normalen Songs getrennt; innerhalb beider Gruppen gilt dieselbe gewählte Sortierung. Nach „Als gelesen markieren“ fällt der Song zurück in die normale Gruppe.
@@ -118,7 +122,7 @@ Playlists und Tags besitzen dieselbe Save-Logik in ihrem **Sortieren**-Dialog. N
 
 ## Reihenfolge ändern und Sortierbünde
 
-Im Modus **Reihenfolge ändern** werden benannte Gruppen und einzelne Objekte nicht mehr getrennt behandelt. Auf derselben Ebene können Gruppen, Lieder, Playlists oder Tags gemeinsam mit Pfeilen nach oben und unten verschoben werden. Das gilt auch innerhalb einer benannten Obergruppe. Die gemischte Reihenfolge wird lokal separat gespeichert; die bestehenden Objekt- und Gruppenreihenfolgen werden soweit möglich parallel aktualisiert.
+Im Modus **Reihenfolge ändern** werden benannte Gruppen und einzelne Objekte nicht mehr getrennt behandelt. Auf derselben Ebene können Gruppen, Lieder, Playlists oder Tags gemeinsam mit Pfeilen nach oben und unten verschoben werden. Das gilt auch innerhalb einer benannten Obergruppe und auch dann, wenn **Reihenfolge ändern** direkt im Menü dieser Gruppe gestartet wurde. Die Funktion ändert dabei niemals die Gruppenzugehörigkeit: Ein Objekt innerhalb einer Gruppe bleibt in genau dieser Gruppe, ein äußeres Objekt bleibt außerhalb und Untergruppen bleiben Kinder derselben Obergruppe. Die gemischte Reihenfolge wird lokal separat gespeichert; die bestehenden Objekt- und Gruppenreihenfolgen werden soweit möglich parallel aktualisiert.
 
 Jeder Eintrag erhält im Bearbeitungsmodus zusätzlich ein Schloss. Offen bedeutet ungebunden. Geschlossene, direkt benachbarte Einträge bilden einen namenlosen **Sortierbund**. Ein solcher Bund kann aus normalen Objekten und benannten Gruppen bestehen. Er wird beim Verschieben als Einheit behandelt; die interne Reihenfolge bleibt dabei unverändert. Bei zwei oder mehr benachbarten geschlossenen Einträgen erscheint je Eintrag ein Kreis. Der rot markierte Kreis bestimmt den Sortieranker des Bundes für automatische Sortierungen. Ohne gewählten Anker dient der erste Eintrag als Anker.
 
@@ -128,7 +132,7 @@ Sortierbünde sind keine Objektgruppen: Sie haben keinen Namen, kein Gruppenmen�
 
 Lieder, Playlists, Tags und benannte Gruppen besitzen im jeweiligen Drei-Punkte-Menü die Aktion **Bewegen**; bei Menüs mit **Kopieren** steht Bewegen direkt darüber. Die Aktion wechselt für diesen Typ auf den aktiven Save und zeigt auf derselben Hierarchieebene rote Zielstriche zwischen den sichtbaren Objekten und Gruppen. Ein einfacher Klick markiert einen Zielstrich, ein Doppelklick bestätigt. Gruppen werden dabei als ein Token verschoben; Untergruppen und direkte Inhalte bleiben intern unverändert. Objekte innerhalb einer benannten Gruppe bleiben beim Bewegen in dieser Obergruppe. Nach einer Positionierung bleibt der Bewegen-Modus aktiv und setzt nur die Zielmarkierung zurück; erst **Abbrechen** oben beendet ihn. Dadurch kann dasselbe Objekt bzw. eine bereits aktive Auswahl nacheinander an weitere Positionen gesetzt werden.
 
-Neue leere Gruppen und aus einer Auswahl gebildete Gruppen werden nicht sofort eingefügt. Zuerst erscheint ein Namensdialog mit **Unbenannt** als Vorgabe. Über `•••` direkt neben dem Namen kann **Bewegen** vorgemerkt werden. Ohne Bewegen wird die Gruppe bei automatischer Sortierung sofort passend einsortiert; in einem aktiven Save steht sie zunächst ganz oben. Mit Bewegen folgt nach dem Erstellen die rote Zielstrich-Auswahl.
+Neue leere Gruppen und aus einer Auswahl gebildete Gruppen werden normalerweise nicht sofort eingefügt. Zuerst erscheint ein Namensdialog mit **Unbenannt** als Vorgabe. Über `•••` direkt neben dem Namen kann **Bewegen** vorgemerkt werden. Ohne Bewegen wird die Gruppe bei automatischer Sortierung sofort passend einsortiert; in einem aktiven Save steht sie zunächst ganz oben. Mit Bewegen folgt nach dem Erstellen die rote Zielstrich-Auswahl. Ausnahme: Wird **Neue leere Gruppe** innerhalb von **Gruppe hinzufügen** vorgemerkt, entsteht sie erst mit **Fertig** direkt als **Unbenannt**, damit der Hinzufügen-Entwurf nicht durch einen zweiten Dialog unterbrochen wird.
 
 Neu importierte Lieder sowie neu erstellte Playlists und Tags erhalten direkt nach ihrer Erstellung einen kompakten Namensdialog. Der Name kann sofort geändert werden; `••• → Bewegen` öffnet anschließend dieselbe Einzelobjekt-Positionierung. Bei einem Mehrfachimport werden diese Schritte nacheinander pro Lied angeboten.
 

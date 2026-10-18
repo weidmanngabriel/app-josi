@@ -4,7 +4,12 @@ import { registerSW } from 'virtual:pwa-register'
 import App from './App'
 import './styles.css'
 
-registerSW({ immediate: true })
+registerSW({
+  immediate: true,
+  onRegisteredSW(_swUrl, registration) {
+    if (registration) void registration.update()
+  },
+})
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
