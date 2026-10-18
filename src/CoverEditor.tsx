@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type PointerEvent } from 'react'
 import { ColorSpectrumPicker } from './ColorSpectrumPicker'
 
 export type CoverEditorValue = {
@@ -39,12 +39,12 @@ export function CoverEditor({ title, file, initialScale = 1, initialX = 0, initi
     return () => URL.revokeObjectURL(next)
   }, [file])
 
-  const beginDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+  const beginDrag = (event: PointerEvent<HTMLDivElement>) => {
     dragRef.current = { pointerId: event.pointerId, clientX: event.clientX, clientY: event.clientY, x, y }
     event.currentTarget.setPointerCapture(event.pointerId)
   }
 
-  const moveDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+  const moveDrag = (event: PointerEvent<HTMLDivElement>) => {
     const drag = dragRef.current
     if (!drag || drag.pointerId !== event.pointerId) return
     const rect = event.currentTarget.getBoundingClientRect()
@@ -52,7 +52,7 @@ export function CoverEditor({ title, file, initialScale = 1, initialX = 0, initi
     setY(clamp(drag.y + ((event.clientY - drag.clientY) / Math.max(1, rect.height)) * 100, -50, 50))
   }
 
-  const endDrag = (event: React.PointerEvent<HTMLDivElement>) => {
+  const endDrag = (event: PointerEvent<HTMLDivElement>) => {
     if (dragRef.current?.pointerId === event.pointerId) dragRef.current = null
   }
 
