@@ -1851,3 +1851,67 @@ input, textarea {
 .selection-mode-hint span { font-weight:750; }
 
 .reorder-mode-hint { gap:8px; }
+
+
+/* Tag overview and viewport-level action menus */
+.library-global-action-menu {
+  position: fixed !important;
+  top: 76px !important;
+  left: 18px !important;
+  right: auto !important;
+  bottom: auto !important;
+  z-index: 181 !important;
+  width: min(310px, calc(100vw - 36px));
+}
+.library-global-action-menu .playlist-action-ready { color: #c4b5fd; }
+.library-global-action-menu button:disabled { opacity: .38; cursor: default; }
+
+.overflow-menu.overflow-menu-right {
+  left: auto !important;
+  right: 18px !important;
+}
+
+.playlist-grid {
+  grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+  gap: clamp(12px, 2.4vw, 30px);
+}
+.playlist-card-wrap {
+  width: 100%;
+}
+.playlist-card-cover {
+  width: 100%;
+  aspect-ratio: 1;
+}
+.tag-card-cover {
+  border-width: 2px;
+  background: #11161f;
+}
+.tag-card-placeholder {
+  font-size: clamp(24px, 5vw, 56px);
+  line-height: 1;
+}
+.tag-card > strong {
+  display: block;
+}
+.overview-create-form {
+  box-sizing: border-box;
+  width: calc((100% - 3 * clamp(12px, 2.4vw, 30px)) / 4);
+  min-width: 0;
+  margin-top: 30px;
+}
+.new-tag input {
+  box-sizing: border-box;
+  min-width: 0;
+}
+
+@media (max-width: 620px) {
+  .playlist-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr)) !important;
+    gap: 10px;
+  }
+  .playlist-card > strong { font-size: 12px; }
+  .playlist-card > small { font-size: 10px; }
+  .overview-create-form {
+    width: calc((100% - 30px) / 4);
+  }
+}
