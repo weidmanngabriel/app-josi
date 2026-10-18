@@ -2445,7 +2445,7 @@ function App() {
     setSingleMoveTarget({ kind, id, parentGroupId, targetIndex: null })
     setOverflowMenu(null)
     setCreationPlacementMenuOpen(false)
-    setMessage('Zielstrich einmal auswählen und dann doppelt antippen, um zu verschieben.')
+    setMessage('Du kannst einen roten Zielstrich wählen oder eine Gruppe anklicken, um die Datei direkt hinein zu bewegen.')
   }
   const confirmSingleMove = async (targetIndex: number) => {
     if (!singleMoveTarget) return
@@ -2531,7 +2531,7 @@ function App() {
     if (draft.moveAfterCreate) {
       setSortModeFor(draft.kind, 'manual')
       setSingleMoveTarget({ kind: 'group', id, parentGroupId: draft.parentGroupId, targetIndex: null })
-      setMessage('Gruppe erstellt. Zielstrich wählen und doppelt antippen.')
+      setMessage('Gruppe erstellt. Wähle einen roten Zielstrich für die Position.')
     } else setMessage(`Gruppe „${name}“ wurde erstellt.`)
     if (draft.kind === 'song') stopSelection()
     else { setSidebarSelectionKind(null); setSelectedPlaylistIds(new Set()); setSelectedTagIds(new Set()); setSidebarSelectionMenuOpen(false) }
@@ -2924,7 +2924,7 @@ function App() {
     const token = itemToken(playlist.id)
     const key = containerKey ?? (groupId ? groupContainerKey('playlist', groupId) : rootContainerKey('playlist'))
     const bundleClass = bundleDisplayClass(key, baseTokens, token)
-    return <div className={`playlist-nav-row${groupId ? ' grouped-object-row' : ''}${bundleClass}`} key={playlist.id}>{renderOrderControls('playlist', key, baseTokens, token, groupId)}{sidebarSelectionKind === 'playlist' && <button className="selection-check sidebar-selection-check" type="button" onClick={() => toggleSidebarSelected('playlist', playlist.id)}>{selected ? '✓' : ''}</button>}<button className={`nav-item${activePlaylistId === playlist.id && view === 'library' ? ' active' : ''}${selected ? ' selected-sidebar-object' : ''}${surfaceColor ? ' custom-surface' : ''}`} style={surfaceStyle(surfaceColor)} type="button" onClick={() => { if (selectionSourceKind) { if (selectionSourceKind === 'playlist') applySelectionSourceById('playlist', playlist.id); return } sidebarSelectionKind === 'playlist' ? toggleSidebarSelected('playlist', playlist.id) : void openPlaylist(playlist.id) }} disabled={reorderScope === 'sidebar' || groupReordering}><span className="playlist-nav-name">{coverUrls[playlist.id] ? <span className="playlist-mini-cover cover-media" style={coverFrameStyle(playlist)}><img className="positioned-cover-image" style={coverImageStyle(playlist)} src={coverUrls[playlist.id]} alt="" /></span> : <span className="playlist-mini-cover">♫</span>}<span className="nav-tag-dots">{playlistTags(playlist.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} />)}</span><span>{playlist.name}</span></span><strong>{playlist.songIds.length}</strong></button>{renderBundleBadge('playlist', key, baseTokens, token, groupId)}{sidebarSelectionKind !== 'playlist' && !selectionSourceKind && <button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id, parentGroupId: groupId })}>•••</button>}</div>
+    return <div className={`playlist-nav-row${groupId ? ' grouped-object-row' : ''}${bundleClass}`} key={playlist.id}>{renderOrderControls('playlist', key, baseTokens, token, groupId)}{sidebarSelectionKind === 'playlist' && <button className="selection-check sidebar-selection-check" type="button" onClick={() => toggleSidebarSelected('playlist', playlist.id)}>{selected ? '✓' : ''}</button>}<button className={`nav-item${activePlaylistId === playlist.id && view === 'library' ? ' active' : ''}${selected ? ' selected-sidebar-object' : ''}${surfaceColor ? ' custom-surface' : ''}${selectionSourceKind === 'playlist' ? ' direct-source-target' : ''}`} style={surfaceStyle(surfaceColor)} type="button" onClick={() => { if (selectionSourceKind) { if (selectionSourceKind === 'playlist') applySelectionSourceById('playlist', playlist.id); return } sidebarSelectionKind === 'playlist' ? toggleSidebarSelected('playlist', playlist.id) : void openPlaylist(playlist.id) }} disabled={reorderScope === 'sidebar' || groupReordering}><span className="playlist-nav-name">{coverUrls[playlist.id] ? <span className="playlist-mini-cover cover-media" style={coverFrameStyle(playlist)}><img className="positioned-cover-image" style={coverImageStyle(playlist)} src={coverUrls[playlist.id]} alt="" /></span> : <span className="playlist-mini-cover">♫</span>}<span className="nav-tag-dots">{playlistTags(playlist.id).map((tag) => <i key={tag.id} className="tag-dot" style={{ background: tag.color }} />)}</span><span>{playlist.name}</span></span><strong>{playlist.songIds.length}</strong></button>{renderBundleBadge('playlist', key, baseTokens, token, groupId)}{sidebarSelectionKind !== 'playlist' && !selectionSourceKind && <button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'playlist', id: playlist.id, parentGroupId: groupId })}>•••</button>}</div>
   }
   const renderTagRow = (tag: Tag, index: number, groupId?: string, containerKey?: string, baseTokens: string[] = []) => {
     const groupReordering = groupId === groupReorderId
@@ -2933,7 +2933,7 @@ function App() {
     const token = itemToken(tag.id)
     const key = containerKey ?? (groupId ? groupContainerKey('tag', groupId) : rootContainerKey('tag'))
     const bundleClass = bundleDisplayClass(key, baseTokens, token)
-    return <div className={`playlist-nav-row tag-nav-row${groupId ? ' grouped-object-row' : ''}${bundleClass}`} key={tag.id}>{renderOrderControls('tag', key, baseTokens, token, groupId)}{sidebarSelectionKind === 'tag' && <button className="selection-check sidebar-selection-check" type="button" onClick={() => toggleSidebarSelected('tag', tag.id)}>{selected ? '✓' : ''}</button>}<button className={`nav-item${activeTagId === tag.id && view === 'tag' ? ' active' : ''}${selected ? ' selected-sidebar-object' : ''}${surfaceColor ? ' custom-surface' : ''}`} style={surfaceStyle(surfaceColor)} type="button" onClick={() => { if (selectionSourceKind) { if (selectionSourceKind === 'tag') applySelectionSourceById('tag', tag.id); return } sidebarSelectionKind === 'tag' ? toggleSidebarSelected('tag', tag.id) : void openTag(tag.id) }} disabled={tagEditMode || groupReordering}><span className="tag-nav-name"><i className="tag-dot" style={{ background: tag.color }} /><span>{tag.name}</span></span><strong>{tag.songIds.filter((id) => songs.some((song) => song.id === id)).length}</strong></button>{renderBundleBadge('tag', key, baseTokens, token, groupId)}{sidebarSelectionKind !== 'tag' && !selectionSourceKind && <button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'tag', id: tag.id, parentGroupId: groupId })}>•••</button>}</div>
+    return <div className={`playlist-nav-row tag-nav-row${groupId ? ' grouped-object-row' : ''}${bundleClass}`} key={tag.id}>{renderOrderControls('tag', key, baseTokens, token, groupId)}{sidebarSelectionKind === 'tag' && <button className="selection-check sidebar-selection-check" type="button" onClick={() => toggleSidebarSelected('tag', tag.id)}>{selected ? '✓' : ''}</button>}<button className={`nav-item${activeTagId === tag.id && view === 'tag' ? ' active' : ''}${selected ? ' selected-sidebar-object' : ''}${surfaceColor ? ' custom-surface' : ''}${selectionSourceKind === 'tag' ? ' direct-source-target' : ''}`} style={surfaceStyle(surfaceColor)} type="button" onClick={() => { if (selectionSourceKind) { if (selectionSourceKind === 'tag') applySelectionSourceById('tag', tag.id); return } sidebarSelectionKind === 'tag' ? toggleSidebarSelected('tag', tag.id) : void openTag(tag.id) }} disabled={tagEditMode || groupReordering}><span className="tag-nav-name"><i className="tag-dot" style={{ background: tag.color }} /><span>{tag.name}</span></span><strong>{tag.songIds.filter((id) => songs.some((song) => song.id === id)).length}</strong></button>{renderBundleBadge('tag', key, baseTokens, token, groupId)}{sidebarSelectionKind !== 'tag' && !selectionSourceKind && <button className="overflow-button row-overflow" type="button" onClick={() => setOverflowMenu({ kind: 'tag', id: tag.id, parentGroupId: groupId })}>•••</button>}</div>
   }
   const groupPathName = (group: ObjectGroup) => {
     const names = [group.name]
@@ -3148,7 +3148,12 @@ function App() {
       <strong>Gruppe: Reihenfolge ändern</strong>
       <p>Direkte Objekte und Untergruppen lassen sich mit den Pfeilen innerhalb dieser Gruppe anordnen.</p>
     </aside>}
-    {layoutEditMode && !selectionSourceKind && !singleMoveTarget && !bulkMoveMode && !reorderScope && !selectionMode && <aside className="inline-mode-guide">
+    {sidebarSelectionKind && !selectionSourceKind && !singleMoveTarget && !bulkMoveMode && !reorderScope && <aside className="inline-mode-guide">
+      <strong>{sidebarSelectionKind === 'playlist' ? 'Playlists auswählen' : 'Tags auswählen'}</strong>
+      <p>Tippe Objekte an, um sie zur Auswahl hinzuzufügen oder wieder zu entfernen. Das ••• enthält Aktionen für die gesamte Auswahl.</p>
+      <button type="button" onClick={stopSidebarSelection}>Abbrechen</button>
+    </aside>}
+    {layoutEditMode && !selectionSourceKind && !singleMoveTarget && !bulkMoveMode && !reorderScope && !selectionMode && !sidebarSelectionKind && <aside className="inline-mode-guide">
       <strong>Layout bearbeiten</strong>
       <p>Ziehe die Trennlinien, um die Bereiche anzupassen. „Layout fertig“ speichert die aktuelle Einstellung.</p>
     </aside>}
