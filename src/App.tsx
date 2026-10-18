@@ -3075,11 +3075,51 @@ function App() {
         {importDraftConfirmation && <div className="import-confirm-layer"><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>{importDraftConfirmation === 'finish' ? 'Import abschließen?' : 'Import abbrechen?'}</h2><p>{importDraftConfirmation === 'finish' ? `${importDraftItems.length} ${importDraftItems.length === 1 ? 'Lied wird' : 'Lieder werden'} jetzt lokal gespeichert.` : 'Die ausgewählten Dateien werden nicht importiert.'}</p><div className="dialog-actions"><button type="button" onClick={() => setImportDraftConfirmation(null)}>Zurück</button>{importDraftConfirmation === 'finish' ? <button type="button" onClick={() => void commitImportDraft()}>Importieren</button> : <button className="danger-button" type="button" onClick={discardImportDraft}>Nicht importieren</button>}</div></div></div>}
       </div>
     })()}
-    {singleMoveTarget && <div className="single-move-hint"><span>Zielstrich wählen und doppelt antippen. Der Modus bleibt aktiv.</span><button type="button" onClick={cancelSingleMove}>Abbrechen</button></div>}
-    {sidebarMoveKind && <div className="single-move-hint persistent-move-hint"><span>Bewegen bleibt aktiv.</span><button type="button" onClick={() => { setSidebarMoveKind(null); setChooserSearch('') }}>Abbrechen</button></div>}
-    {bulkMoveMode && <div className="single-move-hint persistent-move-hint"><span>Rote Striche verschieben die Auswahl als Block.</span><button type="button" onClick={() => { setBulkMoveMode(false); setBulkMoveContext(null) }}>Abbrechen</button><button type="button" onClick={finishSelectedMove}>Fertig</button></div>}
-    {reorderScope && !bulkMoveMode && <div className="single-move-hint reorder-mode-hint"><span>Reihenfolge mit Pfeilen verändern.</span><button type="button" onClick={() => { cleanupBundleSingletons(); setReorderScope(null); setMoveCandidate(null) }}>Abbrechen</button><button type="button" onClick={finishReorder}>Fertig</button></div>}
-    {selectionMode && !bulkMoveMode && !reorderScope && !selectedSongsListOpen && <div className="single-move-hint selection-mode-hint"><span>{selectedSongIds.size ? `${selectedSongIds.size} ausgewählt` : 'Dateien auswählen'}</span><button type="button" onClick={stopSelection}>Abbrechen</button><button type="button" onClick={finishSelection}>Fertig</button></div>}
+    {selectionSourceKind && <aside className="inline-mode-guide">
+      <strong>{selectionSourceKind === 'group' ? 'Alles aus Gruppe auswählen' : selectionSourceKind === 'playlist' ? 'Alles aus Playlist auswählen' : 'Alles aus Tag auswählen'}</strong>
+      <p>{selectionSourceKind === 'group' ? 'Ein Klick auf eine Gruppe wählt alle darin vorhandenen Lieder aus.' : selectionSourceKind === 'playlist' ? 'Klicke links direkt auf die gewünschte Playlist.' : 'Klicke links direkt auf den gewünschten Tag.'}</p>
+      <p>Gruppen öffnest oder schließt du in diesem Modus mit einem Doppelklick.</p>
+      <button type="button" onClick={closeSelectionSource}>Abbrechen</button>
+    </aside>}
+    {singleMoveTarget && <aside className="inline-mode-guide">
+      <strong>Bewegen</strong>
+      <p>Ein Klick auf eine passende Gruppe bewegt die Datei direkt hinein.</p>
+      <p>Doppelklick auf eine Gruppe öffnet oder schließt sie. Danach kannst du innerhalb der Gruppe weiter positionieren.</p>
+      <p>Rote Striche wählen die genaue Position; ein Doppelklick auf den Strich bestätigt sie.</p>
+      <button type="button" onClick={cancelSingleMove}>Abbrechen</button>
+    </aside>}
+    {bulkMoveMode && <aside className="inline-mode-guide">
+      <strong>Auswahl bewegen</strong>
+      <p>Ein Klick auf eine Gruppe bewegt die ausgewählten Lieder gemeinsam hinein.</p>
+      <p>Doppelklick öffnet oder schließt Gruppen. Rote Striche verschieben den Block an die genaue Position.</p>
+      <div><button type="button" onClick={() => { setBulkMoveMode(false); setBulkMoveContext(null) }}>Abbrechen</button><button type="button" onClick={finishSelectedMove}>Fertig</button></div>
+    </aside>}
+    {reorderScope && !bulkMoveMode && <aside className="inline-mode-guide">
+      <strong>Reihenfolge ändern</strong>
+      <p>Mit den Pfeilen verschiebst du Objekte auf ihrer aktuellen Ebene. Schlösser verbinden benachbarte Einträge zu einem Sortierbund.</p>
+      <div><button type="button" onClick={() => { cleanupBundleSingletons(); setReorderScope(null); setMoveCandidate(null) }}>Abbrechen</button><button type="button" onClick={finishReorder}>Fertig</button></div>
+    </aside>}
+    {selectionMode && !bulkMoveMode && !reorderScope && !selectedSongsListOpen && !selectionSourceKind && <aside className="inline-mode-guide">
+      <strong>Auswählen</strong>
+      <p>{selectedSongIds.size ? `${selectedSongIds.size} Dateien ausgewählt. Tippe weitere Dateien an, um die Auswahl zu ändern.` : 'Tippe Dateien an, um sie auszuwählen.'}</p>
+      <div><button type="button" onClick={stopSelection}>Abbrechen</button><button type="button" onClick={finishSelection}>Fertig</button></div>
+    </aside>}
+    {moveCandidate && !reorderScope && <aside className="inline-mode-guide">
+      <strong>Position wählen</strong>
+      <p>Wähle einen roten Zielstrich. Mit ✓ oben bestätigst du die Position, mit × brichst du ab.</p>
+    </aside>}
+    {groupMoveId && !singleMoveTarget && !bulkMoveMode && <aside className="inline-mode-guide">
+      <strong>Gruppe bewegen</strong>
+      <p>Mit den Pfeilen am Gruppenkopf verschiebst du die Gruppe auf ihrer aktuellen Ebene. „Fertig“ beendet den Modus.</p>
+    </aside>}
+    {groupReorderId && !reorderScope && <aside className="inline-mode-guide">
+      <strong>Gruppe: Reihenfolge ändern</strong>
+      <p>Direkte Objekte und Untergruppen lassen sich mit den Pfeilen innerhalb dieser Gruppe anordnen.</p>
+    </aside>}
+    {layoutEditMode && !selectionSourceKind && !singleMoveTarget && !bulkMoveMode && !reorderScope && !selectionMode && <aside className="inline-mode-guide">
+      <strong>Layout bearbeiten</strong>
+      <p>Ziehe die Trennlinien, um die Bereiche anzupassen. „Layout fertig“ speichert die aktuelle Einstellung.</p>
+    </aside>}
 
     {view !== 'playlistOverview' && view !== 'tagOverview' && <main className={`music-layout custom-layout${layoutEditMode ? ' layout-editing' : ''}`} style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}><aside className="sidebar">
       <button className={`nav-item${view === 'library' && !activePlaylistId ? ' active' : ''}`} type="button" onClick={() => navigateTo({ view: 'library', playlistId: null, detailOpen: false })}><span>Bibliothek</span><strong>{songs.length}</strong></button>
