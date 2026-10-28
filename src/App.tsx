@@ -3314,7 +3314,7 @@ function App() {
         <div className="playlist-chooser-heading selected-songs-heading"><div><p className="eyebrow">AUSWAHL</p><h2>{selectedSongIds.size === 1 ? 'Ausgewähltes Lied' : 'Ausgewählte Lieder'}</h2><small>{focusId ? 'Ein Lied ist aktiv. Tippe ein anderes an, um es für die Aktionen zu wählen.' : 'Tippe ein Lied an.'}</small></div><div className="selected-songs-heading-actions"><button className="selection-more-button selected-songs-more-button" type="button" disabled={!focusId} onClick={() => setSelectedSongsMenuOpen((value) => !value)}>•••</button></div></div>
         {selectedSongsMenuOpen && <div className="overflow-menu selected-songs-action-menu-fixed">
           <button type="button" onClick={() => { setSelectionMode(true); setSelectedSongsMenuOpen(false); setSelectedSongsListOpen(false) }}>Auswählen</button>
-          <button type="button" disabled={!focusId || view !== 'library'} onClick={() => runFocusedSelectedSongAction('move')}>Bewegen</button>
+          <button type="button" disabled={!selectedSongIds.size || view !== 'library'} onClick={() => selectedSongIds.size > 1 ? beginSelectedMove(new Set(selectedSongIds)) : runFocusedSelectedSongAction('move')}>Bewegen</button>
           <button type="button" disabled={!focusId || view !== 'library'} onClick={() => runFocusedSelectedSongAction('arrow')}>Reihenfolge verändern (Pfeil)</button>
           <button type="button" disabled={!focusId || view !== 'library'} onClick={() => runFocusedSelectedSongAction('line')}>Reihenfolge verändern (Strich)</button>
           <button type="button" onClick={() => openSelectionObjectEdit('add')}>Objekte hinzufügen</button>
