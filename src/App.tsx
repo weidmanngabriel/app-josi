@@ -235,8 +235,16 @@ function App() {
   const [layoutEditMode, setLayoutEditMode] = useState(false)
   const [layoutEditStart, setLayoutEditStart] = useState<LayoutPreset | null>(null)
   const [layoutEditConfirmation, setLayoutEditConfirmation] = useState<LayoutEditConfirmation>(null)
-  const [layoutToolbarPosition, setLayoutToolbarPosition] = useState({ x: 12, y: 88 })
+  const [layoutToolbarPosition, setLayoutToolbarPosition] = useState(() => {
+    try {
+      const stored = JSON.parse(localStorage.getItem('josi-layout-toolbar-position') ?? 'null')
+      if (stored && Number.isFinite(Number(stored.x)) && Number.isFinite(Number(stored.y))) return { x: Number(stored.x), y: Number(stored.y) }
+    } catch { /* use default toolbar position */ }
+    return { x: 12, y: 88 }
+  })
   const [layoutToolbarDrag, setLayoutToolbarDrag] = useState<{ offsetX: number; offsetY: number } | null>(null)
+  const [layoutToolbarPositionEditMode, setLayoutToolbarPositionEditMode] = useState(false)
+  const [layoutToolbarPositionEditStart, setLayoutToolbarPositionEditStart] = useState<{ x: number; y: number } | null>(null)
   const [sidebarWidth, setSidebarWidth] = useState(() => Math.max(150, Math.min(420, Number(localStorage.getItem('josi-sidebar-width')) || 240)))
   const [playerSplitLeft, setPlayerSplitLeft] = useState(() => Math.max(12, Math.min(44, Number(localStorage.getItem('josi-player-split-left')) || 27)))
   const [playerSplitRight, setPlayerSplitRight] = useState(() => Math.max(56, Math.min(88, Number(localStorage.getItem('josi-player-split-right')) || 68)))
@@ -510,16 +518,32 @@ function App() {
     return () => { window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', stop); window.removeEventListener('pointercancel', stop) }
   }, [layoutDrag, playerSplitLeft, playerSplitRight])
 
+  const clampLayoutToolbarPosition = (position: { x: number; y: number }) => ({
+    x: Math.max(8, Math.min(window.innerWidth - 272, position.x)),
+    y: Math.max(8, Math.min(window.innerHeight - 180, position.y)),
+  })
   const startLayoutEditing = () => {
     setLayoutEditStart({ sidebarWidth, playerSplitLeft, playerSplitRight })
     setLayoutEditConfirmation(null)
     setLayoutToolbarDrag(null)
-    setLayoutToolbarPosition({
-      x: Math.max(12, Math.min(window.innerWidth - 276, window.innerWidth - 292)),
-      y: Math.max(72, Math.min(window.innerHeight - 190, 92)),
-    })
+    setLayoutToolbarPosition((current) => clampLayoutToolbarPosition(current))
     setSettingsOpen(false)
     setLayoutEditMode(true)
+  }
+  const startLayoutToolbarPositionEditing = () => {
+    const current = clampLayoutToolbarPosition(layoutToolbarPosition)
+    setLayoutToolbarPosition(current)
+    setLayoutToolbarPositionEditStart(current)
+    setLayoutToolbarDrag(null)
+    setSettingsOpen(false)
+    setLayoutToolbarPositionEditMode(true)
+  }
+  const completeLayoutToolbarPositionEditing = (save: boolean) => {
+    if (!save && layoutToolbarPositionEditStart) setLayoutToolbarPosition(layoutToolbarPositionEditStart)
+    setLayoutToolbarDrag(null)
+    setLayoutToolbarPositionEditMode(false)
+    setLayoutToolbarPositionEditStart(null)
+    setSettingsOpen(true)
   }
   const persistLayout = (preset: LayoutPreset) => {
     localStorage.setItem('josi-sidebar-width', String(preset.sidebarWidth))
@@ -543,7 +567,7 @@ function App() {
   }
 
   useEffect(() => {
-    if (!layoutToolbarDrag || !layoutEditMode) return
+    if (!layoutToolbarDrag || (!layoutEditMode && !layoutToolbarPositionEditMode)) return
     const move = (event: PointerEvent) => {
       const width = 264
       const height = 172
@@ -561,8 +585,9 @@ function App() {
       window.removeEventListener('pointerup', stop)
       window.removeEventListener('pointercancel', stop)
     }
-  }, [layoutToolbarDrag, layoutEditMode])
+  }, [layoutToolbarDrag, layoutEditMode, layoutToolbarPositionEditMode])
 
+  useEffect(() => localStorage.setItem('josi-layout-toolbar-position', JSON.stringify(layoutToolbarPosition)), [layoutToolbarPosition])
   useEffect(() => localStorage.setItem('josi-sort-saves', JSON.stringify(sortSaves)), [sortSaves])
   useEffect(() => localStorage.setItem('josi-active-sort-saves', JSON.stringify(activeSortSaveIds)), [activeSortSaveIds])
   useEffect(() => localStorage.setItem('josi-side-pane-scroll-locked', sidePaneScrollLocked ? '1' : '0'), [sidePaneScrollLocked])
@@ -3211,16 +3236,16 @@ function App() {
       <p>Tippe Objekte an, um sie zur Auswahl hinzuzufügen oder wieder zu entfernen. Das ••• enthält Aktionen für die gesamte Auswahl.</p>
       <button type="button" onClick={stopSidebarSelection}>Abbrechen</button>
     </aside>}
-    {layoutEditMode && <aside className="layout-edit-toolbar" style={{ left: layoutToolbarPosition.x, top: layoutToolbarPosition.y }}>
+    {(layoutEditMode || layoutToolbarPositionEditMode) && <aside className="layout-edit-toolbar" style={{ left: layoutToolbarPosition.x, top: layoutToolbarPosition.y }}>
       <div className="layout-edit-toolbar-drag" onPointerDown={(event) => {
         event.preventDefault()
         const rect = event.currentTarget.parentElement?.getBoundingClientRect()
         setLayoutToolbarDrag({ offsetX: rect ? event.clientX - rect.left : 0, offsetY: rect ? event.clientY - rect.top : 0 })
       }}>
-        <strong>Layout bearbeiten</strong><span>↕ Verschieben</span>
+        <strong>{layoutToolbarPositionEditMode ? 'Abbrechen/Fertig verschieben' : 'Layout bearbeiten'}</strong><span>↕ Verschieben</span>
       </div>
-      <p>Ziehe diese Box an der oberen Leiste an eine freie Stelle. Die Trennlinien verändern weiterhin die Bibliotheksbereiche.</p>
-      <div className="layout-edit-toolbar-actions"><button type="button" onClick={() => setLayoutEditConfirmation('cancel')}>Abbrechen</button><button type="button" onClick={() => setLayoutEditConfirmation('finish')}>Fertig</button></div>
+      <p>{layoutToolbarPositionEditMode ? 'Ziehe dieses Fenster an der oberen Leiste an die gewünschte Standardposition.' : 'Ziehe diese Box an der oberen Leiste an eine freie Stelle. Die Trennlinien verändern weiterhin die Bibliotheksbereiche.'}</p>
+      <div className="layout-edit-toolbar-actions">{layoutToolbarPositionEditMode ? <><button type="button" onClick={() => completeLayoutToolbarPositionEditing(false)}>Abbrechen</button><button type="button" onClick={() => completeLayoutToolbarPositionEditing(true)}>Fertig</button></> : <><button type="button" onClick={() => setLayoutEditConfirmation('cancel')}>Abbrechen</button><button type="button" onClick={() => setLayoutEditConfirmation('finish')}>Fertig</button></>}</div>
     </aside>}
 
     {view !== 'playlistOverview' && view !== 'tagOverview' && <main className={`music-layout custom-layout${layoutEditMode ? ' layout-editing' : ''}`} style={{ '--sidebar-width': `${sidebarWidth}px` } as React.CSSProperties}><aside className="sidebar">
@@ -3396,7 +3421,7 @@ function App() {
     {trashConfirmation && <div className="modal-backdrop" onClick={() => setTrashConfirmation(false)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Papierkorb endgültig leeren?</h2><p>{trashCount} {trashCount === 1 ? 'Eintrag wird' : 'Einträge werden'} dauerhaft gelöscht. Audiodateien im Papierkorb können danach nicht wiederhergestellt werden.</p><div className="dialog-actions"><button type="button" onClick={() => setTrashConfirmation(false)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void emptyTrash()}>Endgültig leeren</button></div></div></div>}
     {sortSaveDialogTarget && <div className="modal-backdrop" onClick={() => setSortSaveDialogTarget(null)}><form className="confirm-dialog sort-save-dialog" onSubmit={(event) => { event.preventDefault(); saveCurrentSort() }} onClick={(event) => event.stopPropagation()}><h2>Aktuelle Sortierung speichern</h2><p>Gib dem Save einen Namen. Ohne Namen verwendet Josi automatisch die erste freie Nummer.</p><input value={sortSaveName} onChange={(event) => setSortSaveName(event.target.value)} placeholder={nextSortSaveName(sortSaveDialogTarget)} autoFocus /><div className="dialog-actions"><button type="button" onClick={() => setSortSaveDialogTarget(null)}>Abbrechen</button><button type="submit">Speichern</button></div></form></div>}
     {sortSaveRenameId && <div className="modal-backdrop" onClick={() => setSortSaveRenameId(null)}><form className="confirm-dialog sort-save-dialog" onSubmit={confirmSortSaveRename} onClick={(event) => event.stopPropagation()}><h2>Save umbenennen</h2><input value={sortSaveRenameValue} onChange={(event) => setSortSaveRenameValue(event.target.value)} autoFocus /><div className="dialog-actions"><button type="button" onClick={() => setSortSaveRenameId(null)}>Abbrechen</button><button type="submit" disabled={!sortSaveRenameValue.trim()}>Speichern</button></div></form></div>}
-    {settingsOpen && <div className="modal-backdrop settings-backdrop" onClick={() => setSettingsOpen(false)}><div className="confirm-dialog settings-dialog" onClick={(event) => event.stopPropagation()}><h2>Einstellungen</h2><div className="settings-row"><div><strong>Spulweite</strong><small>Für ⏪/⏩ und die Detailansicht.</small></div><select value={seekSeconds} onChange={(event) => setSeekSeconds(Number(event.target.value))}>{SEEK_SECOND_OPTIONS.map((value) => <option key={value} value={value}>{value} Sekunden</option>)}</select></div><div className="settings-row"><div><strong>Loops</strong><small>Bestimmt global, ob vorhandene Loops automatisch an, aus oder pro Lied manuell gesteuert werden.</small></div><select value={loopActivationMode} onChange={(event) => { const next = event.target.value as LoopActivationMode; if (next === 'disabled') cancelLoopTransition(); setLoopActivationMode(next) }}><option value="enabled">Aktiviert</option><option value="disabled">Deaktiviert</option><option value="manual">Manuell</option></select></div><div className="settings-row settings-info-row"><div><strong>Loop-Übergang</strong><small>Josi überlappt Loop-Ende und Loop-Anfang kurz. Falls der zweite Wiedergabekanal technisch nicht startet, wird lokal nach einem ähnlichen Verbindungspunkt gesucht.</small></div><span className="settings-info-value">Automatisch</span></div><div className="settings-row layout-settings-row"><div><strong>Bibliotheks-Interface</strong><small>Im Bearbeitungsmodus lassen sich die Trennleisten verschieben. Außerhalb davon sind sie gesperrt.</small></div><div className="layout-settings-actions"><button type="button" onClick={startLayoutEditing}>Leisten verschieben</button><button type="button" onClick={() => { setSidebarWidth(layoutDefault.sidebarWidth); setPlayerSplitLeft(layoutDefault.playerSplitLeft); setPlayerSplitRight(layoutDefault.playerSplitRight) }}>Standard</button></div></div><div className="settings-row"><div><strong>Seitliche Bereiche sperren</strong><small>Verhindert das eigenständige Scrollen der linken und rechten Bibliotheksbereiche.</small></div><button className={`settings-switch${sidePaneScrollLocked ? ' on' : ''}`} type="button" role="switch" aria-checked={sidePaneScrollLocked} onClick={() => setSidePaneScrollLocked((value) => !value)}><i /></button></div><div className="dialog-actions"><button type="button" onClick={() => setSettingsOpen(false)}>Fertig</button></div></div></div>}
+    {settingsOpen && <div className="modal-backdrop settings-backdrop" onClick={() => setSettingsOpen(false)}><div className="confirm-dialog settings-dialog" onClick={(event) => event.stopPropagation()}><h2>Einstellungen</h2><div className="settings-row"><div><strong>Spulweite</strong><small>Für ⏪/⏩ und die Detailansicht.</small></div><select value={seekSeconds} onChange={(event) => setSeekSeconds(Number(event.target.value))}>{SEEK_SECOND_OPTIONS.map((value) => <option key={value} value={value}>{value} Sekunden</option>)}</select></div><div className="settings-row"><div><strong>Loops</strong><small>Bestimmt global, ob vorhandene Loops automatisch an, aus oder pro Lied manuell gesteuert werden.</small></div><select value={loopActivationMode} onChange={(event) => { const next = event.target.value as LoopActivationMode; if (next === 'disabled') cancelLoopTransition(); setLoopActivationMode(next) }}><option value="enabled">Aktiviert</option><option value="disabled">Deaktiviert</option><option value="manual">Manuell</option></select></div><div className="settings-row settings-info-row"><div><strong>Loop-Übergang</strong><small>Josi überlappt Loop-Ende und Loop-Anfang kurz. Falls der zweite Wiedergabekanal technisch nicht startet, wird lokal nach einem ähnlichen Verbindungspunkt gesucht.</small></div><span className="settings-info-value">Automatisch</span></div><div className="settings-row layout-settings-row"><div><strong>Bibliotheks-Interface</strong><small>Im Bearbeitungsmodus lassen sich die Trennleisten verschieben. Außerhalb davon sind sie gesperrt.</small></div><div className="layout-settings-actions"><button type="button" onClick={startLayoutEditing}>Leisten verschieben</button><button type="button" onClick={startLayoutToolbarPositionEditing}>Abbrechen/Fertig verschieben</button><button type="button" onClick={() => { setSidebarWidth(layoutDefault.sidebarWidth); setPlayerSplitLeft(layoutDefault.playerSplitLeft); setPlayerSplitRight(layoutDefault.playerSplitRight) }}>Standard</button></div></div><div className="settings-row"><div><strong>Seitliche Bereiche sperren</strong><small>Verhindert das eigenständige Scrollen der linken und rechten Bibliotheksbereiche.</small></div><button className={`settings-switch${sidePaneScrollLocked ? ' on' : ''}`} type="button" role="switch" aria-checked={sidePaneScrollLocked} onClick={() => setSidePaneScrollLocked((value) => !value)}><i /></button></div><div className="dialog-actions"><button type="button" onClick={() => setSettingsOpen(false)}>Fertig</button></div></div></div>}
     {layoutEditConfirmation && <div className="modal-backdrop layout-edit-confirm-backdrop"><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>{layoutEditConfirmation === 'finish' ? 'Layout übernehmen?' : 'Layout-Änderungen verwerfen?'}</h2><p>{layoutEditConfirmation === 'finish' ? 'Die aktuelle Aufteilung wird gespeichert und der Bearbeitungsmodus beendet.' : 'Die Aufteilung wird auf den Stand vor „Leisten verschieben“ zurückgesetzt.'}</p><div className="dialog-actions"><button type="button" onClick={() => setLayoutEditConfirmation(null)}>Zurück</button><button type="button" onClick={() => completeLayoutEditing(layoutEditConfirmation)}>{layoutEditConfirmation === 'finish' ? 'Ja, fertig' : 'Ja, verwerfen'}</button></div></div></div>}
         {selectionConfirmation === 'switchManual' && <div className="modal-backdrop selection-confirm-backdrop" onClick={() => setSelectionConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Zu „{activeSortSave('song')?.name ?? 'Save'}“ wechseln?</h2><p>Ausgewählte Lieder können nur innerhalb einer gespeicherten Reihenfolge bewegt werden.</p><div className="dialog-actions"><button type="button" onClick={() => setSelectionConfirmation(null)}>Nein</button><button type="button" onClick={() => { setSortMode('manual'); setSelectionConfirmation(null); setBulkMoveMode(true) }}>Ja, wechseln</button></div></div></div>}
     {selectionConfirmation === 'deleteSelected' && <div className="modal-backdrop selection-confirm-backdrop" onClick={() => setSelectionConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>{selectedSongIds.size} ausgewählte Lieder löschen?</h2><p>Die ausgewählten Lieder werden in den Papierkorb verschoben und aus allen Playlists entfernt.</p><div className="dialog-actions"><button type="button" onClick={() => setSelectionConfirmation(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void deleteSelectedSongs()}>In Papierkorb</button></div></div></div>}
