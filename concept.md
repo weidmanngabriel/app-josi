@@ -76,9 +76,9 @@ Eine Song-Auswahl kann als Block bewegt werden. Dabei wird die betroffene Ebene 
 
 ## Suche
 
-In Bibliothek und geöffneter Playlist gibt es ein Suchfeld. Über **Gruppen** kann zusätzlich eingestellt werden, ob auch Gruppen- und Obergruppennamen durchsucht werden. Die Suche toleriert Groß-/Kleinschreibung, Leerzeichen, Trennzeichen und einfache unvollständige Eingaben. „Miniboss“ findet deshalb auch „Mini Boss“.
+In Bibliothek und geöffneter Playlist gibt es ein Suchfeld. Über **Gruppen** kann zusätzlich eingestellt werden, ob Namen direkt zugeordneter Gruppen mit durchsucht werden. Obergruppen zählen nicht automatisch mit: Enthält eine Untergruppe ein passendes Lied, wird nur diese direkt betroffene Gruppe angezeigt. Die Obergruppe erscheint nur dann ebenfalls, wenn sie selbst unmittelbar ein passendes Lied enthält oder ihr eigener Name der Suchanfrage entspricht. Die Suche toleriert Groß-/Kleinschreibung, Leerzeichen, Trennzeichen und einfache unvollständige Eingaben. „Miniboss“ findet deshalb auch „Mini Boss“.
 
-Auch Auswahlfenster für Lieder, Playlists, Tags und Gruppen besitzen eine Suchleiste. Bei Objektlisten steht der Gruppen-Schalter ebenfalls zur Verfügung. Die Playlist- und Tag-Übersichten haben direkt unter ihrer Anzahl dieselbe Suchleiste; **Playlist suchen** bzw. **Tag suchen** im Überschriften-`•••` öffnet die passende Übersicht und setzt den Fokus in dieses Feld. Die Ergebnisse bleiben soweit möglich in derselben Sortierung und Gruppenstruktur wie die entsprechende Hauptliste.
+Auch Auswahlfenster für Lieder, Playlists, Tags und Gruppen besitzen eine Suchleiste. Bei Objektlisten steht der Gruppen-Schalter ebenfalls zur Verfügung und bezieht sich nur auf die direkte Gruppenzuordnung des jeweiligen Objekts. Die Playlist- und Tag-Übersichten haben direkt unter ihrer Anzahl dieselbe Suchleiste; **Playlist suchen** bzw. **Tag suchen** im Überschriften-`•••` öffnet die passende Übersicht und setzt den Fokus in dieses Feld. Während einer Suche werden passende Untergruppen eigenständig gezeigt, ohne ihre Obergruppen nur als Strukturhülle mit einzublenden. Außerhalb der Suche bleibt die normale Gruppenstruktur unverändert.
 
 ## Importverlauf
 

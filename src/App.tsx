@@ -91,18 +91,7 @@ type GroupSortMode = 'general' | SortMode
 type ObjectGroup = { id: string; kind: GroupKind; name: string; itemIds: string[]; createdAt: number; sortOrder: number; sortMode: GroupSortMode; sortDirection: SortDirection; color?: string; parentGroupId?: string; afterItems?: boolean }
 
 function itemMatchesGroupQuery(groups: ObjectGroup[], kind: GroupKind, itemId: string, query: string) {
-  const direct = groups.filter((group) => group.kind === kind && group.itemIds.includes(itemId))
-  return direct.some((start) => {
-    let current: ObjectGroup | undefined = start
-    const seen = new Set<string>()
-    while (current && !seen.has(current.id)) {
-      if (fuzzyMatch(current.name, query)) return true
-      seen.add(current.id)
-      const parentId: string | undefined = current.parentGroupId
-      current = parentId ? groups.find((group) => group.id === parentId) : undefined
-    }
-    return false
-  })
+  return groups.some((group) => group.kind === kind && group.itemIds.includes(itemId) && fuzzyMatch(group.name, query))
 }
 type SidebarSelectionKind = 'playlist' | 'tag' | null
 type SidebarSelectionConfirmation = 'delete' | 'switchManualMove' | null
@@ -2943,6 +2932,13 @@ function App() {
   const tagGroups = sortedGroupsFor('tag', sidebarTags)
   const groupedTagIds = new Set(objectGroups.filter((group) => group.kind === 'tag').flatMap((group) => group.itemIds))
   const ungroupedSidebarTags = sidebarTags.filter((tag) => !groupedTagIds.has(tag.id))
+  const songSearchActive = view === 'library' && Boolean(searchQuery.trim())
+  const visibleSongIds = new Set(visibleSongs.map((song) => song.id))
+  const songSearchGroups = songSearchActive
+    ? flattenedGroupsFor('song', baseVisibleSongs).filter((group) => group.itemIds.some((id) => visibleSongIds.has(id)))
+    : []
+  const playlistOverviewSearchGroups = playlistOverviewSearch.trim() ? flattenedGroupsFor('playlist', sidebarPlaylists) : []
+  const tagOverviewSearchGroups = tagOverviewSearch.trim() ? flattenedGroupsFor('tag', sidebarTags) : []
 
   const songRootKey = rootContainerKey('song')
   const songRootBaseTokens = [...songGroups.map((group) => groupToken(group.id)), ...ungroupedVisibleSongs.map((song) => itemToken(song.id))]
@@ -3055,6 +3051,15 @@ function App() {
     const childMap = new Map(children.map((child) => [child.id, child])); const itemMap = new Map(items.map((item) => [item.id, item]))
     return <section className={`object-group song-object-group${depth ? ' nested-object-group' : ''}${parentBundleClass}`} key={group.id}>{renderGroupHeader(group, visibleSongs, parentContainerKey, parentBaseTokens)}{!collapsedGroupIds.has(group.id) && <>{order.map((token, index) => <Fragment key={token}>{renderBulkMoveDropZone(group.id, index)}{renderSingleMoveZone('song', group.id, index)}{isGroupToken(token) ? renderSongGroup(childMap.get(tokenId(token))!, depth + 1, containerKey, baseTokens) : renderSongRow(itemMap.get(tokenId(token))!, index, group.id, containerKey, baseTokens)}</Fragment>)}{renderBulkMoveDropZone(group.id, order.length)}{renderSingleMoveZone('song', group.id, order.length)}</>}</section>
   }
+  const renderSongSearchGroup = (group: ObjectGroup): React.ReactNode => {
+    const items = orderedGroupItems(group, visibleSongs) as Song[]
+    if (!items.length) return null
+    const baseTokens = items.map((item) => itemToken(item.id))
+    const containerKey = groupContainerKey('song', group.id)
+    const order = orderedTokensForContainer(containerKey, baseTokens, containerManualMode('song', group.id))
+    const itemMap = new Map(items.map((item) => [item.id, item]))
+    return <section className="object-group song-object-group search-direct-group" key={`search-${group.id}`}>{renderGroupHeader(group, items, containerKey, baseTokens)}{!collapsedGroupIds.has(group.id) && <>{order.map((token, index) => <Fragment key={token}>{renderBulkMoveDropZone(group.id, index)}{renderSingleMoveZone('song', group.id, index)}{renderSongRow(itemMap.get(tokenId(token))!, index, group.id, containerKey, baseTokens)}</Fragment>)}{renderBulkMoveDropZone(group.id, order.length)}{renderSingleMoveZone('song', group.id, order.length)}</>}</section>
+  }
   const renderPlaylistGroup = (group: ObjectGroup, depth = 0, parentContainerKey?: string, parentBaseTokens: string[] = []): React.ReactNode => {
     const parentBundleClass = parentContainerKey ? bundleDisplayClass(parentContainerKey, parentBaseTokens, groupToken(group.id)) : ''
     const children = sortedGroupsFor('playlist', sidebarPlaylists, group.id)
@@ -3075,27 +3080,33 @@ function App() {
     const childMap = new Map(children.map((child) => [child.id, child])); const itemMap = new Map(items.map((item) => [item.id, item]))
     return <section className={`object-group sidebar-object-group${depth ? ' nested-object-group' : ''}${parentBundleClass}`} key={group.id}>{renderGroupHeader(group, sidebarTags, parentContainerKey, parentBaseTokens)}{!collapsedGroupIds.has(group.id) && <>{order.map((token, index) => <Fragment key={token}>{renderSingleMoveZone('tag', group.id, index)}{isGroupToken(token) ? renderTagGroup(childMap.get(tokenId(token))!, depth + 1, containerKey, baseTokens) : renderTagRow(itemMap.get(tokenId(token))!, index, group.id, containerKey, baseTokens)}</Fragment>)}{renderSingleMoveZone('tag', group.id, order.length)}</>}</section>
   }
-  const renderPlaylistOverviewGroup = (group: ObjectGroup, depth = 0, inheritedMatch = false): React.ReactNode => {
-    const query = playlistOverviewSearch.trim()
-    const groupMatch = Boolean(query) && searchIncludesGroups && fuzzyMatch(group.name, query)
-    const includeAll = !query || inheritedMatch || groupMatch
+  const renderPlaylistOverviewGroup = (group: ObjectGroup, depth = 0): React.ReactNode => {
     const children = sortedGroupsFor('playlist', sidebarPlaylists, group.id)
-    const before = children.filter((child) => !child.afterItems).map((child) => renderPlaylistOverviewGroup(child, depth + 1, includeAll)).filter(Boolean)
-    const after = children.filter((child) => child.afterItems).map((child) => renderPlaylistOverviewGroup(child, depth + 1, includeAll)).filter(Boolean)
-    const items = (orderedGroupItems(group, sidebarPlaylists) as Playlist[]).filter((item) => includeAll || fuzzyMatch(item.name, query))
-    if (query && !groupMatch && !items.length && !before.length && !after.length) return null
+    const before = children.filter((child) => !child.afterItems).map((child) => renderPlaylistOverviewGroup(child, depth + 1))
+    const after = children.filter((child) => child.afterItems).map((child) => renderPlaylistOverviewGroup(child, depth + 1))
+    const items = orderedGroupItems(group, sidebarPlaylists) as Playlist[]
     return <section className={`object-group overview-object-group${depth ? ' nested-object-group' : ''}`} key={group.id}>{renderGroupHeader(group, sidebarPlaylists)}{!collapsedGroupIds.has(group.id) && <>{before}<div className="playlist-grid">{items.map(renderPlaylistCard)}</div>{after}</>}</section>
   }
-  const renderTagOverviewGroup = (group: ObjectGroup, depth = 0, inheritedMatch = false): React.ReactNode => {
-    const query = tagOverviewSearch.trim()
-    const groupMatch = Boolean(query) && searchIncludesGroups && fuzzyMatch(group.name, query)
-    const includeAll = !query || inheritedMatch || groupMatch
+  const renderPlaylistOverviewSearchGroup = (group: ObjectGroup): React.ReactNode => {
+    const query = playlistOverviewSearch.trim()
+    const groupMatch = searchIncludesGroups && fuzzyMatch(group.name, query)
+    const items = (orderedGroupItems(group, sidebarPlaylists) as Playlist[]).filter((item) => groupMatch || fuzzyMatch(item.name, query))
+    if (!groupMatch && !items.length) return null
+    return <section className="object-group overview-object-group search-direct-group" key={`search-${group.id}`}>{renderGroupHeader(group, items)}{!collapsedGroupIds.has(group.id) && <div className="playlist-grid">{items.map(renderPlaylistCard)}</div>}</section>
+  }
+  const renderTagOverviewGroup = (group: ObjectGroup, depth = 0): React.ReactNode => {
     const children = sortedGroupsFor('tag', sidebarTags, group.id)
-    const before = children.filter((child) => !child.afterItems).map((child) => renderTagOverviewGroup(child, depth + 1, includeAll)).filter(Boolean)
-    const after = children.filter((child) => child.afterItems).map((child) => renderTagOverviewGroup(child, depth + 1, includeAll)).filter(Boolean)
-    const items = (orderedGroupItems(group, sidebarTags) as Tag[]).filter((item) => includeAll || fuzzyMatch(item.name, query))
-    if (query && !groupMatch && !items.length && !before.length && !after.length) return null
+    const before = children.filter((child) => !child.afterItems).map((child) => renderTagOverviewGroup(child, depth + 1))
+    const after = children.filter((child) => child.afterItems).map((child) => renderTagOverviewGroup(child, depth + 1))
+    const items = orderedGroupItems(group, sidebarTags) as Tag[]
     return <section className={`object-group overview-object-group tag-overview-group${depth ? ' nested-object-group' : ''}`} key={group.id}>{renderGroupHeader(group, sidebarTags)}{!collapsedGroupIds.has(group.id) && <>{before}<div className="playlist-grid">{items.map(renderTagCard)}</div>{after}</>}</section>
+  }
+  const renderTagOverviewSearchGroup = (group: ObjectGroup): React.ReactNode => {
+    const query = tagOverviewSearch.trim()
+    const groupMatch = searchIncludesGroups && fuzzyMatch(group.name, query)
+    const items = (orderedGroupItems(group, sidebarTags) as Tag[]).filter((item) => groupMatch || fuzzyMatch(item.name, query))
+    if (!groupMatch && !items.length) return null
+    return <section className="object-group overview-object-group tag-overview-group search-direct-group" key={`search-${group.id}`}>{renderGroupHeader(group, items)}{!collapsedGroupIds.has(group.id) && <div className="playlist-grid">{items.map(renderTagCard)}</div>}</section>
   }
   const repeatBadge = repeatSetting?.kind === 'infinite' ? '∞' : repeatSetting?.kind === 'count' ? String(repeatRemaining ?? repeatSetting.count) : null
   const overflowMenuOnLeftSide = Boolean(overflowMenu && (
@@ -3276,11 +3287,11 @@ function App() {
       {trashedTags.map((tag) => <article className="trash-item" key={`trash-tag-${tag.id}`}><div><small>TAG</small><strong><i className="tag-dot" style={{ background: tag.color }} /> {tag.name}</strong><span>{tag.trashedAt ? formatDate(tag.trashedAt) : ''}</span></div><button type="button" onClick={() => void restoreTrashedTag(tag)}>Wiederherstellen</button></article>)}
       {songs.filter((song) => song.trashedLoop).map((song) => <article className="trash-item" key={`trash-loop-${song.id}`}><div><small>LOOP</small><strong>{song.name}</strong><span>{song.trashedLoop ? `${formatPrecise(song.trashedLoop.start)} – ${formatPrecise(song.trashedLoop.end)}` : ''}</span></div><button type="button" onClick={() => void restoreTrashedLoop(song)}>Wiederherstellen</button></article>)}
       {!trashCount && <div className="empty-state trash-empty"><div className="empty-icon">⌫</div><h2>Der Papierkorb ist leer.</h2></div>}
-    </div> : (visibleSongs.length || songGroups.length || importMoveStep === 'place') ? <div className="song-list grouped-song-list">{songRootOrder.map((token, index) => <Fragment key={token}>{renderImportLibraryDropZone(index)}{renderBulkMoveDropZone(undefined, index)}{renderSingleMoveZone('song', undefined, index)}{isGroupToken(token) ? renderSongGroup(songGroupMap.get(tokenId(token))!, 0, songRootKey, songRootBaseTokens) : renderSongRow(songItemMap.get(tokenId(token))!, index, undefined, songRootKey, songRootBaseTokens)}</Fragment>)}{renderImportLibraryDropZone(songRootOrder.length)}{renderBulkMoveDropZone(undefined, songRootOrder.length)}{renderSingleMoveZone('song', undefined, songRootOrder.length)}</div> : <div className="empty-state"><div className="empty-icon">♫</div><h2>{view === 'library' && searchQuery.trim() ? 'Keine Treffer.' : view === 'loops' ? 'Noch keine Loops gespeichert.' : view === 'history' ? 'Keine neuen Importe.' : 'Noch keine Musik hier.'}</h2></div>}
+    </div> : songSearchActive ? (visibleSongs.length || songSearchGroups.length ? <div className="song-list grouped-song-list search-direct-results">{songSearchGroups.map(renderSongSearchGroup)}{ungroupedVisibleSongs.map((song, index) => renderSongRow(song, index, undefined, songRootKey, songRootBaseTokens))}</div> : <div className="empty-state"><div className="empty-icon">♫</div><h2>Keine Treffer.</h2></div>) : (visibleSongs.length || songGroups.length || importMoveStep === 'place') ? <div className="song-list grouped-song-list">{songRootOrder.map((token, index) => <Fragment key={token}>{renderImportLibraryDropZone(index)}{renderBulkMoveDropZone(undefined, index)}{renderSingleMoveZone('song', undefined, index)}{isGroupToken(token) ? renderSongGroup(songGroupMap.get(tokenId(token))!, 0, songRootKey, songRootBaseTokens) : renderSongRow(songItemMap.get(tokenId(token))!, index, undefined, songRootKey, songRootBaseTokens)}</Fragment>)}{renderImportLibraryDropZone(songRootOrder.length)}{renderBulkMoveDropZone(undefined, songRootOrder.length)}{renderSingleMoveZone('song', undefined, songRootOrder.length)}</div> : <div className="empty-state"><div className="empty-icon">♫</div><h2>{view === 'loops' ? 'Noch keine Loops gespeichert.' : view === 'history' ? 'Keine neuen Importe.' : 'Noch keine Musik hier.'}</h2></div>}
     </section></main>}
 
-    {view === 'playlistOverview' && <section className="playlist-overview"><div className="playlist-overview-heading"><p className="eyebrow">DEINE MUSIK</p><h1>Playlists</h1><p>{playlists.length} Playlists</p><div className="search-bar overview-search-bar"><span aria-hidden="true">⌕</span><input ref={playlistOverviewSearchRef} type="search" value={playlistOverviewSearch} onChange={(event) => setPlaylistOverviewSearch(event.target.value)} placeholder="Playlists oder Gruppen suchen" aria-label="Playlists oder Gruppen suchen" /><button className={`search-group-toggle${searchIncludesGroups ? ' active' : ''}`} type="button" onClick={() => setSearchIncludesGroups((value) => !value)}>{searchIncludesGroups ? 'Gruppen ✓' : 'Gruppen'}</button>{playlistOverviewSearch && <button type="button" onClick={() => setPlaylistOverviewSearch('')} aria-label="Suche leeren">×</button>}</div></div>{playlistGroups.map((group) => renderPlaylistOverviewGroup(group))}<div className="playlist-grid">{ungroupedSidebarPlaylists.filter((playlist) => !playlistOverviewSearch.trim() || fuzzyMatch(playlist.name, playlistOverviewSearch)).map(renderPlaylistCard)}</div></section>}
-    {view === 'tagOverview' && <section className="playlist-overview tag-overview"><div className="playlist-overview-heading"><p className="eyebrow">DEINE MUSIK</p><h1>Tags</h1><p>{tags.length} Tags</p><div className="search-bar overview-search-bar"><span aria-hidden="true">⌕</span><input ref={tagOverviewSearchRef} type="search" value={tagOverviewSearch} onChange={(event) => setTagOverviewSearch(event.target.value)} placeholder="Tags oder Gruppen suchen" aria-label="Tags oder Gruppen suchen" /><button className={`search-group-toggle${searchIncludesGroups ? ' active' : ''}`} type="button" onClick={() => setSearchIncludesGroups((value) => !value)}>{searchIncludesGroups ? 'Gruppen ✓' : 'Gruppen'}</button>{tagOverviewSearch && <button type="button" onClick={() => setTagOverviewSearch('')} aria-label="Suche leeren">×</button>}</div></div>{tagGroups.map((group) => renderTagOverviewGroup(group))}<div className="playlist-grid">{ungroupedSidebarTags.filter((tag) => !tagOverviewSearch.trim() || fuzzyMatch(tag.name, tagOverviewSearch)).map(renderTagCard)}</div><form className="overview-create-form new-playlist new-tag" onSubmit={createTag}><span className="new-object-create-label">Neuer Tag</span><input value={tagName} onChange={(event) => setTagName(event.target.value)} placeholder="Name" aria-label="Neuer Tag" /><div className="tag-color-picker-wrap rainbow-ring"><button className="tag-color-trigger" type="button" style={{ background: tagColor }} onClick={() => setColorPickerTarget('create')} aria-label="Tag-Farbe wählen" /></div><button type="submit" disabled={!tagName.trim()}>+</button></form></section>}
+    {view === 'playlistOverview' && <section className="playlist-overview"><div className="playlist-overview-heading"><p className="eyebrow">DEINE MUSIK</p><h1>Playlists</h1><p>{playlists.length} Playlists</p><div className="search-bar overview-search-bar"><span aria-hidden="true">⌕</span><input ref={playlistOverviewSearchRef} type="search" value={playlistOverviewSearch} onChange={(event) => setPlaylistOverviewSearch(event.target.value)} placeholder="Playlists oder Gruppen suchen" aria-label="Playlists oder Gruppen suchen" /><button className={`search-group-toggle${searchIncludesGroups ? ' active' : ''}`} type="button" onClick={() => setSearchIncludesGroups((value) => !value)}>{searchIncludesGroups ? 'Gruppen ✓' : 'Gruppen'}</button>{playlistOverviewSearch && <button type="button" onClick={() => setPlaylistOverviewSearch('')} aria-label="Suche leeren">×</button>}</div></div>{playlistOverviewSearch.trim() ? playlistOverviewSearchGroups.map(renderPlaylistOverviewSearchGroup) : playlistGroups.map((group) => renderPlaylistOverviewGroup(group))}<div className="playlist-grid">{ungroupedSidebarPlaylists.filter((playlist) => !playlistOverviewSearch.trim() || fuzzyMatch(playlist.name, playlistOverviewSearch)).map(renderPlaylistCard)}</div></section>}
+    {view === 'tagOverview' && <section className="playlist-overview tag-overview"><div className="playlist-overview-heading"><p className="eyebrow">DEINE MUSIK</p><h1>Tags</h1><p>{tags.length} Tags</p><div className="search-bar overview-search-bar"><span aria-hidden="true">⌕</span><input ref={tagOverviewSearchRef} type="search" value={tagOverviewSearch} onChange={(event) => setTagOverviewSearch(event.target.value)} placeholder="Tags oder Gruppen suchen" aria-label="Tags oder Gruppen suchen" /><button className={`search-group-toggle${searchIncludesGroups ? ' active' : ''}`} type="button" onClick={() => setSearchIncludesGroups((value) => !value)}>{searchIncludesGroups ? 'Gruppen ✓' : 'Gruppen'}</button>{tagOverviewSearch && <button type="button" onClick={() => setTagOverviewSearch('')} aria-label="Suche leeren">×</button>}</div></div>{tagOverviewSearch.trim() ? tagOverviewSearchGroups.map(renderTagOverviewSearchGroup) : tagGroups.map((group) => renderTagOverviewGroup(group))}<div className="playlist-grid">{ungroupedSidebarTags.filter((tag) => !tagOverviewSearch.trim() || fuzzyMatch(tag.name, tagOverviewSearch)).map(renderTagCard)}</div><form className="overview-create-form new-playlist new-tag" onSubmit={createTag}><span className="new-object-create-label">Neuer Tag</span><input value={tagName} onChange={(event) => setTagName(event.target.value)} placeholder="Name" aria-label="Neuer Tag" /><div className="tag-color-picker-wrap rainbow-ring"><button className="tag-color-trigger" type="button" style={{ background: tagColor }} onClick={() => setColorPickerTarget('create')} aria-label="Tag-Farbe wählen" /></div><button type="submit" disabled={!tagName.trim()}>+</button></form></section>}
 
     <section className={`player custom-layout${currentSong ? ' visible' : ''}${layoutEditMode ? ' layout-editing' : ''}`} style={{ '--player-left': `${playerSplitLeft}%`, '--player-middle': `${Math.max(12, playerSplitRight - playerSplitLeft)}%`, '--player-right': `${Math.max(12, 100 - playerSplitRight)}%` } as React.CSSProperties}><audio ref={audioRef} src={currentUrl ?? undefined} playsInline preload="auto" onTimeUpdate={(event) => handleAudioTimeUpdate(event.currentTarget)} onLoadedMetadata={(event) => { const value = event.currentTarget.duration; setDuration(value); if (currentSong && Number.isFinite(value) && (!currentSong.duration || Math.abs(currentSong.duration - value) > .5)) void updateSong({ ...currentSong, duration: value }) }} onPlay={() => { playbackAudioRef.current ??= audioRef.current; setIsPlaying(true) }} onPause={() => requestAnimationFrame(updatePlayingState)} onError={() => currentSong && setMessage(`„${currentSong.name}“ kann aus dem lokalen Speicher nicht geladen werden.`)} onEnded={(event) => handleAudioEnded(event.currentTarget)} /><audio ref={overlapAudioRef} src={currentUrl ?? undefined} playsInline preload="auto" onTimeUpdate={(event) => handleAudioTimeUpdate(event.currentTarget)} onPlay={() => setIsPlaying(true)} onPause={() => requestAnimationFrame(updatePlayingState)} onEnded={(event) => handleAudioEnded(event.currentTarget)} />{layoutEditMode && <><button className="player-layout-handle player-layout-handle-left" style={{ left: `${playerSplitLeft}%` }} type="button" aria-label="Erste Player-Leiste verschieben" onPointerDown={(event) => { event.preventDefault(); setLayoutDrag('playerLeft') }} /><button className="player-layout-handle player-layout-handle-right" style={{ left: `${playerSplitRight}%` }} type="button" aria-label="Zweite Player-Leiste verschieben" onPointerDown={(event) => { event.preventDefault(); setLayoutDrag('playerRight') }} /></>}
       <button className="now-playing" type="button" onClick={() => currentSong && navigateTo({ view, playlistId: activePlaylistId, tagId: activeTagId, detailOpen: true })} disabled={!currentSong}><span className="cover-placeholder">♫</span><span className="now-playing-copy"><small>JETZT</small><span className="marquee"><strong>{currentSong?.name ?? 'Kein Song ausgewählt'}</strong></span></span></button>
