@@ -2677,8 +2677,12 @@ function App() {
     setGroupSelectionKind(null)
     setSelectedGroupIds(new Set())
     setSelectedSongIds(new Set())
+    setSelectedPlaylistIds(new Set())
+    setSelectedTagIds(new Set())
     setGroupSelectionMenuOpen(false)
     setGroupSelectionHintOpen(false)
+    setGroupSelectionMoveContext(null)
+    setGroupSelectionConfirmation(null)
   }
   const toggleGroupSelected = (id: string) => setSelectedGroupIds((current) => {
     const next = new Set(current)
@@ -2695,6 +2699,195 @@ function App() {
     setPlayerSplitRight(layoutDefault.playerSplitRight)
     setGroupSelectionHintEnabled(true)
     if (groupSelectionKind) setGroupSelectionHintOpen(true)
+  }
+  const groupSelectionItemIds = (kind: GroupKind) => kind === 'song' ? [...selectedSongIds] : kind === 'playlist' ? [...selectedPlaylistIds] : [...selectedTagIds]
+  const groupSelectionTokens = (kind: GroupKind) => [
+    ...[...selectedGroupIds].filter((id) => objectGroups.some((group) => group.id === id && group.kind === kind)).map(groupToken),
+    ...groupSelectionItemIds(kind).map(itemToken),
+  ]
+  const groupSelectionCount = (kind: GroupKind) => groupSelectionTokens(kind).length
+  const resolveGroupSelectionContainer = (kind: GroupKind) => {
+    const selectedTokens = groupSelectionTokens(kind)
+    if (!selectedTokens.length) return null
+    const parents: Array<string | undefined> = [undefined, ...objectGroups.filter((group) => group.kind === kind).map((group) => group.id)]
+    const matches = parents.filter((parentGroupId) => {
+      const base = containerBaseTokensFor(kind, parentGroupId)
+      return selectedTokens.every((token) => base.includes(token))
+    })
+    return matches.length === 1 ? { kind, parentGroupId: matches[0], selectedTokens } : null
+  }
+  const beginGroupSelectionMove = () => {
+    if (!groupSelectionKind || !groupSelectionCount(groupSelectionKind)) return
+    const context = resolveGroupSelectionContainer(groupSelectionKind)
+    setOverflowMenu(null); setSortMenuOpen(false); setGroupSelectionMenuOpen(false)
+    if (!context) {
+      setMessage('Gemeinsames Bewegen geht nur, wenn alle ausgewählten Gruppen und Objekte auf derselben Ebene liegen.')
+      return
+    }
+    const key = context.parentGroupId ? groupContainerKey(context.kind, context.parentGroupId) : rootContainerKey(context.kind)
+    const base = containerBaseTokensFor(context.kind, context.parentGroupId)
+    const currentOrder = orderedTokensForContainer(key, base, containerManualMode(context.kind, context.parentGroupId))
+    setSortModeFor(context.kind, 'manual')
+    setMixedOrders((current) => ({ ...current, [key]: currentOrder }))
+    setGroupSelectionMoveContext(context)
+  }
+  const applyGroupSelectionMove = async (targetIndex: number) => {
+    const context = groupSelectionMoveContext
+    if (!context) return
+    const key = context.parentGroupId ? groupContainerKey(context.kind, context.parentGroupId) : rootContainerKey(context.kind)
+    const base = containerBaseTokensFor(context.kind, context.parentGroupId)
+    const currentOrder = orderedTokensForContainer(key, base, true)
+    const selected = new Set(context.selectedTokens)
+    const moving = currentOrder.filter((token) => selected.has(token))
+    const remaining = currentOrder.filter((token) => !selected.has(token))
+    const insertAt = Math.max(0, Math.min(targetIndex, remaining.length))
+    const nextOrder = [...remaining.slice(0, insertAt), ...moving, ...remaining.slice(insertAt)]
+    if (nextOrder.join('|') === currentOrder.join('|')) return
+    recordHistory()
+    setMixedOrders((current) => ({ ...current, [key]: nextOrder }))
+    await persistRelativeOrder(context.kind, nextOrder, context.parentGroupId)
+    const active = activeSortSave(context.kind)
+    if (active) setSortSaves((current) => current.map((save) => save.id === active.id ? { ...save, orders: { ...save.orders, [key]: nextOrder } } : save))
+    setMessage('Auswahl wurde als Block bewegt.')
+  }
+  const selectionMoveTokenLabel = (kind: GroupKind, token: string) => {
+    if (isGroupToken(token)) return objectGroups.find((group) => group.id === tokenId(token))?.name ?? 'Gruppe'
+    const item = objectFor(kind, tokenId(token))
+    return item?.name ?? 'Objekt'
+  }
+  const beginGroupSelectionGrouping = () => {
+    if (!groupSelectionKind || groupSelectionCount(groupSelectionKind) < 2) {
+      setMessage('Wähle mindestens zwei Gruppen oder Objekte zum Gruppieren aus.')
+      return
+    }
+    const context = resolveGroupSelectionContainer(groupSelectionKind)
+    setOverflowMenu(null); setSortMenuOpen(false)
+    if (!context) {
+      setMessage('Gemeinsames Gruppieren geht nur, wenn alle ausgewählten Gruppen und Objekte auf derselben Ebene liegen.')
+      return
+    }
+    setPendingGroupCreate({
+      kind: groupSelectionKind,
+      sourceIds: groupSelectionItemIds(groupSelectionKind),
+      sourceGroupIds: [...selectedGroupIds],
+      parentGroupId: context.parentGroupId,
+      name: 'Unbenannt',
+      moveAfterCreate: false,
+    })
+    setGroupCreateMenuOpen(false)
+  }
+  const copyGroupSelection = async () => {
+    if (!groupSelectionKind || !groupSelectionCount(groupSelectionKind)) return
+    const kind = groupSelectionKind
+    const itemIds = groupSelectionItemIds(kind)
+    const selectedGroups = new Set([...selectedGroupIds].filter((id) => objectGroups.some((group) => group.id === id && group.kind === kind)))
+    const rootGroupIds = [...selectedGroups].filter((id) => {
+      let parentId = objectGroups.find((group) => group.id === id)?.parentGroupId
+      while (parentId) {
+        if (selectedGroups.has(parentId)) return false
+        parentId = objectGroups.find((group) => group.id === parentId)?.parentGroupId
+      }
+      return true
+    })
+    const now = Date.now()
+    recordHistory()
+    let copiedItems = 0
+    if (kind === 'song') {
+      const used = new Set(songs.map((item) => item.name.toLocaleLowerCase('de-DE')))
+      const copies = itemIds.map((id, index) => {
+        const source = songs.find((item) => item.id === id)
+        if (!source?.file?.size) return null
+        return { ...source, id: crypto.randomUUID(), name: copyNameForSelection(source.name, used), addedAt: now + index, libraryOrder: now + index, importBatchId: crypto.randomUUID(), isNew: false, completedPlays: 0, loopMarkers: source.loopMarkers ? [...source.loopMarkers] : undefined, trashedAt: undefined, trashPlaylistIds: undefined, trashedLoop: undefined }
+      }).filter(Boolean) as Song[]
+      if (copies.length) { await Promise.all(copies.map(saveSong)); setSongs((current) => [...current, ...copies]); copiedItems = copies.length }
+    } else if (kind === 'playlist') {
+      const used = new Set(playlists.map((item) => item.name.toLocaleLowerCase('de-DE')))
+      const copies = itemIds.map((id, index) => { const source = playlists.find((item) => item.id === id); return source ? { ...source, id: crypto.randomUUID(), name: copyNameForSelection(source.name, used), songIds: [...source.songIds], createdAt: now + index, lastUsedAt: now + index, sortOrder: -now - index, trashedAt: undefined } : null }).filter(Boolean) as Playlist[]
+      if (copies.length) { await Promise.all(copies.map(savePlaylist)); setPlaylists((current) => [...copies, ...current]); copiedItems = copies.length }
+    } else {
+      const used = new Set(tags.map((item) => item.name.toLocaleLowerCase('de-DE')))
+      const copies = itemIds.map((id, index) => { const source = tags.find((item) => item.id === id); return source ? { ...source, id: crypto.randomUUID(), name: copyNameForSelection(source.name, used), songIds: [...source.songIds], playlistIds: [...source.playlistIds], groupIds: source.groupIds ? [...source.groupIds] : undefined, createdAt: now + index, lastUsedAt: now + index, sortOrder: -now - index, trashedAt: undefined } : null }).filter(Boolean) as Tag[]
+      if (copies.length) { await Promise.all(copies.map(saveTag)); setTags((current) => [...copies, ...current]); copiedItems = copies.length }
+    }
+    const usedGroupNames = new Set(objectGroups.filter((group) => group.kind === kind).map((group) => group.name.toLocaleLowerCase('de-DE')))
+    const groupCopies: ObjectGroup[] = []
+    rootGroupIds.forEach((rootId, rootIndex) => {
+      const subtreeIds = [rootId, ...groupDescendantIds(rootId)]
+      const sources = objectGroups.filter((group) => subtreeIds.includes(group.id))
+      const idMap = new Map(sources.map((group) => [group.id, crypto.randomUUID()]))
+      sources.forEach((source, index) => {
+        const isRoot = source.id === rootId
+        groupCopies.push({
+          ...source,
+          id: idMap.get(source.id)!,
+          name: isRoot ? copyNameForSelection(source.name, usedGroupNames) : source.name,
+          itemIds: [...source.itemIds],
+          createdAt: now + 1000 + rootIndex * 100 + index,
+          sortOrder: isRoot ? source.sortOrder + ((rootIndex + 1) / 1000) : source.sortOrder,
+          parentGroupId: isRoot ? source.parentGroupId : source.parentGroupId ? idMap.get(source.parentGroupId) : undefined,
+        })
+      })
+    })
+    if (groupCopies.length) setObjectGroups((current) => [...groupCopies, ...current])
+    setMessage(`${copiedItems + rootGroupIds.length} ${copiedItems + rootGroupIds.length === 1 ? 'Auswahl wurde' : 'Auswahlen wurden'} kopiert.`)
+    stopGroupSelection()
+  }
+  const openGroupSelectionTags = () => {
+    if (!groupSelectionKind) return
+    const groupIds = [...selectedGroupIds]
+    const itemIds = groupSelectionItemIds(groupSelectionKind)
+    setOverflowMenu(null); setSortMenuOpen(false)
+    if (groupSelectionKind === 'tag') {
+      if (!groupIds.length) { setMessage('Tags selbst können nicht mit Tags versehen werden.'); return }
+      openTagChooser('group', groupIds)
+      return
+    }
+    if (groupIds.length && itemIds.length) openMixedTagChooser(groupSelectionKind, itemIds, groupIds)
+    else if (groupIds.length) openTagChooser('group', groupIds)
+    else if (itemIds.length) openTagChooser(groupSelectionKind, itemIds)
+  }
+  const deleteGroupSelection = async () => {
+    if (!groupSelectionKind) return
+    const kind = groupSelectionKind
+    const groupIds = new Set<string>()
+    ;[...selectedGroupIds].forEach((id) => {
+      const group = objectGroups.find((item) => item.id === id && item.kind === kind)
+      if (!group) return
+      groupIds.add(group.id)
+      groupDescendantIds(group.id).forEach((childId) => groupIds.add(childId))
+    })
+    const objectIds = new Set(groupSelectionItemIds(kind))
+    objectGroups.filter((group) => groupIds.has(group.id)).forEach((group) => group.itemIds.forEach((id) => objectIds.add(id)))
+    if (!groupIds.size && !objectIds.size) return
+    if (kind === 'song') {
+      await moveSongsToTrash([...objectIds])
+    } else if (kind === 'playlist') {
+      const trashedAt = Date.now()
+      const moving = playlists.filter((item) => objectIds.has(item.id)).map((item) => ({ ...item, trashedAt }))
+      await Promise.all(moving.map(savePlaylist))
+      setPlaylists((items) => items.filter((item) => !objectIds.has(item.id)))
+      setTrashedPlaylists((items) => [...moving, ...items.filter((item) => !objectIds.has(item.id))])
+      if (activePlaylistId && objectIds.has(activePlaylistId)) goHome()
+    } else {
+      const trashedAt = Date.now()
+      const moving = tags.filter((item) => objectIds.has(item.id)).map((item) => ({ ...item, trashedAt }))
+      await Promise.all(moving.map(saveTag))
+      setTags((items) => items.filter((item) => !objectIds.has(item.id)))
+      setTrashedTags((items) => [...moving, ...items.filter((item) => !objectIds.has(item.id))])
+      if (activeTagId && objectIds.has(activeTagId)) goHome()
+    }
+    const deletedTagIds = kind === 'tag' ? objectIds : new Set<string>()
+    const tagGroupUpdates = tags.filter((tag) => !deletedTagIds.has(tag.id) && (tag.groupIds ?? []).some((id) => groupIds.has(id))).map((tag) => ({ ...tag, groupIds: (tag.groupIds ?? []).filter((id) => !groupIds.has(id)) }))
+    if (tagGroupUpdates.length) {
+      await Promise.all(tagGroupUpdates.map(saveTag))
+      const updates = new Map(tagGroupUpdates.map((tag) => [tag.id, tag]))
+      setTags((current) => current.map((tag) => updates.get(tag.id) ?? tag))
+    }
+    setObjectGroups((current) => current.filter((group) => !groupIds.has(group.id)).map((group) => group.kind === kind ? { ...group, itemIds: group.itemIds.filter((id) => !objectIds.has(id)) } : group))
+    setCollapsedGroupIds((current) => { const next = new Set(current); groupIds.forEach((id) => next.delete(id)); return next })
+    setGroupSelectionConfirmation(null)
+    stopGroupSelection()
+    setMessage('Die ausgewählte Mischung aus Gruppen und Objekten wurde in den Papierkorb verschoben.')
   }
   const selectGroupObjects = (group: ObjectGroup) => {
     const ids = deepGroupItemIds(group)
