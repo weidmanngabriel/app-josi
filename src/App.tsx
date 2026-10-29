@@ -2727,7 +2727,8 @@ function App() {
     const key = context.parentGroupId ? groupContainerKey(context.kind, context.parentGroupId) : rootContainerKey(context.kind)
     const base = containerBaseTokensFor(context.kind, context.parentGroupId)
     const currentOrder = orderedTokensForContainer(key, base, containerManualMode(context.kind, context.parentGroupId))
-    setSortModeFor(context.kind, 'manual')
+    if (context.parentGroupId) updateObjectGroup(context.parentGroupId, (group) => ({ ...group, sortMode: 'manual' }))
+    else setSortModeFor(context.kind, 'manual')
     setMixedOrders((current) => ({ ...current, [key]: currentOrder }))
     setGroupSelectionMoveContext(context)
   }
