@@ -3403,6 +3403,7 @@ function App() {
     importDraftItems.length || selectedSongsListOpen || selectionObjectEditMode || coverEditorDraft || playlistChooserMode || tagChooserTarget || sidebarMoveKind || sidebarSelectionConfirmation ||
     pendingGroupCreate || groupRenameId || groupSortId || groupDeleteTargetId || groupNestingTarget || groupMembershipTarget ||
     groupPlaybackChooserOpen || repeatMenuOpen || sidebarSortTarget || duplicateConflict || tagToDelete || loopConfirmation ||
+    groupSelectionMoveContext || groupSelectionConfirmation ||
     trashConfirmation || sortSaveDialogTarget || sortSaveRenameId || settingsOpen || selectionConfirmation || loopManualRequest ||
     creationPlacement || renameTarget || songToDelete || playlistToDelete
   )
@@ -3424,6 +3425,15 @@ function App() {
   const cursorStepSeconds = parseEditorSeconds(cursorStep, 5)
   const markerStepSeconds = parseEditorSeconds(markerStep, 1)
   const activeMarker = activeMarkerIndex === null ? null : loopMarkers[activeMarkerIndex] ?? null
+  const renderGroupSelectionActions = (kind: GroupKind) => {
+    const count = groupSelectionCount(kind)
+    const groupsSelected = [...selectedGroupIds].filter((id) => objectGroups.some((group) => group.id === id && group.kind === kind)).length
+    return <><button type="button" disabled={!count} onClick={beginGroupSelectionMove}>Bewegen</button><button type="button" disabled={count < 2} onClick={beginGroupSelectionGrouping}>Gruppieren</button><button type="button" disabled={!count} onClick={() => void copyGroupSelection()}>Kopieren</button><button type="button" disabled={kind === 'tag' ? !groupsSelected : !count} onClick={openGroupSelectionTags}>Tags</button><button className="danger-menu-action" type="button" disabled={!count} onClick={() => { setOverflowMenu(null); setSortMenuOpen(false); setGroupSelectionConfirmation('delete') }}>Alle löschen</button><div className="library-bottom-menu-divider" /><button type="button" onClick={stopGroupSelection}>Abbrechen</button></>
+  }
+  const renderSidebarSelectionActions = (kind: 'playlist' | 'tag') => {
+    const count = selectedSidebarIds(kind).length
+    return <><button type="button" disabled={!count} onClick={beginSidebarSelectionMove}>Bewegen</button><button type="button" disabled={count < 2} onClick={() => createObjectGroup(kind, selectedSidebarIds(kind))}>Gruppieren</button><button type="button" disabled={!count} onClick={() => void copySelectedSidebarObjects()}>Kopieren</button>{kind === 'playlist' && <button type="button" disabled={!count} onClick={() => openTagChooser('playlist', selectedSidebarIds('playlist'))}>Tags</button>}<button className="danger-menu-action" type="button" disabled={!count} onClick={() => { setOverflowMenu(null); setSidebarSelectionConfirmation('delete') }}>Alle löschen</button><div className="library-bottom-menu-divider" /><button type="button" onClick={stopSidebarSelection}>Abbrechen</button></>
+  }
   const handleAudioTimeUpdate = (audio: HTMLAudioElement) => { if (currentPlaybackAudio() !== audio) return; setCurrentTime(audio.currentTime); if (loopEditorSongId) setLoopCursor(audio.currentTime) }
   const handleAudioEnded = (audio: HTMLAudioElement) => {
     if (loopTransitionRef.current?.outgoing === audio || currentPlaybackAudio() !== audio) return
@@ -3445,7 +3455,7 @@ function App() {
   }
 
   return <div className={`app-shell${sidePaneScrollLocked ? ' side-pane-scroll-locked' : ''}`}>
-    {groupSelectionKind && groupSelectionHintOpen && <aside className="group-selection-hint"><div><strong>Gruppen auswählen</strong><span>{groupSelectionKind === 'song' ? 'Ein Klick wählt eine Gruppe oder ein Lied aus. Ein Doppelklick auf eine Gruppe öffnet oder schließt sie nur.' : 'Ein Klick wählt eine Gruppe aus. Ein Doppelklick öffnet oder schließt sie nur.'}</span></div><button type="button" onClick={dismissGroupSelectionHint}>Verstanden</button></aside>}
+    {groupSelectionKind && groupSelectionHintOpen && <aside className="group-selection-hint"><div><strong>Gruppen auswählen</strong><span>{groupSelectionKind === 'song' ? 'Ein Klick wählt eine Gruppe oder ein Lied aus. Ein Doppelklick auf eine Gruppe öffnet oder schließt sie nur.' : groupSelectionKind === 'playlist' ? 'Ein Klick wählt eine Gruppe oder eine Playlist aus. Ein Doppelklick auf eine Gruppe öffnet oder schließt sie nur.' : 'Ein Klick wählt eine Gruppe oder einen Tag aus. Ein Doppelklick auf eine Gruppe öffnet oder schließt sie nur.'}</span></div><button type="button" onClick={dismissGroupSelectionHint}>Verstanden</button></aside>}
     <header className="site-header">
       <div className="history-controls" aria-label="Navigation und Verlauf"><button className="home-button" type="button" onClick={goHome} aria-label="Bibliothek">⌂</button><button className="settings-button" type="button" onClick={() => setSettingsOpen(true)} aria-label="Einstellungen">⚙</button><button type="button" onClick={navigateBack} disabled={navigationIndex === 0 && !loopEditorSongId}>‹</button><button type="button" onClick={navigateForward} disabled={navigationIndex >= navigation.length - 1 || Boolean(loopEditorSongId)}>›</button><button type="button" onClick={() => void undo()} disabled={!undoStack.length || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↶</button><button type="button" onClick={() => void redo()} disabled={(!redoStack.length && !cancelledDuplicateAction) || Boolean(moveCandidate) || Boolean(loopEditorSongId)}>↷</button>{moveCandidate && <><button className="confirm-move" type="button" onClick={() => void confirmPendingMove()} disabled={moveCandidate.targetIndex === null}>✓</button><button className="cancel-move" type="button" onClick={() => setMoveCandidate(null)}>×</button></>}</div>
       <div className="header-right-actions"><button className="import-button" type="button" onClick={openImportPicker}>+ Musik importieren</button></div><input ref={fileInputRef} className="file-input" type="file" accept="audio/*,.mp3,.m4a,.aac,.wav,.ogg,.flac" multiple onChange={(event) => void importFiles(event.target.files)} /><input ref={coverInputRef} className="file-input" type="file" accept="image/*" onChange={(event) => void changeObjectCover(event.target.files)} />
