@@ -73,7 +73,7 @@ type SortDirection = 'down' | 'up'
 type SortSaveKind = 'song' | 'playlist' | 'tag'
 type SortSave = { id: string; kind: SortSaveKind; name: string; orders: Record<string, string[]>; createdAt: number }
 type SingleMoveTarget = { kind: GroupKind | 'group'; id: string; parentGroupId?: string; targetIndex: number | null } | null
-type PendingGroupCreate = { kind: GroupKind; sourceIds: string[]; parentGroupId?: string; name: string; moveAfterCreate: boolean } | null
+type PendingGroupCreate = { kind: GroupKind; sourceIds: string[]; sourceGroupIds?: string[]; parentGroupId?: string; name: string; moveAfterCreate: boolean } | null
 type CreationPlacement = { kind: GroupKind; id: string; name: string } | null
 type LayoutPreset = { sidebarWidth: number; playerSplitLeft: number; playerSplitRight: number }
 type ImportDraftItem = { id: string; file: File; name: string; originalIndex: number }
@@ -95,12 +95,14 @@ function itemMatchesGroupQuery(groups: ObjectGroup[], kind: GroupKind, itemId: s
 }
 type SidebarSelectionKind = 'playlist' | 'tag' | null
 type SidebarSelectionConfirmation = 'delete' | 'switchManualMove' | null
+type GroupSelectionMoveContext = { kind: GroupKind; parentGroupId?: string; selectedTokens: string[] } | null
+type GroupSelectionConfirmation = 'delete' | null
 type AppearanceColorTarget = { kind: GroupKind | 'group'; id: string } | null
 type GroupMembershipTarget = { groupId: string; mode: 'add' | 'remove' } | null
 type GroupNestingTarget = { groupId: string; mode: 'add' | 'remove' } | null
 type GroupClipboard = { kind: GroupKind; rootId: string; groups: ObjectGroup[] } | null
 type ClipboardItem = { kind: 'song'; song: Song } | { kind: 'playlist'; playlist: Playlist }
-type TagChooserTarget = { kind: 'song' | 'playlist' | 'group'; ids: string[] } | null
+type TagChooserTarget = { kind: 'song' | 'playlist' | 'group'; ids: string[] } | { kind: 'mixed'; itemKind: 'song' | 'playlist'; itemIds: string[]; groupIds: string[] } | null
 type DuplicateAction =
   | { kind: 'tag-add'; tagId: string; targetKind: 'song' | 'playlist'; ids: string[] }
   | { kind: 'paste-song'; source: Song; targetPlaylistId: string | null }
@@ -180,6 +182,8 @@ function App() {
   const [groupSelectionMenuOpen, setGroupSelectionMenuOpen] = useState(false)
   const [groupSelectionHintEnabled, setGroupSelectionHintEnabled] = useState(() => localStorage.getItem('josi-group-selection-hint') !== '0')
   const [groupSelectionHintOpen, setGroupSelectionHintOpen] = useState(false)
+  const [groupSelectionMoveContext, setGroupSelectionMoveContext] = useState<GroupSelectionMoveContext>(null)
+  const [groupSelectionConfirmation, setGroupSelectionConfirmation] = useState<GroupSelectionConfirmation>(null)
   const [sidebarSelectionConfirmation, setSidebarSelectionConfirmation] = useState<SidebarSelectionConfirmation>(null)
   const [sidebarMoveKind, setSidebarMoveKind] = useState<SidebarSelectionKind>(null)
   const [groupRenameId, setGroupRenameId] = useState<string | null>(null)
