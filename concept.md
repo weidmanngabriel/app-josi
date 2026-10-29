@@ -228,6 +228,8 @@ Bei Liedgruppen gilt **Gruppe abspielen** als strikt abgeschlossene Wiedergabe: 
 
 Im Playlist-Auswahlmodus steht neben dem Drei-Punkte-Knopf der Überschrift **Alle auswählen**. Dabei werden auch Playlists markiert, die bereits in Gruppen oder Untergruppen liegen.
 
+Gruppen besitzen zusätzlich einen eigenen Mehrfachauswahlmodus. Unter **••• → Auswählen** steht **Gruppen auswählen**; bei einer einzelnen Gruppe steht direkt unter **Auswählen** **Gruppe auswählen**. Ein einfacher Klick markiert oder demarkiert die Gruppe. Ein Doppelklick dient ausschließlich zum Öffnen oder Schließen und ändert die Markierung nicht. Mehrere markierte Gruppen können gemeinsam getaggt werden. Beim Start erklärt eine Box oben im Bildschirm diese Klick-Regel, solange der Hinweis aktiviert ist. **Verstanden** blendet sie aus und deaktiviert sie für spätere Starts. Unter **Einstellungen → Bibliotheks-Interface → Hinweis bei Gruppenauswahl** kann sie wieder aktiviert werden. **Standard** aktiviert den Hinweis ebenfalls wieder.
+
 ## Gruppen und Playlists direkt taggen
 
 Bei einer Playlist und bei einer benannten Gruppe steht **Tags** direkt unter **Kopieren**. Mehrere ausgewählte Playlists können ebenfalls gemeinsam getaggt werden; die Song-Mehrfachauswahl behält ihre bestehende Tag-Aktion. Ein Gruppen-Tag gehört ausschließlich zur Gruppe selbst. Die darin enthaltenen Lieder, Playlists, Tags oder Untergruppen erhalten dieses Tag nicht automatisch.
