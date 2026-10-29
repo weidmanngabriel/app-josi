@@ -1756,6 +1756,12 @@ function App() {
   const playlistTags = (playlistId: string) => tags.filter((tag) => tag.playlistIds.includes(playlistId))
   const groupTags = (groupId: string) => tags.filter((tag) => (tag.groupIds ?? []).includes(groupId))
   const openTagChooser = (kind: 'song' | 'playlist' | 'group', ids: string[]) => { setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setTagChooserOriginalSnapshot(snapshot()); setTagChooserDirty(false); setTagChooserTarget({ kind, ids }); setOverflowMenu(null); setSortMenuOpen(false) }
+  const openMixedTagChooser = (itemKind: 'song' | 'playlist', itemIds: string[], groupIds: string[]) => {
+    if (!itemIds.length && !groupIds.length) return
+    setChooserSearch(''); setChooserSortMode('manual'); setChooserSortDirection('down'); setTagChooserOriginalSnapshot(snapshot()); setTagChooserDirty(false)
+    setTagChooserTarget({ kind: 'mixed', itemKind, itemIds: [...new Set(itemIds)], groupIds: [...new Set(groupIds)] })
+    setOverflowMenu(null); setSortMenuOpen(false)
+  }
   const closeTagChooser = async (apply: boolean) => {
     const original = tagChooserOriginalSnapshot
     if (!apply && tagChooserDirty && original) await restoreSnapshot(original)
@@ -1763,7 +1769,25 @@ function App() {
     setTagChooserTarget(null); setTagChooserOriginalSnapshot(null); setTagChooserDirty(false); setChooserSearch('')
   }
   const toggleTargetTag = async (tag: Tag) => {
-    if (!tagChooserTarget?.ids.length) return
+    if (!tagChooserTarget) return
+    if (tagChooserTarget.kind === 'mixed') {
+      const itemMemberIds = tagChooserTarget.itemKind === 'song' ? tag.songIds : tag.playlistIds
+      const groupMemberIds = tag.groupIds ?? []
+      const allItemsAssigned = tagChooserTarget.itemIds.every((id) => itemMemberIds.includes(id))
+      const allGroupsAssigned = tagChooserTarget.groupIds.every((id) => groupMemberIds.includes(id))
+      const allAssigned = allItemsAssigned && allGroupsAssigned
+      setTagChooserDirty(true)
+      const nextGroupIds = allAssigned ? groupMemberIds.filter((id) => !tagChooserTarget.groupIds.includes(id)) : [...new Set([...groupMemberIds, ...tagChooserTarget.groupIds])]
+      if (tagChooserTarget.itemKind === 'song') {
+        const nextSongIds = allAssigned ? tag.songIds.filter((id) => !tagChooserTarget.itemIds.includes(id)) : [...new Set([...tag.songIds, ...tagChooserTarget.itemIds])]
+        await updateTag({ ...tag, songIds: nextSongIds, groupIds: nextGroupIds, lastUsedAt: Date.now() })
+      } else {
+        const nextPlaylistIds = allAssigned ? tag.playlistIds.filter((id) => !tagChooserTarget.itemIds.includes(id)) : [...new Set([...tag.playlistIds, ...tagChooserTarget.itemIds])]
+        await updateTag({ ...tag, playlistIds: nextPlaylistIds, groupIds: nextGroupIds, lastUsedAt: Date.now() })
+      }
+      return
+    }
+    if (!tagChooserTarget.ids.length) return
     const memberIds = tagChooserTarget.kind === 'song' ? tag.songIds : tagChooserTarget.kind === 'playlist' ? tag.playlistIds : (tag.groupIds ?? [])
     const allAssigned = tagChooserTarget.ids.every((id) => memberIds.includes(id))
     if (tagChooserTarget.kind === 'group') {
