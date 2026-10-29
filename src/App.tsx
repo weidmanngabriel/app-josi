@@ -94,7 +94,7 @@ function itemMatchesGroupQuery(groups: ObjectGroup[], kind: GroupKind, itemId: s
   return groups.some((group) => group.kind === kind && group.itemIds.includes(itemId) && fuzzyMatch(group.name, query))
 }
 type SidebarSelectionKind = 'playlist' | 'tag' | null
-type SidebarSelectionConfirmation = 'delete' | 'switchManualMove' | null
+type SidebarSelectionConfirmation = 'delete' | null
 type GroupSelectionMoveContext = { kind: GroupKind; parentGroupId?: string; selectedTokens: string[] } | null
 type GroupSelectionConfirmation = 'delete' | null
 type AppearanceColorTarget = { kind: GroupKind | 'group'; id: string } | null
@@ -185,7 +185,6 @@ function App() {
   const [groupSelectionMoveContext, setGroupSelectionMoveContext] = useState<GroupSelectionMoveContext>(null)
   const [groupSelectionConfirmation, setGroupSelectionConfirmation] = useState<GroupSelectionConfirmation>(null)
   const [sidebarSelectionConfirmation, setSidebarSelectionConfirmation] = useState<SidebarSelectionConfirmation>(null)
-  const [sidebarMoveKind, setSidebarMoveKind] = useState<SidebarSelectionKind>(null)
   const [groupRenameId, setGroupRenameId] = useState<string | null>(null)
   const [groupRenameValue, setGroupRenameValue] = useState('')
   const [groupSortId, setGroupSortId] = useState<string | null>(null)
@@ -2654,7 +2653,7 @@ function App() {
     setPendingGroupCreate(null)
     setGroupCreateMenuOpen(false)
   }
-  const startSidebarSelection = (kind: 'playlist' | 'tag', initialIds: string[] = []) => { setSidebarSelectionKind(kind); setSelectedPlaylistIds(kind === 'playlist' ? new Set(initialIds) : new Set()); setSelectedTagIds(kind === 'tag' ? new Set(initialIds) : new Set()); setSidebarSelectionMenuOpen(false); setOverflowMenu(null) }
+  const startSidebarSelection = (kind: 'playlist' | 'tag', initialIds: string[] = []) => { setGroupSelectionKind(null); setSelectedGroupIds(new Set()); setGroupSelectionHintOpen(false); setSidebarSelectionKind(kind); setSelectedPlaylistIds(kind === 'playlist' ? new Set(initialIds) : new Set()); setSelectedTagIds(kind === 'tag' ? new Set(initialIds) : new Set()); setSidebarSelectionMenuOpen(false); setOverflowMenu(null) }
   const startGroupSelection = (kind: GroupKind, initialIds: string[] = []) => {
     setSelectionMode(false)
     setSelectedSongIds(new Set())
@@ -2955,19 +2954,20 @@ function App() {
   }
   const beginSidebarSelectionMove = () => {
     if (!sidebarSelectionKind || !selectedSidebarIds(sidebarSelectionKind).length) return
-    const mode = sidebarSelectionKind === 'playlist' ? playlistSortMode : tagSortMode
-    setSidebarSelectionMenuOpen(false); setChooserSearch('')
-    if (mode !== 'manual') { setSidebarSelectionConfirmation('switchManualMove'); return }
-    setSidebarMoveKind(sidebarSelectionKind)
-  }
-  const applySidebarSelectionMove = async (targetIndex: number) => {
-    if (!sidebarMoveKind) return
-    const selected = new Set(selectedSidebarIds(sidebarMoveKind)); const source = sidebarMoveKind === 'playlist' ? sidebarPlaylists : sidebarTags
-    const moving = source.filter((item) => selected.has(item.id)); const remaining = source.filter((item) => !selected.has(item.id)); const insertAt = Math.max(0, Math.min(targetIndex, remaining.length)); const ordered = [...remaining.slice(0, insertAt), ...moving, ...remaining.slice(insertAt)]
-    recordHistory()
-    if (sidebarMoveKind === 'playlist') { const order = new Map(ordered.map((item, index) => [item.id, index])); const updated = playlists.map((item) => ({ ...item, sortOrder: order.get(item.id) ?? item.sortOrder })); setPlaylists(updated); await Promise.all(updated.map(savePlaylist)) }
-    else { const order = new Map(ordered.map((item, index) => [item.id, index])); const updated = tags.map((item) => ({ ...item, sortOrder: order.get(item.id) ?? item.sortOrder })); setTags(updated); await Promise.all(updated.map(saveTag)) }
-    setMessage('Auswahl wurde bewegt. Du kannst weitere Zielpositionen wählen; „Abbrechen“ beendet den Modus.')
+    const kind = sidebarSelectionKind
+    const context = resolveGroupSelectionContainer(kind)
+    setOverflowMenu(null); setChooserSearch('')
+    if (!context) {
+      setMessage('Gemeinsames Bewegen geht nur, wenn alle ausgewählten Objekte auf derselben Ebene liegen.')
+      return
+    }
+    const key = context.parentGroupId ? groupContainerKey(kind, context.parentGroupId) : rootContainerKey(kind)
+    const base = containerBaseTokensFor(kind, context.parentGroupId)
+    const currentOrder = orderedTokensForContainer(key, base, containerManualMode(kind, context.parentGroupId))
+    if (context.parentGroupId) updateObjectGroup(context.parentGroupId, (group) => ({ ...group, sortMode: 'manual' }))
+    else setSortModeFor(kind, 'manual')
+    setMixedOrders((current) => ({ ...current, [key]: currentOrder }))
+    setGroupSelectionMoveContext(context)
   }
   const deleteSelectedSidebarObjects = async () => {
     if (!sidebarSelectionKind) return
@@ -3401,7 +3401,7 @@ function App() {
     (overflowMenu.kind === 'group' && objectGroups.find((group) => group.id === overflowMenu.id)?.kind !== 'song')
   ))
   const overlayWindowOpen = Boolean(
-    importDraftItems.length || selectedSongsListOpen || selectionObjectEditMode || coverEditorDraft || playlistChooserMode || tagChooserTarget || sidebarMoveKind || sidebarSelectionConfirmation ||
+    importDraftItems.length || selectedSongsListOpen || selectionObjectEditMode || coverEditorDraft || playlistChooserMode || tagChooserTarget || sidebarSelectionConfirmation ||
     pendingGroupCreate || groupRenameId || groupSortId || groupDeleteTargetId || groupNestingTarget || groupMembershipTarget ||
     groupPlaybackChooserOpen || repeatMenuOpen || sidebarSortTarget || duplicateConflict || tagToDelete || loopConfirmation ||
     groupSelectionMoveContext || groupSelectionConfirmation ||
@@ -3728,8 +3728,6 @@ function App() {
       return <div className="modal-backdrop sidebar-move-backdrop"><div className="confirm-dialog sidebar-move-dialog" onClick={(event) => event.stopPropagation()}><h2>Auswahl bewegen</h2><p>Die markierten Gruppen und Objekte werden gemeinsam als Block auf dieser Ebene bewegt.</p><div className="sidebar-move-targets"><button type="button" onClick={() => void applyGroupSelectionMove(0)}>Ganz nach oben</button>{remaining.map((token, index) => <button type="button" key={token} onClick={() => void applyGroupSelectionMove(index)}>Vor „{selectionMoveTokenLabel(context.kind, token)}“</button>)}<button type="button" onClick={() => void applyGroupSelectionMove(remaining.length)}>Ganz nach unten</button></div><div className="dialog-actions"><button type="button" onClick={() => setGroupSelectionMoveContext(null)}>Fertig</button></div></div></div>
     })()}
     {groupSelectionConfirmation === 'delete' && groupSelectionKind && <div className="modal-backdrop" onClick={() => setGroupSelectionConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Gesamte Auswahl löschen?</h2><p>Ausgewählte Gruppen werden inklusive ihrer Untergruppen und enthaltenen Objekte in den Papierkorb verschoben. Zusätzlich ausgewählte einzelne Objekte werden ebenfalls gelöscht.</p><div className="dialog-actions"><button type="button" onClick={() => setGroupSelectionConfirmation(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void deleteGroupSelection()}>In Papierkorb</button></div></div></div>}
-    {sidebarMoveKind && (() => { const source = sidebarMoveKind === 'playlist' ? sidebarPlaylists : sidebarTags; const selected = new Set(selectedSidebarIds(sidebarMoveKind)); const remaining = source.filter((item) => !selected.has(item.id)); const filteredRemaining = remaining.filter((item) => fuzzyMatch(item.name, chooserSearch)); return <div className="modal-backdrop sidebar-move-backdrop"><div className="confirm-dialog sidebar-move-dialog" onClick={(event) => event.stopPropagation()}><h2>{sidebarMoveKind === 'playlist' ? 'Playlists' : 'Tags'} bewegen</h2><p>Wähle weitere Zielpositionen. Der Modus endet erst mit „Abbrechen“.</p><div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Suchen" /></div><div className="sidebar-move-targets"><button type="button" onClick={() => void applySidebarSelectionMove(0)}>Ganz nach oben</button>{filteredRemaining.map((item) => <button type="button" key={item.id} onClick={() => void applySidebarSelectionMove(remaining.findIndex((candidate) => candidate.id === item.id))}>Vor „{item.name}“</button>)}<button type="button" onClick={() => void applySidebarSelectionMove(remaining.length)}>Ganz nach unten</button></div><div className="dialog-actions"><button type="button" onClick={() => setSidebarMoveKind(null)}>Abbrechen</button></div></div></div> })()}
-    {sidebarSelectionConfirmation === 'switchManualMove' && sidebarSelectionKind && (() => { const kind: SortSaveKind = sidebarSelectionKind === 'playlist' ? 'playlist' : 'tag'; const saveName = activeSortSave(kind)?.name ?? 'Save'; return <div className="modal-backdrop" onClick={() => setSidebarSelectionConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Zu „{saveName}“ wechseln?</h2><p>Die Auswahl kann nur innerhalb einer gespeicherten {sidebarSelectionKind === 'playlist' ? 'Playlist-' : 'Tag-'}Reihenfolge bewegt werden.</p><div className="dialog-actions"><button type="button" onClick={() => setSidebarSelectionConfirmation(null)}>Nein</button><button type="button" onClick={() => { if (kind === 'playlist') setPlaylistSortMode('manual'); else setTagSortMode('manual'); setSidebarSelectionConfirmation(null); setSidebarMoveKind(sidebarSelectionKind) }}>Ja, wechseln</button></div></div></div> })()}
     {sidebarSelectionConfirmation === 'delete' && sidebarSelectionKind && <div className="modal-backdrop" onClick={() => setSidebarSelectionConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Auswahl löschen?</h2><p>{selectedSidebarIds(sidebarSelectionKind).length} {sidebarSelectionKind === 'playlist' ? 'Playlists' : 'Tags'} werden in den Papierkorb verschoben.</p><div className="dialog-actions"><button type="button" onClick={() => setSidebarSelectionConfirmation(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void deleteSelectedSidebarObjects()}>In Papierkorb</button></div></div></div>}
     {pendingGroupCreate && <div className="modal-backdrop" onClick={() => { setPendingGroupCreate(null); setGroupCreateMenuOpen(false) }}><form className="confirm-dialog group-create-dialog" onSubmit={(event) => { event.preventDefault(); finalizePendingGroupCreate() }} onClick={(event) => event.stopPropagation()}><h2>Neue Gruppe</h2><div className="creation-name-row"><input value={pendingGroupCreate.name} onChange={(event) => setPendingGroupCreate((current) => current ? { ...current, name: event.target.value } : current)} autoFocus /><div className="creation-more-wrap"><button className="creation-more-button" type="button" onClick={() => setGroupCreateMenuOpen((value) => !value)}>•••</button>{groupCreateMenuOpen && <div className="creation-more-menu"><button type="button" onClick={() => { setPendingGroupCreate((current) => current ? { ...current, moveAfterCreate: true } : current); setGroupCreateMenuOpen(false) }}>{pendingGroupCreate.moveAfterCreate ? 'Bewegen ✓' : 'Bewegen'}</button></div>}</div></div><p>{pendingGroupCreate.moveAfterCreate ? 'Nach dem Erstellen wählst du die Zielposition mit dem roten Strich.' : 'Bei einem Save erscheint die neue Gruppe ganz oben. Bei automatischer Sortierung wird sie sofort passend eingeordnet.'}</p><div className="dialog-actions"><button type="button" onClick={() => { setPendingGroupCreate(null); setGroupCreateMenuOpen(false) }}>Abbrechen</button><button type="submit">Fertig</button></div></form></div>}
         {groupRenameId && <div className="modal-backdrop" onClick={() => setGroupRenameId(null)}><form className="confirm-dialog rename-dialog" onSubmit={saveGroupRename} onClick={(event) => event.stopPropagation()}><h2>Gruppe umbenennen</h2><input value={groupRenameValue} onChange={(event) => setGroupRenameValue(event.target.value)} autoFocus /><div className="dialog-actions"><button type="button" onClick={() => setGroupRenameId(null)}>Abbrechen</button><button type="submit" disabled={!groupRenameValue.trim()}>Speichern</button></div></form></div>}
