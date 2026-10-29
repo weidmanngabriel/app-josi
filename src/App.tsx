@@ -3434,6 +3434,34 @@ function App() {
     const count = selectedSidebarIds(kind).length
     return <><button type="button" disabled={!count} onClick={beginSidebarSelectionMove}>Bewegen</button><button type="button" disabled={count < 2} onClick={() => createObjectGroup(kind, selectedSidebarIds(kind))}>Gruppieren</button><button type="button" disabled={!count} onClick={() => void copySelectedSidebarObjects()}>Kopieren</button>{kind === 'playlist' && <button type="button" disabled={!count} onClick={() => openTagChooser('playlist', selectedSidebarIds('playlist'))}>Tags</button>}<button className="danger-menu-action" type="button" disabled={!count} onClick={() => { setOverflowMenu(null); setSidebarSelectionConfirmation('delete') }}>Alle löschen</button><div className="library-bottom-menu-divider" /><button type="button" onClick={stopSidebarSelection}>Abbrechen</button></>
   }
+  const tagChooserHeading = () => {
+    if (!tagChooserTarget) return ''
+    if (tagChooserTarget.kind === 'mixed') {
+      const itemLabel = tagChooserTarget.itemKind === 'song'
+        ? `${tagChooserTarget.itemIds.length} ${tagChooserTarget.itemIds.length === 1 ? 'Lied' : 'Lieder'}`
+        : `${tagChooserTarget.itemIds.length} ${tagChooserTarget.itemIds.length === 1 ? 'Playlist' : 'Playlists'}`
+      const groupLabel = `${tagChooserTarget.groupIds.length} ${tagChooserTarget.groupIds.length === 1 ? 'Gruppe' : 'Gruppen'}`
+      return `${itemLabel} · ${groupLabel} taggen`
+    }
+    const count = tagChooserTarget.ids.length
+    const label = tagChooserTarget.kind === 'song' ? (count === 1 ? 'Lied' : 'Lieder') : tagChooserTarget.kind === 'playlist' ? (count === 1 ? 'Playlist' : 'Playlists') : (count === 1 ? 'Gruppe' : 'Gruppen')
+    return `${count} ${label} taggen`
+  }
+  const tagChooserAssignmentState = (tag: Tag) => {
+    if (!tagChooserTarget) return { all: false, some: false }
+    if (tagChooserTarget.kind === 'mixed') {
+      const itemIds = tagChooserTarget.itemKind === 'song' ? tag.songIds : tag.playlistIds
+      const groupIds = tag.groupIds ?? []
+      const assignedItems = tagChooserTarget.itemIds.filter((id) => itemIds.includes(id)).length
+      const assignedGroups = tagChooserTarget.groupIds.filter((id) => groupIds.includes(id)).length
+      const total = tagChooserTarget.itemIds.length + tagChooserTarget.groupIds.length
+      const assigned = assignedItems + assignedGroups
+      return { all: total > 0 && assigned === total, some: assigned > 0 && assigned < total }
+    }
+    const ids = tagChooserTarget.kind === 'song' ? tag.songIds : tagChooserTarget.kind === 'playlist' ? tag.playlistIds : (tag.groupIds ?? [])
+    const assigned = tagChooserTarget.ids.filter((id) => ids.includes(id)).length
+    return { all: tagChooserTarget.ids.length > 0 && assigned === tagChooserTarget.ids.length, some: assigned > 0 && assigned < tagChooserTarget.ids.length }
+  }
   const renderPlaylistsHeaderMenu = () => groupSelectionKind === 'playlist'
     ? renderGroupSelectionActions('playlist')
     : sidebarSelectionKind === 'playlist'
@@ -3532,11 +3560,6 @@ function App() {
       <p>Mit den Pfeilen verschiebst du Objekte auf ihrer aktuellen Ebene. Schlösser verbinden benachbarte Einträge zu einem Sortierbund.</p>
       <div><button type="button" onClick={() => { cleanupBundleSingletons(); setReorderScope(null); setMoveCandidate(null) }}>Abbrechen</button><button type="button" onClick={finishReorder}>Fertig</button></div>
     </aside>}
-    {selectionMode && !bulkMoveMode && !reorderScope && !selectedSongsListOpen && !selectionSourceKind && <aside className="inline-mode-guide">
-      <strong>Auswählen</strong>
-      <p>{selectedSongIds.size ? `${selectedSongIds.size} Dateien ausgewählt. Tippe weitere Dateien an, um die Auswahl zu ändern.` : 'Tippe Dateien an, um sie auszuwählen.'}</p>
-      <div><button type="button" onClick={stopSelection}>Abbrechen</button><button type="button" onClick={finishSelection}>Fertig</button></div>
-    </aside>}
     {moveCandidate && !reorderScope && <aside className="inline-mode-guide">
       <strong>Position wählen</strong>
       <p>Wähle einen roten Zielstrich. Mit ✓ oben bestätigst du die Position, mit × brichst du ab.</p>
@@ -3548,11 +3571,6 @@ function App() {
     {groupReorderId && !reorderScope && <aside className="inline-mode-guide">
       <strong>Gruppe: Reihenfolge ändern</strong>
       <p>Direkte Objekte und Untergruppen lassen sich mit den Pfeilen innerhalb dieser Gruppe anordnen.</p>
-    </aside>}
-    {sidebarSelectionKind && !selectionSourceKind && !singleMoveTarget && !bulkMoveMode && !reorderScope && <aside className="inline-mode-guide">
-      <strong>{sidebarSelectionKind === 'playlist' ? 'Playlists auswählen' : 'Tags auswählen'}</strong>
-      <p>Tippe Objekte an, um sie zur Auswahl hinzuzufügen oder wieder zu entfernen. Das ••• enthält Aktionen für die gesamte Auswahl.</p>
-      <button type="button" onClick={stopSidebarSelection}>Abbrechen</button>
     </aside>}
     {(layoutEditMode || layoutToolbarPositionEditMode) && <aside className="layout-edit-toolbar" style={{ left: layoutToolbarPosition.x, top: layoutToolbarPosition.y }}>
       <div className="layout-edit-toolbar-drag" onPointerDown={(event) => {
@@ -3694,13 +3712,21 @@ function App() {
 
     {tagChooserTarget && <div className="playlist-chooser-backdrop tag-chooser-backdrop"><section className="playlist-chooser tag-chooser" onClick={(event) => event.stopPropagation()}>
       <div className="dialog-actions"><button type="button" onClick={() => void closeTagChooser(false)}>Abbrechen</button><button type="button" onClick={() => void closeTagChooser(true)}>Fertig</button></div>
-      <div className="playlist-chooser-heading"><div><p className="eyebrow">TAGS</p><h2>{tagChooserTarget.kind === 'song' ? `${tagChooserTarget.ids.length} ${tagChooserTarget.ids.length === 1 ? 'Lied' : 'Lieder'}` : tagChooserTarget.kind === 'playlist' ? `${tagChooserTarget.ids.length} ${tagChooserTarget.ids.length === 1 ? 'Playlist' : 'Playlists'}` : `${tagChooserTarget.ids.length} ${tagChooserTarget.ids.length === 1 ? 'Gruppe' : 'Gruppen'}`} taggen</h2></div></div>
+      <div className="playlist-chooser-heading"><div><p className="eyebrow">TAGS</p><h2>{tagChooserHeading()}</h2></div></div>
       <div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Tags oder Gruppen suchen" /><button className={`search-group-toggle${searchIncludesGroups ? ' active' : ''}`} type="button" onClick={() => setSearchIncludesGroups((value) => !value)}>{searchIncludesGroups ? 'Gruppen ✓' : 'Gruppen'}</button></div>
       {renderChooserSortControls('tag')}
-      <div className="tag-chooser-list">{sortChooserObjects('tag', sidebarTags).filter((tag) => fuzzyMatch(tag.name, chooserSearch) || (searchIncludesGroups && itemMatchesGroupQuery(objectGroups, 'tag', tag.id, chooserSearch))).map((tag) => { const ids = tagChooserTarget.kind === 'song' ? tag.songIds : tagChooserTarget.kind === 'playlist' ? tag.playlistIds : (tag.groupIds ?? []); const all = tagChooserTarget.ids.every((id) => ids.includes(id)); const some = !all && tagChooserTarget.ids.some((id) => ids.includes(id)); return <button key={tag.id} type="button" onClick={() => void toggleTargetTag(tag)}><span><i className="tag-dot" style={{ background: tag.color }} /><b>{tag.name}</b></span><small>{tag.songIds.filter((id) => songs.some((song) => song.id === id)).length} Lieder</small><strong>{all ? '−' : some ? '±' : '+'}</strong></button> })}{!sidebarTags.length && <p className="tag-empty-hint">Erstelle zuerst links unter „Tags“ einen Tag.</p>}</div>
+      <div className="tag-chooser-list">{sortChooserObjects('tag', sidebarTags).filter((tag) => fuzzyMatch(tag.name, chooserSearch) || (searchIncludesGroups && itemMatchesGroupQuery(objectGroups, 'tag', tag.id, chooserSearch))).map((tag) => { const state = tagChooserAssignmentState(tag); return <button key={tag.id} type="button" onClick={() => void toggleTargetTag(tag)}><span><i className="tag-dot" style={{ background: tag.color }} /><b>{tag.name}</b></span><small>{tag.songIds.filter((id) => songs.some((song) => song.id === id)).length} Lieder</small><strong>{state.all ? '−' : state.some ? '±' : '+'}</strong></button> })}{!sidebarTags.length && <p className="tag-empty-hint">Erstelle zuerst links unter „Tags“ einen Tag.</p>}</div>
     </section></div>}
-    {groupSelectionKind && <div className="group-selection-dock" style={groupSelectionKind === 'song' ? { right: '18px' } : { left: '12px', maxWidth: `${Math.max(150, sidebarWidth - 24)}px` }}><strong>{groupSelectionKind === 'song' ? `${selectedGroupIds.size} ${selectedGroupIds.size === 1 ? 'Gruppe' : 'Gruppen'} · ${selectedSongIds.size} ${selectedSongIds.size === 1 ? 'Lied' : 'Lieder'}` : `${selectedGroupIds.size} ${selectedGroupIds.size === 1 ? 'Gruppe' : 'Gruppen'} ausgewählt`}</strong><button type="button" onClick={stopGroupSelection}>Abbrechen</button><div className="selection-more-wrap"><button className="selection-more-button" type="button" onClick={() => setGroupSelectionMenuOpen((value) => !value)}>•••</button>{groupSelectionMenuOpen && <><button className="selection-menu-shield" type="button" onClick={() => setGroupSelectionMenuOpen(false)} /><div className="selection-action-menu group-selection-action-menu"><button type="button" disabled={!selectedGroupIds.size} onClick={() => { setGroupSelectionMenuOpen(false); openTagChooser('group', [...selectedGroupIds]) }}>{groupSelectionKind === 'song' ? 'Gruppen taggen' : 'Tags'}</button>{groupSelectionKind === 'song' && <button type="button" disabled={!selectedSongIds.size} onClick={() => { setGroupSelectionMenuOpen(false); openTagChooser('song', [...selectedSongIds]) }}>Lieder taggen</button>}</div></>}</div></div>}
-    {sidebarSelectionKind && <div className="sidebar-selection-dock" style={{ left: '12px', right: 'auto', maxWidth: `${Math.max(126, sidebarWidth - 24)}px` }}><strong>{sidebarSelectionKind === 'playlist' ? selectedPlaylistIds.size : selectedTagIds.size} ausgewählt</strong><button type="button" onClick={stopSidebarSelection}>Abbrechen</button><div className="selection-more-wrap"><button className="selection-more-button" type="button" onClick={() => setSidebarSelectionMenuOpen((value) => !value)}>•••</button>{sidebarSelectionMenuOpen && <><button className="selection-menu-shield" type="button" onClick={() => setSidebarSelectionMenuOpen(false)} /><div className="selection-action-menu sidebar-selection-action-menu"><button type="button" disabled={(sidebarSelectionKind === 'playlist' ? selectedPlaylistIds.size : selectedTagIds.size) < 2} onClick={() => createObjectGroup(sidebarSelectionKind, [...(sidebarSelectionKind === 'playlist' ? selectedPlaylistIds : selectedTagIds)])}>Gruppieren</button><button type="button" disabled={!(sidebarSelectionKind === 'playlist' ? selectedPlaylistIds.size : selectedTagIds.size)} onClick={() => void copySelectedSidebarObjects()}>Kopieren</button>{sidebarSelectionKind === 'playlist' && <button type="button" disabled={!selectedPlaylistIds.size} onClick={() => openTagChooser('playlist', [...selectedPlaylistIds])}>Tags</button>}<button className="danger-menu-action" type="button" disabled={!(sidebarSelectionKind === 'playlist' ? selectedPlaylistIds.size : selectedTagIds.size)} onClick={() => { setSidebarSelectionMenuOpen(false); setSidebarSelectionConfirmation('delete') }}>Alle löschen</button></div></>}</div></div>}
+    {groupSelectionMoveContext && (() => {
+      const context = groupSelectionMoveContext
+      const key = context.parentGroupId ? groupContainerKey(context.kind, context.parentGroupId) : rootContainerKey(context.kind)
+      const base = containerBaseTokensFor(context.kind, context.parentGroupId)
+      const order = orderedTokensForContainer(key, base, true)
+      const selected = new Set(context.selectedTokens)
+      const remaining = order.filter((token) => !selected.has(token))
+      return <div className="modal-backdrop sidebar-move-backdrop"><div className="confirm-dialog sidebar-move-dialog" onClick={(event) => event.stopPropagation()}><h2>Auswahl bewegen</h2><p>Die markierten Gruppen und Objekte werden gemeinsam als Block auf dieser Ebene bewegt.</p><div className="sidebar-move-targets"><button type="button" onClick={() => void applyGroupSelectionMove(0)}>Ganz nach oben</button>{remaining.map((token, index) => <button type="button" key={token} onClick={() => void applyGroupSelectionMove(index)}>Vor „{selectionMoveTokenLabel(context.kind, token)}“</button>)}<button type="button" onClick={() => void applyGroupSelectionMove(remaining.length)}>Ganz nach unten</button></div><div className="dialog-actions"><button type="button" onClick={() => setGroupSelectionMoveContext(null)}>Fertig</button></div></div></div>
+    })()}
+    {groupSelectionConfirmation === 'delete' && groupSelectionKind && <div className="modal-backdrop" onClick={() => setGroupSelectionConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Gesamte Auswahl löschen?</h2><p>Ausgewählte Gruppen werden inklusive ihrer Untergruppen und enthaltenen Objekte in den Papierkorb verschoben. Zusätzlich ausgewählte einzelne Objekte werden ebenfalls gelöscht.</p><div className="dialog-actions"><button type="button" onClick={() => setGroupSelectionConfirmation(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void deleteGroupSelection()}>In Papierkorb</button></div></div></div>}
     {sidebarMoveKind && (() => { const source = sidebarMoveKind === 'playlist' ? sidebarPlaylists : sidebarTags; const selected = new Set(selectedSidebarIds(sidebarMoveKind)); const remaining = source.filter((item) => !selected.has(item.id)); const filteredRemaining = remaining.filter((item) => fuzzyMatch(item.name, chooserSearch)); return <div className="modal-backdrop sidebar-move-backdrop"><div className="confirm-dialog sidebar-move-dialog" onClick={(event) => event.stopPropagation()}><h2>{sidebarMoveKind === 'playlist' ? 'Playlists' : 'Tags'} bewegen</h2><p>Wähle weitere Zielpositionen. Der Modus endet erst mit „Abbrechen“.</p><div className="chooser-search"><input type="search" value={chooserSearch} onChange={(event) => setChooserSearch(event.target.value)} placeholder="Suchen" /></div><div className="sidebar-move-targets"><button type="button" onClick={() => void applySidebarSelectionMove(0)}>Ganz nach oben</button>{filteredRemaining.map((item) => <button type="button" key={item.id} onClick={() => void applySidebarSelectionMove(remaining.findIndex((candidate) => candidate.id === item.id))}>Vor „{item.name}“</button>)}<button type="button" onClick={() => void applySidebarSelectionMove(remaining.length)}>Ganz nach unten</button></div><div className="dialog-actions"><button type="button" onClick={() => setSidebarMoveKind(null)}>Abbrechen</button></div></div></div> })()}
     {sidebarSelectionConfirmation === 'switchManualMove' && sidebarSelectionKind && (() => { const kind: SortSaveKind = sidebarSelectionKind === 'playlist' ? 'playlist' : 'tag'; const saveName = activeSortSave(kind)?.name ?? 'Save'; return <div className="modal-backdrop" onClick={() => setSidebarSelectionConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Zu „{saveName}“ wechseln?</h2><p>Die Auswahl kann nur innerhalb einer gespeicherten {sidebarSelectionKind === 'playlist' ? 'Playlist-' : 'Tag-'}Reihenfolge bewegt werden.</p><div className="dialog-actions"><button type="button" onClick={() => setSidebarSelectionConfirmation(null)}>Nein</button><button type="button" onClick={() => { if (kind === 'playlist') setPlaylistSortMode('manual'); else setTagSortMode('manual'); setSidebarSelectionConfirmation(null); setSidebarMoveKind(sidebarSelectionKind) }}>Ja, wechseln</button></div></div></div> })()}
     {sidebarSelectionConfirmation === 'delete' && sidebarSelectionKind && <div className="modal-backdrop" onClick={() => setSidebarSelectionConfirmation(null)}><div className="confirm-dialog" onClick={(event) => event.stopPropagation()}><h2>Auswahl löschen?</h2><p>{selectedSidebarIds(sidebarSelectionKind).length} {sidebarSelectionKind === 'playlist' ? 'Playlists' : 'Tags'} werden in den Papierkorb verschoben.</p><div className="dialog-actions"><button type="button" onClick={() => setSidebarSelectionConfirmation(null)}>Abbrechen</button><button className="danger-button" type="button" onClick={() => void deleteSelectedSidebarObjects()}>In Papierkorb</button></div></div></div>}
