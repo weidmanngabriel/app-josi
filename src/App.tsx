@@ -2620,17 +2620,25 @@ function App() {
     if (!draft) return
     const id = crypto.randomUUID()
     const name = draft.name.trim() || 'Unbenannt'
+    const sourceGroupIds = [...new Set(draft.sourceGroupIds ?? [])]
+    const sourceGroupSet = new Set(sourceGroupIds)
+    const sourceItemSet = new Set(draft.sourceIds)
     const siblings = objectGroups.filter((group) => group.kind === draft.kind && (group.parentGroupId ?? null) === (draft.parentGroupId ?? null))
     const minOrder = Math.min(0, ...siblings.map((group) => group.sortOrder))
     const nextGroup: ObjectGroup = { id, kind: draft.kind, name, itemIds: [...draft.sourceIds], createdAt: Date.now(), sortOrder: minOrder - 1, sortMode: 'general', sortDirection: 'down', parentGroupId: draft.parentGroupId, afterItems: draft.parentGroupId ? false : undefined }
     recordHistory()
-    setObjectGroups((current) => [nextGroup, ...current.map((group) => draft.parentGroupId && group.id === draft.parentGroupId ? { ...group, itemIds: group.itemIds.filter((itemId) => !draft.sourceIds.includes(itemId)) } : group)])
+    setObjectGroups((current) => [nextGroup, ...current.map((group) => {
+      if (sourceGroupSet.has(group.id)) return { ...group, parentGroupId: id, afterItems: false }
+      if (draft.parentGroupId && group.id === draft.parentGroupId) return { ...group, itemIds: group.itemIds.filter((itemId) => !sourceItemSet.has(itemId)) }
+      return group
+    })])
     const key = draft.parentGroupId ? groupContainerKey(draft.kind, draft.parentGroupId) : rootContainerKey(draft.kind)
     const base = containerBaseTokensFor(draft.kind, draft.parentGroupId)
     const currentOrder = orderedTokensForContainer(key, base, containerManualMode(draft.kind, draft.parentGroupId))
-    const nextOrder = [groupToken(id), ...currentOrder.filter((token) => token !== groupToken(id))]
+    const sourceTokens = new Set([...draft.sourceIds.map(itemToken), ...sourceGroupIds.map(groupToken)])
+    const nextOrder = [groupToken(id), ...currentOrder.filter((token) => !sourceTokens.has(token) && token !== groupToken(id))]
     const manual = sortModeFor(draft.kind) === 'manual'
-    if (manual || draft.moveAfterCreate) {
+    if (manual || draft.moveAfterCreate || sourceGroupIds.length) {
       setMixedOrders((current) => ({ ...current, [key]: nextOrder }))
       const active = activeSortSave(draft.kind)
       if (active) setSortSaves((current) => current.map((save) => save.id === active.id ? { ...save, orders: { ...save.orders, [key]: nextOrder } } : save))
@@ -2640,7 +2648,8 @@ function App() {
       setSingleMoveTarget({ kind: 'group', id, parentGroupId: draft.parentGroupId, targetIndex: null })
       setMessage('Gruppe erstellt. Wähle einen roten Zielstrich für die Position.')
     } else setMessage(`Gruppe „${name}“ wurde erstellt.`)
-    if (draft.kind === 'song') stopSelection()
+    if (sourceGroupIds.length || groupSelectionKind === draft.kind) stopGroupSelection()
+    else if (draft.kind === 'song') stopSelection()
     else { setSidebarSelectionKind(null); setSelectedPlaylistIds(new Set()); setSelectedTagIds(new Set()); setSidebarSelectionMenuOpen(false) }
     setPendingGroupCreate(null)
     setGroupCreateMenuOpen(false)
